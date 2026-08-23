@@ -1,0 +1,10 @@
+▲ Next.js 16.3.1 (webpack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.7:3001
+✓ Ready in 307ms
+⚠ Attempted to load @next/swc-darwin-arm64, but an error occurred: dlopen(/Users/zemichaeltefera/Documents/ZEMU/ULS/NEW/PlayEthiopia/play-ethiopia/frontend/node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node, 0x0001): tried: '/Users/zemichaeltefera/Documents/ZEMU/ULS/NEW/PlayEthiopia/play-ethiopia/frontend/node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node' (segment '__TEXT' load command content extends beyond end of file), '/System/Volumes/Preboot/Cryptexes/OS/Users/zemichaeltefera/Documents/ZEMU/ULS/NEW/PlayEthiopia/play-ethiopia/frontend/node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node' (no such file), '/Users/zemichaeltefera/Documents/ZEMU/ULS/NEW/PlayEthiopia/play-ethiopia/frontend/node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node' (segment '__TEXT' load command content extends beyond end of file)
+✓ Running next.config.ts took 124ms
+  Skipping creating a lockfile at /Users/zemichaeltefera/Documents/ZEMU/ULS/NEW/PlayEthiopia/play-ethiopia/frontend/.next/dev/lock because we're using WASM bindings
+
+ GET / 200 in 2.9s (next.js: 2.7s, application-code: 144ms)
+[?25h

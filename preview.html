@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Play Ethiopia — Modern Frontend Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#030712;color:#f9fafb;overflow-x:hidden}
+.mesh{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(at 40% 20%,rgba(34,197,94,.12) 0px,transparent 50%),radial-gradient(at 80% 0%,rgba(234,179,8,.08) 0px,transparent 50%),radial-gradient(at 0% 50%,rgba(34,197,94,.08) 0px,transparent 50%);animation:m 15s ease-in-out infinite alternate}
+@keyframes m{0%{background-position:0% 0%}100%{background-position:100% 100%}}
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:4rem 1.5rem}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(34,197,94,.15),transparent 60%),radial-gradient(circle at 20% 80%,rgba(234,179,8,.1),transparent 50%)}
+.content{position:relative;z-index:1;max-width:900px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:999px;background:rgba(255,255,255,.05);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);margin-bottom:2rem;font-size:14px;color:#4ade80}
+.badge .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+h1{font-size:clamp(3rem,8vw,6rem);font-weight:800;line-height:.95;margin-bottom:1.5rem}
+h1 .green{background:linear-gradient(135deg,#22c55e,#eab308,#22c55e);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gs 3s ease infinite}
+@keyframes gs{0%{background-position:0% center}50%{background-position:100% center}100%{background-position:0% center}}
+p.sub{font-size:1.25rem;color:#9ca3af;max-width:600px;margin:0 auto 2.5rem;line-height:1.7}
+.btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.btn{padding:1rem 2rem;border-radius:12px;font-weight:700;font-size:1rem;cursor:pointer;transition:all .3s;border:none;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;box-shadow:0 8px 32px rgba(34,197,94,.3)}
+.btn.primary:hover{box-shadow:0 8px 48px rgba(34,197,94,.5);transform:translateY(-2px)}
+.btn.outline{background:transparent;color:#22c55e;border:2px solid #22c55e}
+.btn.outline:hover{background:#22c55e;color:#fff}
+.stats{display:flex;gap:3rem;justify-content:center;margin-top:4rem;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-val{font-size:2rem;font-weight:800;background:linear-gradient(135deg,#22c55e,#eab308);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-lbl{font-size:.85rem;color:#6b7280;margin-top:.25rem}
+
+/* Features */
+.section{padding:6rem 1.5rem;position:relative;z-index:1}
+.section-title{text-align:center;margin-bottom:4rem}
+.section-title .tag{color:#4ade80;font-size:.85rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.section-title h2{font-size:clamp(2rem,5vw,3rem);font-weight:800;margin-top:.75rem}
+.section-title h2 .green{background:linear-gradient(135deg,#22c55e,#eab308,#22c55e);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gs 3s ease infinite}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;max-width:1200px;margin:0 auto}
+.card{background:rgba(255,255,255,.03);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:1.25rem;padding:2rem;transition:all .5s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden}
+.card:hover{transform:translateY(-8px);border-color:rgba(34,197,94,.3);box-shadow:0 20px 60px rgba(34,197,94,.15)}
+.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(34,197,94,.05),transparent,rgba(234,179,8,.05));opacity:0;transition:opacity .5s}
+.card:hover::before{opacity:1}
+.card-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:1rem}
+.card-icon.green{background:rgba(34,197,94,.1)}
+.card-icon.yellow{background:rgba(234,179,8,.1)}
+.card h3{font-size:1.25rem;font-weight:700;margin-bottom:.5rem;position:relative;z-index:1}
+.card p{color:#9ca3af;line-height:1.7;position:relative;z-index:1}
+
+/* Tech Stack */
+.tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;max-width:800px;margin:0 auto}
+.tech{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:1.25rem;text-align:center;transition:all .3s}
+.tech:hover{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05)}
+.tech-name{font-weight:700;font-size:.9rem;margin-top:.5rem}
+.tech-desc{font-size:.75rem;color:#6b7280;margin-top:.25rem}
+
+/* File tree */
+.files{max-width:700px;margin:0 auto;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:2rem;font-family:'SF Mono',Menlo,monospace;font-size:.8rem;line-height:1.8;color:#9ca3af}
+.files .dir{color:#4ade80}
+.files .file{color:#e5e7eb}
+.files .ext{color:#eab308}
+.files .count{color:#6b7280}
+
+/* CTA */
+.cta{text-align:center;padding:6rem 1.5rem;position:relative;z-index:1}
+.cta-box{max-width:700px;margin:0 auto;padding:4rem;background:linear-gradient(135deg,rgba(34,197,94,.08),rgba(234,179,8,.05));border:1px solid rgba(255,255,255,.08);border-radius:2rem}
+.cta-box h2{font-size:clamp(2rem,5vw,3rem);font-weight:800;margin-bottom:1rem}
+.cta-box p{color:#9ca3af;font-size:1.1rem;margin-bottom:2rem}
+
+/* Footer */
+footer{border-top:1px solid rgba(255,255,255,.05);padding:3rem 1.5rem;text-align:center;color:#6b7280;font-size:.85rem;position:relative;z-index:1}
+
+/* Responsive */
+@media(max-width:640px){
+  .stats{gap:1.5rem}
+  .grid{grid-template-columns:1fr}
+  .tech-grid{grid-template-columns:repeat(3,1fr)}
+}
+
+/* 3D floating animation */
+.float{animation:float 6s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+</style>
+</head>
+<body>
+<div class="mesh"></div>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="content">
+    <div class="badge"><div class="dot"></div> Ethiopia's #1 Football Platform</div>
+    <h1>Play <span class="green">Ethiopia</span></h1>
+    <p class="sub">Book football fields, watch AI-powered match replays, and connect with every stadium in Ethiopia.</p>
+    <div class="btns">
+      <a href="#features" class="btn primary">📍 Find Stadiums</a>
+      <a href="#tech" class="btn outline">🏟️ Register Stadium</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val">50+</div><div class="stat-lbl">Stadiums</div></div>
+      <div class="stat"><div class="stat-val">10K+</div><div class="stat-lbl">Players</div></div>
+      <div class="stat"><div class="stat-val">5K+</div><div class="stat-lbl">Matches</div></div>
+      <div class="stat"><div class="stat-val">24/7</div><div class="stat-lbl">Live</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+  <div class="section-title">
+    <div class="tag">Features</div>
+    <h2>Everything You Need to <span class="green">Play</span></h2>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-icon green">📍</div>
+      <h3>Smart Discovery</h3>
+      <p>Find nearby stadiums with GPS-powered PostGIS proximity search. Real-time availability and pricing.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon yellow">📅</div>
+      <h3>Instant Booking</h3>
+      <p>Book your preferred time slot in seconds. Pay with Telebirr, Chapa, or card. Exclusion constraints prevent double-booking.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon green">🎥</div>
+      <h3>AI Match Replays</h3>
+      <p>Watch full matches or AI-generated highlights. Camera systems on every ULS-verified stadium.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon yellow">🛡️</div>
+      <h3>ULS Verified</h3>
+      <p>Look for the ULS badge. Guaranteed quality, security, and modern facilities across Ethiopia.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon green">🌐</div>
+      <h3>Stadium Microsites</h3>
+      <p>Every registered stadium gets its own branded website with headless CMS, analytics, and ad management.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon yellow">📱</div>
+      <h3>Mobile First</h3>
+      <p>Book, pay, and watch from anywhere. Responsive design optimized for every device and connection speed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="section" id="tech">
+  <div class="section-title">
+    <div class="tag">Technology</div>
+    <h2>Built for <span class="green">Scale</span></h2>
+  </div>
+  <div class="tech-grid">
+    <div class="tech"><div style="font-size:1.5rem">⚡</div><div class="tech-name">Go + Echo</div><div class="tech-desc">High-performance API</div></div>
+    <div class="tech"><div style="font-size:1.5rem">🐘</div><div class="tech-name">PostgreSQL</div><div class="tech-desc">+ PostGIS spatial</div></div>
+    <div class="tech"><div style="font-size:1.5rem">🔴</div><div class="tech-name">Redis</div><div class="tech-desc">Caching & rate limit</div></div>
+    <div class="tech"><div style="font-size:1.5rem">⚛️</div><div class="tech-name">Next.js 16</div><div class="tech-desc">React + TypeScript</div></div>
+    <div class="tech"><div style="font-size:1.5rem">🎨</div><div class="tech-name">Three.js</div><div class="tech-desc">3D stadium views</div></div>
+    <div class="tech"><div style="font-size:1.5rem">✨</div><div class="tech-name">Framer Motion</div><div class="tech-desc">Smooth animations</div></div>
+    <div class="tech"><div style="font-size:1.5rem">🎭</div><div class="tech-name">Tailwind CSS</div><div class="tech-desc">Utility-first styling</div></div>
+    <div class="tech"><div style="font-size:1.5rem">🐳</div><div class="tech-name">Docker</div><div class="tech-desc">Containerized deploy</div></div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section">
+  <div class="section-title">
+    <div class="tag">Architecture</div>
+    <h2>Clean <span class="green">Architecture</span></h2>
+  </div>
+  <div class="files">
+    <div><span class="dir">play-ethiopia/</span></div>
+    <div>&nbsp;&nbsp;├── <span class="dir">frontend/</span> <span class="count">← Next.js 16 + Three.js + Framer Motion</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">src/app/</span> <span class="count">← App Router pages</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">page.tsx</span> <span class="count">← 3D hero + particle field</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">auth/login/</span> <span class="count">← Glassmorphism OTP flow</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">stadiums/</span> <span class="count">← Search + filters</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="file">stadiums/[slug]/</span> <span class="count">← Microsite</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">components/three/</span> <span class="count">← 3D scenes</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="ext">ParticleField.tsx</span> <span class="count">← Football wireframe + particles</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="ext">Scene3D.tsx</span> <span class="count">← 3D stadium model</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">components/ui/</span> <span class="count">← Reusable UI</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="ext">GlassCard.tsx</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="ext">MagneticButton.tsx</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="ext">AnimatedSection.tsx</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="dir">components/microsite/</span> <span class="count">← Stadium microsite</span></div>
+    <div>&nbsp;&nbsp;├── <span class="dir">backend/</span> <span class="count">← Go + Echo + Clean Architecture</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">cmd/server/</span> <span class="count">← Entry point</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">internal/</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">config/</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">domain/</span> <span class="count">← Entities + repository interfaces</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">usecase/</span> <span class="count">← Business logic</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="dir">delivery/http/</span> <span class="count">← Handlers + middleware</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="dir">infrastructure/</span> <span class="count">← Postgres + Redis + Chapa</span></div>
+    <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="dir">migrations/</span> <span class="count">← 45 tables, 51 RLS policies</span></div>
+    <div>&nbsp;&nbsp;└── <span class="dir">docker-compose.yml</span> <span class="count">← PG+PostGIS, Redis, MinIO, Nginx</span></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-box">
+    <h2>Ready to <span class="green">Play</span>?</h2>
+    <p>Join thousands of players and stadium owners across Ethiopia.</p>
+    <div class="btns">
+      <button class="btn primary">⚡ Sign Up Free</button>
+      <button class="btn outline">📍 Browse Stadiums</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>© 2026 Play Ethiopia. All rights reserved. Built with ⚡ Go + ⚛️ Next.js + 🎨 Three.js</p>
+</footer>
+
+<script>
+// Intersection Observer for fade-in
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.style.opacity = '1';
+      e.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.card, .tech, .stat, .files, .cta-box').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(30px)';
+  el.style.transition = 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+  observer.observe(el);
+});
+
+// Stagger
+document.querySelectorAll('.card').forEach((el, i) => {
+  el.style.transitionDelay = `${i * 0.1}s`;
+});
+document.querySelectorAll('.tech').forEach((el, i) => {
+  el.style.transitionDelay = `${i * 0.05}s`;
+});
+</script>
+</body>
+</html>
