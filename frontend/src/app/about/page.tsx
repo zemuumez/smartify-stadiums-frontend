@@ -17,7 +17,7 @@ export default function AboutPage() {
               Building Ethiopia&apos;s<br /><span className="gradient-text">Football Future</span>
             </h1>
             <p className="text-xl text-slate-300 max-w-2xl leading-relaxed">
-              Play Ethiopia is on a mission to digitize and elevate football infrastructure across the nation.
+              ET Smart Fields is on a mission to digitize and elevate football infrastructure across the nation.
               We connect players, stadiums, and technology in one seamless platform.
             </p>
           </motion.div>
@@ -38,7 +38,7 @@ export default function AboutPage() {
                 and the ability to relive their best moments through technology.
               </p>
               <p className="text-slate-500 leading-relaxed">
-                Founded in Addis Ababa, Play Ethiopia is the first integrated football infrastructure
+                Founded in Addis Ababa, ET Smart Fields is the first integrated football infrastructure
                 platform in the country. We provide stadiums with modern booking systems, AI-powered
                 camera technology, and professional microsites — all under one roof.
               </p>
@@ -91,7 +91,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">Our Team</span>
-            <h2 className="text-4xl font-black text-slate-900 mt-4">The People Behind Play Ethiopia</h2>
+            <h2 className="text-4xl font-black text-slate-900 mt-4">The People Behind ET Smart Fields</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[

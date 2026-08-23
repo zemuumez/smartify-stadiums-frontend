@@ -1,7 +1,7 @@
 {
-  "name": "Play Ethiopia - Football Infrastructure Platform",
+  "name": "ET Smart Fields - Football Infrastructure Platform",
   "short_name": "PlayEth",
-  "description": "Book football fields, watch match replays, and follow your favorite stadiums in Ethiopia",
+  "description": "Book football fields, watch match replays, and connect with smart stadiums across Ethiopia",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030712",

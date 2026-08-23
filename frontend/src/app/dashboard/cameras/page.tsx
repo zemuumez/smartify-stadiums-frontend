@@ -61,7 +61,7 @@ export default function CamerasPage() {
           status: "active",
           certification_passed: true,
           last_heartbeat: new Date(Date.now() - 30000).toISOString(),
-          stream_url: "rtmp://stream.playethiopia.com/live/cam_001",
+          stream_url: "rtmp://stream.etsmartfields.com/live/cam_001",
           storage_used_gb: 128,
           storage_limit_gb: 500,
           uptime_percent: 99.2,

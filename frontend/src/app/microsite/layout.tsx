@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Home, Info, Phone, Wrench, Trophy, Grid3X3, Play, Shield } from "lucide-react";
+import { Menu, X, Home, Info, Phone, Wrench, Grid3X3, Play, Shield, MapPin, Calendar } from "lucide-react";
+import { useStadium } from "@/lib/sanity/hooks";
 
 const DEMO_STADIUM = {
   name: "Bambis Meda Stadium",
@@ -13,18 +14,26 @@ const DEMO_STADIUM = {
   primary_color: "#16a34a",
 };
 
-const navLinks = [
-  { href: "/microsite", label: "Home", icon: <Home size={18} /> },
-  { href: "/microsite/about", label: "About", icon: <Info size={18} /> },
-  { href: "/microsite/fields", label: "Fields", icon: <Grid3X3 size={18} /> },
-  { href: "/microsite/matches", label: "Matches", icon: <Play size={18} /> },
-  { href: "/microsite/services", label: "Services", icon: <Wrench size={18} /> },
-  { href: "/microsite/contact", label: "Contact", icon: <Phone size={18} /> },
-];
-
 export default function MicrositeLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { stadium } = useStadium(DEMO_STADIUM.slug);
+
+  // Use CMS data if available, fallback to demo
+  const stadiumName = stadium?.name || DEMO_STADIUM.name;
+  const stadiumCity = stadium?.city || DEMO_STADIUM.city;
+  const primaryColor = stadium?.primaryColor || DEMO_STADIUM.primary_color;
+  const isVerified = stadium?.isVerified ?? true;
+  const openingHours = stadium?.openingHours || "Mon-Sun: 6:00 AM - 10:00 PM";
+
+  const navLinks = [
+    { href: "/microsite", label: "Home", icon: <Home size={18} /> },
+    { href: "/microsite/about", label: "About", icon: <Info size={18} /> },
+    { href: "/microsite/fields", label: "Fields", icon: <Grid3X3 size={18} /> },
+    { href: "/microsite/matches", label: "Matches", icon: <Play size={18} /> },
+    { href: "/microsite/services", label: "Services", icon: <Wrench size={18} /> },
+    { href: "/microsite/contact", label: "Contact", icon: <Phone size={18} /> },
+  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -33,14 +42,14 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/microsite" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-lg" style={{ backgroundColor: DEMO_STADIUM.primary_color }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-lg" style={{ backgroundColor: primaryColor }}>
                 🏟️
               </div>
               <div>
-                <h1 className="text-base font-bold text-slate-900 leading-tight">{DEMO_STADIUM.name}</h1>
+                <h1 className="text-base font-bold text-slate-900 leading-tight">{stadiumName}</h1>
                 <p className="text-xs text-slate-500 flex items-center gap-1">
-                  <Shield size={10} className="text-green-600" />
-                  Powered by Play Ethiopia
+                  {isVerified && <Shield size={10} className="text-green-600" />}
+                  Powered by ET Smart Fields
                 </p>
               </div>
             </Link>
@@ -97,9 +106,9 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-bold text-lg mb-3">{DEMO_STADIUM.name}</h3>
-              <p className="text-slate-400 text-sm">{DEMO_STADIUM.city}, Ethiopia</p>
-              <p className="text-slate-400 text-sm mt-1 flex items-center gap-1"><Shield size={12} className="text-green-400" /> ULS Verified Stadium</p>
+              <h3 className="font-bold text-lg mb-3">{stadiumName}</h3>
+              <p className="text-slate-400 text-sm flex items-center gap-1"><MapPin size={12} /> {stadiumCity}, Ethiopia</p>
+              {isVerified && <p className="text-slate-400 text-sm mt-1 flex items-center gap-1"><Shield size={12} className="text-green-400" /> ULS Verified Stadium</p>}
             </div>
             <div>
               <h4 className="font-bold mb-3 text-sm uppercase tracking-wider text-slate-400">Quick Links</h4>
@@ -111,11 +120,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             </div>
             <div>
               <h4 className="font-bold mb-3 text-sm uppercase tracking-wider text-slate-400">Opening Hours</h4>
-              <div className="space-y-1 text-sm text-slate-300">
-                <p>Mon-Fri: 6:00 AM - 10:00 PM</p>
-                <p>Saturday: 6:00 AM - 11:00 PM</p>
-                <p>Sunday: 6:00 AM - 10:00 PM</p>
-              </div>
+              <p className="text-sm text-slate-300">{openingHours}</p>
             </div>
             <div>
               <h4 className="font-bold mb-3 text-sm uppercase tracking-wider text-slate-400">Book a Field</h4>
@@ -126,8 +131,8 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-slate-500">© 2026 {DEMO_STADIUM.name}. All rights reserved.</p>
-            <p className="text-sm text-slate-500 flex items-center gap-1">Powered by <span className="text-green-400 font-bold">Play Ethiopia</span></p>
+            <p className="text-sm text-slate-500">© 2026 {stadiumName}. All rights reserved.</p>
+            <p className="text-sm text-slate-500 flex items-center gap-1">Powered by <span className="text-green-400 font-bold">ET Smart Fields</span></p>
           </div>
         </div>
       </footer>

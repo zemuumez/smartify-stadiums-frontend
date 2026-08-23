@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-3">5. Your Rights</h2>
-            <p className="text-slate-600 leading-relaxed">You can access, update, or delete your account data at any time. Contact us at privacy@playethiopia.com for any data-related requests.</p>
+            <p className="text-slate-600 leading-relaxed">You can access, update, or delete your account data at any time. Contact us at privacy@etsmartfields.com for any data-related requests.</p>
           </div>
         </div>
         <p className="text-sm text-slate-400 mt-12">Last updated: August 2026</p>

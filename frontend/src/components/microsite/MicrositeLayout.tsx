@@ -127,7 +127,7 @@ export function MicrositeLayout({ stadium, children }: MicrositeLayoutProps) {
               </div>
               <p className="text-xs text-gray-500">
                 ULS Verified Stadium<br />
-                Powered by Play Ethiopia Platform
+                Powered by ET Smart Fields Platform
               </p>
             </div>
           </div>

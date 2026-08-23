@@ -30,7 +30,7 @@ export default function MicrositePage() {
     primaryColor: "#22c55e",
     accentColor: "#eab308",
     phone: "+251 911 234 567",
-    email: "info@bambismeda.playethiopia.com",
+    email: "info@bambismeda.etsmartfields.com",
     whatsapp: "+251 911 234 567",
     address: "Bole Road, Addis Ababa",
     socialLinks: {
@@ -112,7 +112,7 @@ export default function MicrositePage() {
                 <div>
                   <label className="block text-sm text-gray-300 mb-1.5">URL Slug</label>
                   <div className="flex items-center">
-                    <span className="text-gray-500 text-sm mr-1">playethiopia.com/</span>
+                    <span className="text-gray-500 text-sm mr-1">etsmartfields.com/</span>
                     <input
                       type="text"
                       value={site.slug}

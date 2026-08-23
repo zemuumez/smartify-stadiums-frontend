@@ -76,8 +76,8 @@ export default function DashboardLayout({
                 exit={{ opacity: 0, width: 0 }}
                 className="overflow-hidden whitespace-nowrap"
               >
-                <span className="text-lg font-bold text-white">Play</span>
-                <span className="text-lg font-bold text-yellow-400 ml-1">ETH</span>
+                <span className="text-lg font-bold text-white">ET</span>
+                <span className="text-lg font-bold text-green-400 ml-1">Smart Fields</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -179,8 +179,8 @@ export default function DashboardLayout({
                     <span className="text-white text-xl">⚽</span>
                   </div>
                   <div>
-                    <span className="text-lg font-bold text-white">Play</span>
-                    <span className="text-lg font-bold text-yellow-400 ml-1">ETH</span>
+                    <span className="text-lg font-bold text-white">ET</span>
+                    <span className="text-lg font-bold text-green-400 ml-1">Smart Fields</span>
                   </div>
                 </div>
                 <button onClick={() => setMobileOpen(false)} className="text-gray-400 hover:text-white">

@@ -5,20 +5,20 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 
 export const metadata: Metadata = {
-  title: "Play Ethiopia - Football Infrastructure Platform",
-  description: "Book football fields, watch match replays, and follow your favorite stadiums in Ethiopia",
-  keywords: ["football", "ethiopia", "booking", "stadium", "sports", "replay"],
+  title: "ET Smart Fields - Smart Football Infrastructure",
+  description: "Book football fields, watch match replays, and connect with smart stadiums across Ethiopia",
+  keywords: ["football", "ethiopia", "booking", "stadium", "sports", "replay", "smart fields"],
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "PlayEth",
+    title: "ETSF",
   },
   openGraph: {
-    title: "Play Ethiopia",
-    description: "Ethiopia's #1 Football Infrastructure Platform",
+    title: "ET Smart Fields",
+    description: "Ethiopia's #1 Smart Football Infrastructure Platform",
     type: "website",
     locale: "en_US",
-    siteName: "Play Ethiopia",
+    siteName: "ET Smart Fields",
   },
 };
 

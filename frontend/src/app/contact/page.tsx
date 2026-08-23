@@ -31,7 +31,7 @@ export default function ContactPage() {
             {/* Contact Info */}
             <div className="space-y-8">
               {[
-                { icon: <Mail className="text-green-600" size={24} />, title: "Email", value: "hello@playethiopia.com", desc: "We respond within 24 hours" },
+                { icon: <Mail className="text-green-600" size={24} />, title: "Email", value: "hello@etsmartfields.com", desc: "We respond within 24 hours" },
                 { icon: <Phone className="text-green-600" size={24} />, title: "Phone", value: "+251 911 123 456", desc: "Mon-Fri, 9AM-6PM EAT" },
                 { icon: <MapPin className="text-green-600" size={24} />, title: "Office", value: "Bole, Addis Ababa", desc: "Ethiopia" },
               ].map((item) => (

@@ -49,8 +49,8 @@ export function Header() {
                 <span className="text-white text-lg">⚽</span>
               </motion.div>
               <div className="flex items-baseline">
-                <span className="text-lg font-bold text-slate-900">Play</span>
-                <span className="text-lg font-bold text-green-600 ml-0.5">Ethiopia</span>
+                <span className="text-lg font-bold text-slate-900">ET</span>
+                <span className="text-lg font-bold text-green-600 ml-0.5">Smart Fields</span>
               </div>
             </Link>
 

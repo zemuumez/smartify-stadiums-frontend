@@ -293,7 +293,7 @@ export default function OwnerRegisterPage() {
                   <div>
                     <label className="block text-sm text-gray-300 mb-1.5">Your URL slug</label>
                     <div className="flex items-center">
-                      <span className="text-gray-500 text-xs mr-1">playethiopia.com/</span>
+                      <span className="text-gray-500 text-xs mr-1">etsmartfields.com/</span>
                       <input type="text" value={stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")} readOnly
                         className="flex-1 px-3 py-3 rounded-xl bg-white/5 border border-white/10 text-green-400 font-mono text-sm" />
                     </div>
@@ -463,7 +463,7 @@ export default function OwnerRegisterPage() {
                   </div>
 
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300">
-                    💡 <strong>RTMP URL:</strong> <code className="font-mono text-xs">rtmp://stream.playethiopia.com/live</code> — Enter this in your camera&apos;s streaming settings along with the stream key above.
+                    💡 <strong>RTMP URL:</strong> <code className="font-mono text-xs">rtmp://stream.etsmartfields.com/live</code> — Enter this in your camera&apos;s streaming settings along with the stream key above.
                   </div>
                 </div>
 
@@ -663,7 +663,7 @@ export default function OwnerRegisterPage() {
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
                   <Globe size={16} className="text-green-400" />
                   <code className="text-green-400 font-mono text-sm flex-1">
-                    playethiopia.com/{stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}
+                    etsmartfields.com/{stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}
                   </code>
                   <ExternalLink size={14} className="text-green-400" />
                 </div>

@@ -60,8 +60,8 @@ export default function HomePage() {
               transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
               className="text-5xl sm:text-6xl lg:text-8xl font-black leading-[0.9] mb-8"
             >
-              <span className="block text-white">Play</span>
-              <span className="block gradient-text">Ethiopia</span>
+              <span className="block text-white">ET</span>
+              <span className="block gradient-text">Smart Fields</span>
             </motion.h1>
 
             <motion.p
@@ -351,13 +351,13 @@ export default function HomePage() {
                 Transform Your <span className="gradient-text">Stadium</span>
               </h2>
               <p className="text-slate-500 text-lg mb-8 leading-relaxed">
-                Join Play Ethiopia and give your stadium its own branded microsite. Manage bookings,
+                Join ET Smart Fields and give your stadium its own branded microsite. Manage bookings,
                 showcase match replays, and attract more players with modern technology.
               </p>
 
               <div className="grid sm:grid-cols-2 gap-4 mb-8">
                 {[
-                  { icon: <Globe size={20} />, title: "Your Microsite", desc: "stadium.playethiopia.com" },
+                  { icon: <Globe size={20} />, title: "Your Microsite", desc: "stadium.etsmartfields.com" },
                   { icon: <Camera size={20} />, title: "Camera System", desc: "AI-powered recording" },
                   { icon: <TrendingUp size={20} />, title: "Analytics", desc: "Player insights" },
                   { icon: <Users size={20} />, title: "Community", desc: "Build your audience" },
@@ -510,13 +510,13 @@ export default function HomePage() {
               {
                 name: "Abebe Kebede",
                 role: "Football Player",
-                text: "Play Ethiopia changed how we book fields. No more calling around — just open the app and book in seconds. The match replays are incredible!",
+                text: "ET Smart Fields changed how we book fields. No more calling around — just open the app and book in seconds. The match replays are incredible!",
                 rating: 5,
               },
               {
                 name: "Fatima Hassan",
                 role: "Stadium Owner",
-                text: "Since joining Play Ethiopia, our bookings increased 40%. The microsite looks professional and our players love being able to watch their matches online.",
+                text: "Since joining ET Smart Fields, our bookings increased 40%. The microsite looks professional and our players love being able to watch their matches online.",
                 rating: 5,
               },
               {
@@ -592,8 +592,8 @@ export default function HomePage() {
                   <span className="text-white text-lg">⚽</span>
                 </div>
                 <div className="flex items-baseline">
-                  <span className="text-lg font-bold text-slate-900">Play</span>
-                  <span className="text-lg font-bold text-green-600 ml-0.5">Ethiopia</span>
+                  <span className="text-lg font-bold text-slate-900">ET</span>
+                  <span className="text-lg font-bold text-green-600 ml-0.5">Smart Fields</span>
                 </div>
               </div>
               <p className="text-slate-500 text-sm leading-relaxed">
@@ -627,7 +627,7 @@ export default function HomePage() {
           </div>
           <div className="section-divider mb-8" />
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-slate-400 text-sm">© 2026 Play Ethiopia. All rights reserved.</p>
+            <p className="text-slate-400 text-sm">© 2026 ET Smart Fields. All rights reserved.</p>
             <div className="flex gap-6 text-sm text-slate-400">
               <Link href="/privacy" className="hover:text-green-600 transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-green-600 transition-colors">Terms</Link>

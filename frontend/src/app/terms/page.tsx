@@ -8,7 +8,7 @@ export default function TermsPage() {
         <div className="prose prose-slate max-w-none space-y-8">
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-3">1. Acceptance of Terms</h2>
-            <p className="text-slate-600 leading-relaxed">By using Play Ethiopia, you agree to these terms. If you are a stadium owner, additional terms apply to your subscription and microsite.</p>
+            <p className="text-slate-600 leading-relaxed">By using ET Smart Fields, you agree to these terms. If you are a stadium owner, additional terms apply to your subscription and microsite.</p>
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-3">2. Booking & Payments</h2>
@@ -24,7 +24,7 @@ export default function TermsPage() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-3">5. Limitation of Liability</h2>
-            <p className="text-slate-600 leading-relaxed">Play Ethiopia facilitates bookings between players and stadiums. We are not liable for injuries, facility conditions, or disputes between parties.</p>
+            <p className="text-slate-600 leading-relaxed">ET Smart Fields facilitates bookings between players and stadiums. We are not liable for injuries, facility conditions, or disputes between parties.</p>
           </div>
         </div>
         <p className="text-sm text-slate-400 mt-12">Last updated: August 2026</p>
