@@ -26,7 +26,7 @@ export function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-      <div className="bg-white/95 backdrop-blur-xl border-t border-slate-200/80 safe-bottom">
+      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/10 safe-bottom transition-colors">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -41,15 +41,15 @@ export function MobileNav() {
                 {active && (
                   <motion.div
                     layoutId="mobile-nav-active"
-                    className="absolute -top-1 w-8 h-1 bg-green-600 rounded-full"
+                    className="absolute -top-1 w-8 h-1 bg-green-600 dark:bg-green-400 rounded-full"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
                 <Icon
                   size={20}
-                  className={`transition-colors ${active ? "text-green-600" : "text-slate-400"}`}
+                  className={`transition-colors ${active ? "text-green-600 dark:text-green-400" : "text-slate-400 dark:text-slate-500"}`}
                 />
-                <span className={`text-[10px] font-medium transition-colors ${active ? "text-green-600" : "text-slate-400"}`}>
+                <span className={`text-[10px] font-medium transition-colors ${active ? "text-green-600 dark:text-green-400" : "text-slate-400 dark:text-slate-500"}`}>
                   {item.label}
                 </span>
               </Link>

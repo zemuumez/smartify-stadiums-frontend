@@ -15,6 +15,7 @@
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
+/* Light mode defaults */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
@@ -31,6 +32,12 @@ body {
   backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
 }
 
 /* Glass - dark (for hero/sections) */
@@ -56,15 +63,30 @@ body {
     radial-gradient(at 0% 50%, rgba(22, 163, 74, 0.04) 0px, transparent 50%);
 }
 
+.dark .mesh-gradient {
+  background:
+    radial-gradient(at 40% 20%, rgba(22, 163, 74, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(202, 138, 4, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(22, 163, 74, 0.1) 0px, transparent 50%);
+}
+
 /* Section divider */
 .section-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(22, 163, 74, 0.15), transparent);
 }
 
+.dark .section-divider {
+  background: linear-gradient(90deg, transparent, rgba(22, 163, 74, 0.3), transparent);
+}
+
 /* Glow */
 .glow-green {
   box-shadow: 0 0 30px rgba(22, 163, 74, 0.12);
+}
+
+.dark .glow-green {
+  box-shadow: 0 0 30px rgba(22, 163, 74, 0.25);
 }
 
 /* Floating */
@@ -89,11 +111,16 @@ body {
   box-shadow: 0 25px 50px -12px rgba(22, 163, 74, 0.12);
 }
 
+.dark .card-hover:hover {
+  box-shadow: 0 25px 50px -12px rgba(22, 163, 74, 0.25);
+}
+
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
 
 /* Selection */
 ::selection { background: rgba(22, 163, 74, 0.15); color: #0f172a; }
+.dark ::selection { background: rgba(22, 163, 74, 0.3); color: #f8fafc; }
 
 /* Focus */
 *:focus-visible { outline: 2px solid #16a34a; outline-offset: 2px; }
@@ -107,7 +134,25 @@ html { scroll-behavior: smooth; }
 .table-scroll::-webkit-scrollbar { display: none; }
 
 /* Microsite hero */
-.microsite-hero { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+.microsite-hero { 
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); 
+}
+
+.dark .microsite-hero { 
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+}
+
+/* Theme transition for smooth switching */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0ms;
+}
+
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition-duration: 300ms !important;
+}
 
 @media (max-width: 1023px) {
   input, textarea, select { font-size: 16px !important; }
