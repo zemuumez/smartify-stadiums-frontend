@@ -1,120 +1,284 @@
 "use client";
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import Image from "next/image";
+import { motion } from "framer-motion";
 import {
-  MapPin, Video, Calendar, Shield, ChevronRight, Play, Star,
-  Zap, Globe, Smartphone, TrendingUp, Users, ArrowRight,
-  Camera, Award, Clock, CheckCircle2, ChevronDown, ArrowUpRight
+  MapPin, Star, ArrowUpRight, ArrowRight, ArrowLeft,
+  CheckCircle2, ChevronDown, Play, Shield, Camera,
+  TrendingUp, Users, Globe, Zap, Video, Calendar,
+  Smartphone, Award
 } from "lucide-react";
-import { GlassCard, GlowCard } from "@/components/ui/GlassCard";
 import { FadeUp, SlideIn, ScaleIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
-import { MagneticButton } from "@/components/ui/MagneticButton";
 
 const ParticleField = lazy(() => import("@/components/three/ParticleField"));
-const Scene3D = lazy(() => import("@/components/three/Scene3D"));
 
 function ThreeFallback() {
-  return <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />;
+  return <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #0d2b1d 0%, #1a4731 60%, #0a1a10 100%)" }} />;
 }
 
+/* ─────────────────────────────────────────────
+   Sport category data
+───────────────────────────────────────────── */
+const sports = [
+  { id: "football",   emoji: "⚽", label: "Football" },
+  { id: "basketball", emoji: "🏀", label: "Basketball" },
+  { id: "volleyball", emoji: "🏐", label: "Volleyball" },
+  { id: "badminton",  emoji: "🏸", label: "Badminton" },
+  { id: "tennis",     emoji: "🎾", label: "Tennis" },
+  { id: "futsal",     emoji: "⚽", label: "Futsal" },
+];
+
+/* ─────────────────────────────────────────────
+   Venue card data
+───────────────────────────────────────────── */
+const venues = [
+  {
+    id: 1,
+    location: "Bole, Addis Ababa",
+    name: "Bambis Meda Stadium",
+    desc: "A premium football facility in the heart of Bole, Addis Ababa",
+    rating: 4.8,
+    reviews: 212,
+    sport: "Football",
+    image: "/venue-card-1.jpg",
+  },
+  {
+    id: 2,
+    location: "Kirkos, Addis Ababa",
+    name: "Unity Sports Complex",
+    desc: "Multi-sport complex with basketball, volleyball and indoor courts",
+    rating: 4.6,
+    reviews: 134,
+    sport: "Basketball",
+    image: "/venue-card-2.jpg",
+  },
+  {
+    id: 3,
+    location: "Lideta, Addis Ababa",
+    name: "Lideta Futsal Arena",
+    desc: "Ethiopia's premier indoor futsal facility with AI camera system",
+    rating: 4.9,
+    reviews: 89,
+    sport: "Futsal",
+    image: "/venue-card-1.jpg",
+  },
+];
+
+/* ─────────────────────────────────────────────
+   Testimonials
+───────────────────────────────────────────── */
+const testimonials = [
+  {
+    name: "Abebe Kebede",
+    role: "Football Player",
+    venue: "Bambis Meda Stadium",
+    text: "Booking our regular slot used to mean making three confusing calls. Now it's done in 30 seconds. The instant confirmation feature is a lifesaver for busy team captains.",
+    rating: 5.0,
+    image: "/testimonial-venue.jpg",
+  },
+  {
+    name: "Fatima Hassan",
+    role: "Stadium Owner",
+    venue: "Unity Sports Complex",
+    text: "Since joining ET Smart Fields, our bookings increased 40%. The microsite looks professional and our players love being able to watch their match replays online.",
+    rating: 5.0,
+    image: "/venue-card-2.jpg",
+  },
+  {
+    name: "Daniel Tadesse",
+    role: "Team Captain",
+    venue: "Lideta Futsal Arena",
+    text: "The AI highlights are incredible. We can share our best goals on social media directly from the platform. It feels like having a professional broadcast team.",
+    rating: 5.0,
+    image: "/venue-card-1.jpg",
+  },
+];
+
+/* ─────────────────────────────────────────────
+   Main Component
+───────────────────────────────────────────── */
 export default function HomePage() {
-  const { scrollYProgress } = useScroll();
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
+  const [activeSport, setActiveSport] = useState("football");
+  const [activeVenue, setActiveVenue] = useState(0);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Hero Section with 3D - Dark */}
-      <motion.section
-        style={{ opacity: heroOpacity, scale: heroScale }}
-        className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
-      >
-        {/* 3D Background */}
+    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
+
+      {/* ══════════════════════════════════════════
+          SECTION 1 — HERO (Full-Bleed Photo)
+          ══════════════════════════════════════════ */}
+      <section className="relative min-h-screen flex flex-col overflow-hidden">
+
+        {/* Background photo */}
+        <div className="absolute inset-0">
+          <Image
+            src="/hero-sports-field.jpg"
+            alt="Ethiopian football stadium aerial view at golden hour"
+            fill
+            className="object-cover object-center"
+            priority
+            quality={90}
+          />
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 photo-overlay-hero" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
+        </div>
+
+        {/* 3D Particle overlay (low opacity) */}
         <Suspense fallback={<ThreeFallback />}>
-          <ParticleField className="opacity-40" />
+          <ParticleField className="opacity-20" />
         </Suspense>
 
-        {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-transparent to-slate-900/80" />
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-
         {/* Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <div className="max-w-4xl">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-dark mb-8">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-sm text-green-300 font-medium">Ethiopia&apos;s #1 Football Platform</span>
+        <div className="relative z-10 flex-1 flex items-center">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 lg:py-40">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+              {/* Left — Text */}
+              <div className="max-w-xl">
+                {/* Trust badge */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                  className="mb-6"
+                >
+                  <span className="trust-badge">
+                    <MapPin size={12} className="text-[#74c69d]" />
+                    Trusted Across Ethiopia 🇪🇹
+                  </span>
+                </motion.div>
+
+                {/* Headline */}
+                <motion.h1
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-white font-black leading-[1.02] mb-6"
+                  style={{ fontSize: "clamp(2.6rem, 6vw, 4.5rem)", letterSpacing: "-0.025em" }}
+                >
+                  Book Ethiopia&apos;s
+                  <br />
+                  <span style={{ color: "#74c69d" }}>Smart Sports</span>
+                  <br />
+                  Fields
+                </motion.h1>
+
+                {/* Sub-copy */}
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-white/75 text-lg leading-relaxed mb-10 max-w-md"
+                >
+                  Find, reserve, and pay for your favorite fields across Ethiopia in under 2 minutes.
+                </motion.p>
+
+                {/* CTA Row */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.3 }}
+                  className="flex flex-wrap gap-3"
+                >
+                  <Link
+                    href="/stadiums"
+                    className="btn-primary btn-primary-lg"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Explore All Fields
+                    <span className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                      <ArrowUpRight size={13} />
+                    </span>
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="btn-ghost-white"
+                    style={{ paddingTop: "1rem", paddingBottom: "1rem" }}
+                  >
+                    Register Your Stadium
+                  </Link>
+                </motion.div>
+
+                {/* Stats row */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.8, delay: 0.5 }}
+                  className="mt-14 flex flex-wrap gap-8"
+                >
+                  {[
+                    { value: "50+", label: "Stadiums" },
+                    { value: "10K+", label: "Players" },
+                    { value: "6", label: "Sports" },
+                    { value: "24/7", label: "Booking" },
+                  ].map((s) => (
+                    <div key={s.label}>
+                      <div className="text-3xl font-black text-white">{s.value}</div>
+                      <div className="text-sm text-white/55 mt-0.5 font-medium">{s.label}</div>
+                    </div>
+                  ))}
+                </motion.div>
               </div>
-            </motion.div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="text-5xl sm:text-6xl lg:text-8xl font-black leading-[0.9] mb-8"
-            >
-              <span className="block text-white">ET</span>
-              <span className="block gradient-text">Smart Fields</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="text-xl sm:text-2xl text-slate-300 mb-12 max-w-2xl leading-relaxed"
-            >
-              Book football fields, watch AI-powered match replays,
-              and connect with every stadium in Ethiopia.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Link
-                href="/stadiums"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl text-lg font-bold shadow-xl shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
+              {/* Right — Floating Info Card (SpotNow style) */}
+              <motion.div
+                initial={{ opacity: 0, x: 40, y: 20 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="hidden lg:block"
               >
-                <MapPin size={20} />
-                Find Stadiums
-              </Link>
-              <Link
-                href="/auth/register"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 glass-dark text-white rounded-2xl text-lg font-bold hover:bg-white/10 transition-all"
-              >
-                <Shield size={20} />
-                Register Your Stadium
-              </Link>
-            </motion.div>
+                <div className="glass-hero rounded-3xl p-6 max-w-sm ml-auto">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#2d6a4f" }}>
+                      <span className="text-white text-base">⚽</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-[#111]">50+ Fields</div>
+                      <div className="text-xs text-[#7a7a7a] font-medium">Active &amp; Growing</div>
+                    </div>
+                  </div>
 
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-16 flex flex-wrap gap-8"
-            >
-              {[
-                { value: "50+", label: "Stadiums" },
-                { value: "10K+", label: "Players" },
-                { value: "5K+", label: "Matches" },
-                { value: "24/7", label: "Live" },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-3xl font-black text-white">{stat.value}</div>
-                  <div className="text-sm text-slate-400 mt-1">{stat.label}</div>
+                  <div className="mb-4">
+                    <div className="text-[#111] font-bold text-base mb-1">Book Instantly</div>
+                    <div className="text-sm text-[#7a7a7a] leading-relaxed">
+                      Only verified, high-rated fields with AI camera systems and real-time availability.
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {[
+                      { icon: "✅", label: "ULS Verified" },
+                      { icon: "📹", label: "AI Camera" },
+                      { icon: "⚡", label: "Instant Book" },
+                      { icon: "📱", label: "Telebirr Pay" },
+                    ].map((f) => (
+                      <div
+                        key={f.label}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-[#3d3d3d] px-2.5 py-2 rounded-xl"
+                        style={{ background: "#f4f3ef" }}
+                      >
+                        <span>{f.icon}</span> {f.label}
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link
+                    href="/stadiums"
+                    className="flex items-center justify-between w-full px-4 py-3 rounded-2xl text-white text-sm font-bold transition-all hover:opacity-90"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Explore All Fields
+                    <span className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                      <ArrowUpRight size={12} />
+                    </span>
+                  </Link>
                 </div>
-              ))}
-            </motion.div>
+              </motion.div>
+            </div>
           </div>
         </div>
 
@@ -122,426 +286,459 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          transition={{ delay: 1.2 }}
+          className="relative z-10 pb-8 flex justify-center"
         >
           <motion.div
-            animate={{ y: [0, 10, 0] }}
+            animate={{ y: [0, 8, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="w-6 h-10 rounded-full border-2 border-white/20 flex justify-center pt-2"
+            className="w-6 h-10 rounded-full border-2 border-white/30 flex justify-center pt-2"
           >
-            <div className="w-1 h-2 bg-green-400 rounded-full" />
+            <div className="w-1 h-2 bg-[#74c69d] rounded-full" />
           </motion.div>
         </motion.div>
-      </motion.section>
+      </section>
 
-      {/* Live Replay Interactive Section */}
-      <section className="py-24 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 mesh-gradient opacity-30" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeUp className="text-center mb-16">
-            <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">Experience</span>
-            <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-              Watch Every Match in <span className="gradient-text">Stunning Detail</span>
-            </h2>
-            <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-              AI-powered camera systems capture every moment. Watch full replays or auto-generated highlights.
-            </p>
+      {/* ══════════════════════════════════════════
+          SECTION 2 — FLOATING SEARCH BAR
+          ══════════════════════════════════════════ */}
+      <section className="relative z-20 -mt-8 pb-16" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeUp>
+            <div
+              className="search-bar-float flex flex-col lg:flex-row items-stretch lg:items-center"
+              style={{ padding: "6px" }}
+            >
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row flex-1 divide-y sm:divide-y-0 sm:divide-x divide-black/[0.06]">
+                {[
+                  { icon: <MapPin size={12} />, label: "Location", value: "Addis Ababa" },
+                  { icon: <Calendar size={12} />, label: "Date", value: "Pick a Date" },
+                  { icon: <span className="text-xs">🕐</span>, label: "Time", value: "00:00" },
+                  { icon: <span className="text-xs">⏱</span>, label: "Duration", value: "1 Hour" },
+                  { icon: <span className="text-xs">⚽</span>, label: "Sport", value: "Football" },
+                ].map((filter) => (
+                  <button
+                    key={filter.label}
+                    className="search-filter-chip flex-1 justify-start text-left"
+                  >
+                    <span className="search-filter-icon">
+                      {filter.icon}
+                    </span>
+                    <div>
+                      <div className="text-[10px] text-[#aaaaaa] font-medium">{filter.label}</div>
+                      <div className="text-[#111] text-sm font-semibold truncate">{filter.value}</div>
+                    </div>
+                    <ChevronDown size={14} className="text-[#aaaaaa] ml-auto flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+
+              {/* Submit */}
+              <div className="p-1.5 flex-shrink-0">
+                <Link
+                  href="/stadiums"
+                  className="flex items-center gap-2 px-6 py-4 rounded-full text-white font-bold text-sm whitespace-nowrap transition-all hover:opacity-90"
+                  style={{ background: "#2d6a4f", boxShadow: "0 4px 16px rgba(45,106,79,0.35)" }}
+                >
+                  Check Availability
+                  <span className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
+                    <ArrowUpRight size={11} />
+                  </span>
+                </Link>
+              </div>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SECTION 3 — SPORT CATEGORY SELECTOR
+          ══════════════════════════════════════════ */}
+      <section style={{ backgroundColor: "#f4f3ef", paddingBottom: "80px" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeUp className="mb-8">
+            <div className="text-xs font-bold tracking-widest uppercase text-[#7a7a7a] mb-3">Sports Available</div>
+            <h2 className="heading-xl">Find Your Game</h2>
           </FadeUp>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <SlideIn direction="left">
-              {/* Interactive replay demo */}
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/10 bg-slate-900 aspect-video">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-4 mx-auto backdrop-blur-sm border border-green-500/30">
-                      <Play className="text-white ml-1" size={32} />
-                    </div>
-                    <p className="text-white/60 text-sm">AI Match Replay</p>
+          <FadeUp delay={0.1}>
+            <div className="flex flex-wrap gap-3">
+              {sports.map((sport) => (
+                <button
+                  key={sport.id}
+                  onClick={() => setActiveSport(sport.id)}
+                  className={`sport-pill ${activeSport === sport.id ? "active" : "inactive"}`}
+                >
+                  <span>{sport.emoji}</span>
+                  {sport.label}
+                </button>
+              ))}
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SECTION 4 — STADIUM SELECTION CAROUSEL
+          ══════════════════════════════════════════ */}
+      <section className="py-24 bg-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+
+            {/* Left — Heading */}
+            <SlideIn direction="left" className="lg:sticky lg:top-32">
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">
+                Premium Venues
+              </div>
+              <h2 className="heading-xl mb-6">
+                The Ultimate Stadium Selection Is Here
+              </h2>
+              <p className="text-[#7a7a7a] text-lg leading-relaxed mb-10 max-w-md">
+                We hand-pick the best venues in Ethiopia based on facility quality, AI camera systems, and real player ratings.
+              </p>
+
+              {/* Prev / Next */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setActiveVenue((v) => Math.max(0, v - 1))}
+                  className="btn-arrow-outline"
+                  disabled={activeVenue === 0}
+                  style={{ opacity: activeVenue === 0 ? 0.4 : 1 }}
+                  aria-label="Previous venue"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <button
+                  onClick={() => setActiveVenue((v) => Math.min(venues.length - 1, v + 1))}
+                  className="btn-arrow"
+                  disabled={activeVenue === venues.length - 1}
+                  style={{ opacity: activeVenue === venues.length - 1 ? 0.6 : 1, background: "#2d6a4f" }}
+                  aria-label="Next venue"
+                >
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+
+              {/* Dots */}
+              <div className="flex gap-2 mt-5">
+                {venues.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveVenue(i)}
+                    className="transition-all rounded-full"
+                    style={{
+                      width: i === activeVenue ? "28px" : "8px",
+                      height: "8px",
+                      background: i === activeVenue ? "#2d6a4f" : "#ddd",
+                    }}
+                    aria-label={`Go to venue ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </SlideIn>
+
+            {/* Right — Venue Card */}
+            <SlideIn direction="right">
+              <motion.div
+                key={activeVenue}
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="photo-card"
+              >
+                {/* Photo */}
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <Image
+                    src={venues[activeVenue].image}
+                    alt={venues[activeVenue].name}
+                    fill
+                    className="object-cover transition-transform duration-700 hover:scale-105"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                  {/* Location tag overlay */}
+                  <div className="absolute top-4 left-4">
+                    <span className="venue-tag">
+                      <MapPin size={10} style={{ color: "#2d6a4f" }} />
+                      {venues[activeVenue].location}
+                    </span>
+                  </div>
+                  {/* Sport badge */}
+                  <div className="absolute top-4 right-4">
+                    <span
+                      className="text-white text-xs font-bold px-3 py-1.5 rounded-full"
+                      style={{ background: "rgba(26,71,49,0.85)", backdropFilter: "blur(8px)" }}
+                    >
+                      {venues[activeVenue].sport}
+                    </span>
                   </div>
                 </div>
-                {/* Overlay stats */}
-                <div className="absolute bottom-4 left-4 right-4 flex gap-2">
-                  {["Full Match", "Highlights", "Goals", "Skills"].map((tab, i) => (
-                    <div
-                      key={tab}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium backdrop-blur-sm ${
-                        i === 0
-                          ? "bg-green-500/30 text-green-300 border border-green-500/30"
-                          : "bg-white/10 text-white/60"
-                      }`}
+
+                {/* Info */}
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-[#111] mb-1">{venues[activeVenue].name}</h3>
+                  <p className="text-[#7a7a7a] text-sm leading-relaxed mb-4">{venues[activeVenue].desc}</p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          size={15}
+                          fill={i < Math.floor(venues[activeVenue].rating) ? "#f59e0b" : "none"}
+                          className={i < Math.floor(venues[activeVenue].rating) ? "text-yellow-400" : "text-gray-200"}
+                        />
+                      ))}
+                      <span className="text-sm font-bold text-[#111] ml-1">{venues[activeVenue].rating}</span>
+                      <span className="text-xs text-[#7a7a7a]">({venues[activeVenue].reviews} reviews)</span>
+                    </div>
+                    <Link
+                      href={`/stadiums`}
+                      className="btn-arrow"
+                      style={{ background: "#2d6a4f" }}
+                      aria-label="Book this venue"
                     >
-                      {tab}
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            </SlideIn>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SECTION 5 — BOOK PERFECT FIELD
+          ══════════════════════════════════════════ */}
+      <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeUp className="mb-12">
+            <div className="flex items-end justify-between flex-wrap gap-4">
+              <div>
+                <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Real-Time Booking</div>
+                <h2 className="heading-xl">
+                  Book Perfect Field,
+                  <br />
+                  Guaranteed Real-Time
+                </h2>
+              </div>
+              <p className="text-[#7a7a7a] text-base max-w-xs leading-relaxed">
+                Zero double-bookings. Our real-time sync ensures your reserved time is 100% guaranteed. No last-minute cancellations.
+              </p>
+            </div>
+          </FadeUp>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Card 1 — Photo with text overlay */}
+            <ScaleIn>
+              <div className="photo-card relative overflow-hidden" style={{ minHeight: "360px" }}>
+                <Image
+                  src="/venue-card-1.jpg"
+                  alt="Ethiopia's widest stadium selection"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 photo-overlay-dark" />
+                <div className="absolute bottom-6 left-6 right-6">
+                  <div className="text-xs text-white/60 font-semibold mb-1 uppercase tracking-wider">
+                    Verified Network
+                  </div>
+                  <h3 className="text-2xl font-black text-white">
+                    Ethiopia&apos;s Widest Stadium Selection
+                  </h3>
+                  <Link href="/stadiums" className="inline-flex items-center gap-1.5 mt-4 text-[#74c69d] text-sm font-bold hover:gap-2.5 transition-all">
+                    Browse All Venues <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            </ScaleIn>
+
+            {/* Card 2 — White card with text */}
+            <ScaleIn delay={0.1}>
+              <div className="photo-card p-8 flex flex-col justify-between" style={{ minHeight: "360px" }}>
+                {/* Icon */}
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6"
+                  style={{ background: "#f0faf4" }}
+                >
+                  <Zap size={26} style={{ color: "#2d6a4f" }} />
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">
+                    Instant Booking Confirmation
+                  </div>
+                  <h3 className="text-2xl font-black text-[#111] mb-4">
+                    Zero Double-Booking Risk
+                  </h3>
+                  <p className="text-[#7a7a7a] leading-relaxed mb-6">
+                    Our real-time syncing ensures your reserved time is 100% guaranteed. No last-minute surprises. Book with confidence through Telebirr or Chapa.
+                  </p>
+                  <Link href="/stadiums" className="inline-flex items-center gap-2 text-[#2d6a4f] font-bold text-sm hover:gap-3 transition-all">
+                    Learn More <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            </ScaleIn>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SECTION 6 — CORE SERVICE (Premium Game Day)
+          ══════════════════════════════════════════ */}
+      <section className="py-24 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3 text-center">
+            Core Service
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 mt-8">
+            {/* Left — Large photo with stat badge */}
+            <SlideIn direction="left">
+              <div className="relative rounded-3xl overflow-hidden" style={{ minHeight: "500px" }}>
+                <Image
+                  src="/venue-card-2.jpg"
+                  alt="Premium game day comfort at ET Smart Fields"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(10,26,16,0.8) 0%, transparent 50%)" }} />
+
+                {/* Stat badge */}
+                <div className="absolute bottom-6 left-6">
+                  <div className="stat-badge">
+                    <span className="text-2xl font-black">94%</span>
+                    <div>
+                      <div className="text-xs opacity-75 leading-tight">Venue Quality</div>
+                      <div className="text-xs opacity-75 leading-tight">Satisfaction Rate</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SlideIn>
+
+            {/* Right — Two cards */}
+            <SlideIn direction="right" className="flex flex-col gap-6">
+              {/* Card A */}
+              <div className="photo-card p-8 flex-1">
+                <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Premium Service</div>
+                <h3 className="text-2xl font-black text-[#111] mb-4">
+                  We Offer Full Premium Game Day Comfort
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    "AI-powered camera recording on every field",
+                    "Smart locker rooms and modern changing facilities",
+                    "Real-time scoreboard and match analytics",
+                    "Referee booking and equipment rental",
+                  ].map((feat) => (
+                    <div key={feat} className="flex items-start gap-3 text-sm text-[#3d3d3d]">
+                      <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" style={{ color: "#2d6a4f" }} />
+                      {feat}
                     </div>
                   ))}
                 </div>
-                {/* Progress bar */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-                  <div className="h-full w-1/3 bg-green-500 rounded-r-full" />
-                </div>
               </div>
-            </SlideIn>
 
-            <SlideIn direction="right">
-              <div className="space-y-6">
-                {[
-                  { icon: <Camera className="text-green-600" size={24} />, title: "AI Camera System", desc: "Automated recording with smart detection of goals, fouls, and key moments" },
-                  { icon: <Zap className="text-green-600" size={24} />, title: "Instant Highlights", desc: "Auto-generated highlight reels within minutes of match completion" },
-                  { icon: <Download className="text-green-600" size={24} />, title: "Download & Share", desc: "Save your best moments and share them on social media" },
-                  { icon: <Award className="text-green-600" size={24} />, title: "Goal of the Month", desc: "Community-voted best goals featured on stadium microsites" },
-                ].map((item) => (
-                  <div key={item.title} className="flex gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
-                    <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 mb-1">{item.title}</h3>
-                      <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
+              {/* Card B */}
+              <div
+                className="photo-card p-8 flex-1 relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg, #1a4731 0%, #2d6a4f 100%)" }}
+              >
+                {/* Sport icon pills */}
+                <div className="flex gap-2 mb-5 flex-wrap">
+                  {["⚽", "🏀", "🏐", "🏸", "🎾"].map((emoji) => (
+                    <span
+                      key={emoji}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                      style={{ background: "rgba(255,255,255,0.12)" }}
+                    >
+                      {emoji}
+                    </span>
+                  ))}
+                </div>
+                <h3 className="text-xl font-black text-white mb-2">
+                  Play Seamlessly — Everything You Need Is Here
+                </h3>
+                <p className="text-white/65 text-sm leading-relaxed">
+                  The platform provides everything from booking to broadcast. One app for every sport in Ethiopia.
+                </p>
+                {/* Decorative circle */}
+                <div
+                  className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full opacity-10"
+                  style={{ background: "#74c69d" }}
+                />
               </div>
             </SlideIn>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-24 bg-slate-50 relative">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ══════════════════════════════════════════
+          SECTION 7 — HOW IT WORKS
+          ══════════════════════════════════════════ */}
+      <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">
-            <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">Features</span>
-            <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-              Everything You Need to <span className="gradient-text">Play</span>
-            </h2>
-            <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-              From booking to watching replays, we&apos;ve got every aspect of your football experience covered.
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">How It Works</div>
+            <h2 className="heading-xl mb-4">Three Steps to Play</h2>
+            <p className="text-[#7a7a7a] text-lg max-w-xl mx-auto">
+              From discovery to watching your highlights — we've made the whole journey effortless.
             </p>
-          </FadeUp>
-
-          <StaggerChildren className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: <MapPin className="text-green-600" size={28} />,
-                title: "Smart Discovery",
-                desc: "Find nearby stadiums with GPS-powered proximity search. See real-time availability.",
-              },
-              {
-                icon: <Calendar className="text-green-600" size={28} />,
-                title: "Instant Booking",
-                desc: "Book your preferred time slot in seconds. Pay with Telebirr, Chapa, or card.",
-              },
-              {
-                icon: <Video className="text-green-600" size={28} />,
-                title: "AI Match Replays",
-                desc: "Watch full matches or AI-generated highlights. Camera systems on every ULS stadium.",
-              },
-              {
-                icon: <Shield className="text-green-600" size={28} />,
-                title: "ULS Verified",
-                desc: "Look for the ULS badge. Guaranteed quality, security, and modern facilities.",
-              },
-              {
-                icon: <Globe className="text-green-600" size={28} />,
-                title: "Stadium Microsites",
-                desc: "Every registered stadium gets its own branded website with CMS and analytics.",
-              },
-              {
-                icon: <Smartphone className="text-green-600" size={28} />,
-                title: "Mobile First",
-                desc: "Book, pay, and watch from anywhere. Optimized for every device and connection.",
-              },
-            ].map((feature) => (
-              <StaggerItem key={feature.title}>
-                <div className="h-full p-6 rounded-2xl bg-white border border-slate-200 hover:border-green-200 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300 group">
-                  <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h3>
-                  <p className="text-slate-500 leading-relaxed">{feature.desc}</p>
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerChildren>
-        </div>
-      </section>
-
-      {/* 3D Stadium Showcase */}
-      <section className="py-24 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <SlideIn direction="left">
-              <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">3D Experience</span>
-              <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-                See Stadiums in <span className="gradient-text">3D</span>
-              </h2>
-              <p className="text-slate-500 text-lg mb-8 leading-relaxed">
-                Our immersive 3D visualization lets you explore stadium layouts, field conditions,
-                and facilities before you book. Experience football infrastructure like never before.
-              </p>
-              <div className="space-y-4 mb-8">
-                {[
-                  "Interactive 3D stadium models",
-                  "Real-time field availability",
-                  "Virtual facility tours",
-                  "Camera angle previews",
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle2 className="text-green-600" size={14} />
-                    </div>
-                    <span className="text-slate-700">{item}</span>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href="/stadiums"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl text-lg font-bold shadow-xl shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
-              >
-                <Play size={20} />
-                Explore Stadiums
-              </Link>
-            </SlideIn>
-
-            <SlideIn direction="right">
-              <div className="relative aspect-square max-w-lg mx-auto">
-                <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/10">
-                  <Suspense fallback={<ThreeFallback />}>
-                    <Scene3D />
-                  </Suspense>
-                </div>
-                {/* Floating UI elements */}
-                <motion.div
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute top-10 left-10 glass rounded-xl p-3 shadow-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-sm font-medium text-slate-700">Live Camera</span>
-                  </div>
-                </motion.div>
-                <motion.div
-                  animate={{ y: [0, 10, 0] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute bottom-10 right-10 glass rounded-xl p-3 shadow-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <Star className="text-yellow-500" size={16} fill="currentColor" />
-                    <span className="text-sm font-medium text-slate-700">4.9 Rating</span>
-                  </div>
-                </motion.div>
-              </div>
-            </SlideIn>
-          </div>
-        </div>
-      </section>
-
-      {/* For Stadium Owners */}
-      <section className="py-24 bg-slate-50 relative">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <ScaleIn>
-              <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">For Owners</span>
-              <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-                Transform Your <span className="gradient-text">Stadium</span>
-              </h2>
-              <p className="text-slate-500 text-lg mb-8 leading-relaxed">
-                Join ET Smart Fields and give your stadium its own branded microsite. Manage bookings,
-                showcase match replays, and attract more players with modern technology.
-              </p>
-
-              <div className="grid sm:grid-cols-2 gap-4 mb-8">
-                {[
-                  { icon: <Globe size={20} />, title: "Your Microsite", desc: "stadium.etsmartfields.com" },
-                  { icon: <Camera size={20} />, title: "Camera System", desc: "AI-powered recording" },
-                  { icon: <TrendingUp size={20} />, title: "Analytics", desc: "Player insights" },
-                  { icon: <Users size={20} />, title: "Community", desc: "Build your audience" },
-                ].map((item) => (
-                  <div key={item.title} className="p-4 rounded-xl bg-white border border-slate-200 hover:border-green-200 transition-colors">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-green-600">{item.icon}</div>
-                      <span className="font-bold text-slate-900">{item.title}</span>
-                    </div>
-                    <p className="text-sm text-slate-500">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <Link
-                href="/auth/register"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl text-lg font-bold shadow-xl shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
-              >
-                <Zap size={20} />
-                Get Started Free
-              </Link>
-            </ScaleIn>
-
-            <ScaleIn delay={0.2}>
-              <div className="relative">
-                <div className="rounded-3xl p-8 bg-white border border-slate-200 shadow-xl shadow-slate-900/5">
-                  {/* Mock Dashboard */}
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20">
-                      <span className="text-xl">🏟️</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">Bambis Meda Stadium</h3>
-                      <p className="text-sm text-slate-500">Bole, Addis Ababa</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-green-50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-black text-green-600">127</div>
-                      <div className="text-xs text-slate-500">Bookings</div>
-                    </div>
-                    <div className="bg-yellow-50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-black text-yellow-600">4.9★</div>
-                      <div className="text-xs text-slate-500">Rating</div>
-                    </div>
-                    <div className="bg-blue-50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-black text-blue-600">2</div>
-                      <div className="text-xs text-slate-500">Fields</div>
-                    </div>
-                    <div className="bg-purple-50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-black text-purple-600">📹</div>
-                      <div className="text-xs text-slate-500">Camera Active</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      ✅ ULS Verified
-                    </span>
-                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      📹 Camera Active
-                    </span>
-                  </div>
-
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full" style={{ width: "78%" }} />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-2">78% monthly booking capacity</p>
-                </div>
-
-                {/* Floating elements */}
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                  className="absolute -top-6 -right-6 w-24 h-24 border border-green-200 rounded-full"
-                />
-                <motion.div
-                  animate={{ rotate: -360 }}
-                  transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                  className="absolute -bottom-8 -left-8 w-32 h-32 border border-yellow-200 rounded-full"
-                />
-              </div>
-            </ScaleIn>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-24 bg-white relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-50/50 via-white to-slate-50/50" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeUp className="text-center mb-16">
-            <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">How It Works</span>
-            <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-              Three Steps to <span className="gradient-text">Play</span>
-            </h2>
-          </FadeUp>
-
-          <StaggerChildren className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "01",
-                title: "Find & Choose",
-                desc: "Search for stadiums near you. See real-time availability, prices, and camera status.",
-                icon: <MapPin className="text-green-600" size={32} />,
-              },
-              {
-                step: "02",
-                title: "Book & Pay",
-                desc: "Select your time slot, choose extras like video capture or referee, and pay with Telebirr.",
-                icon: <Calendar className="text-green-600" size={32} />,
-              },
-              {
-                step: "03",
-                title: "Play & Watch",
-                desc: "Play your match, then watch the AI-generated replay or highlights on your dashboard.",
-                icon: <Video className="text-green-600" size={32} />,
-              },
-            ].map((item) => (
-              <StaggerItem key={item.step}>
-                <div className="relative p-8 rounded-2xl bg-white border border-slate-200 hover:border-green-200 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300 group h-full">
-                  <div className="text-7xl font-black text-slate-100 absolute top-4 right-4">{item.step}</div>
-                  <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mb-6 group-hover:bg-green-100 transition-colors">
-                    {item.icon}
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-3">{item.title}</h3>
-                  <p className="text-slate-500 leading-relaxed">{item.desc}</p>
-                  <ArrowRight className="text-green-500 mt-4 group-hover:translate-x-2 transition-transform" size={20} />
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerChildren>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-24 bg-slate-50 relative">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeUp className="text-center mb-16">
-            <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">Testimonials</span>
-            <h2 className="text-4xl sm:text-5xl font-black mt-4 mb-6 text-slate-900">
-              Loved by <span className="gradient-text">Players & Owners</span>
-            </h2>
           </FadeUp>
 
           <StaggerChildren className="grid md:grid-cols-3 gap-6">
             {[
               {
-                name: "Abebe Kebede",
-                role: "Football Player",
-                text: "ET Smart Fields changed how we book fields. No more calling around — just open the app and book in seconds. The match replays are incredible!",
-                rating: 5,
+                step: "01",
+                emoji: "🔍",
+                title: "Find & Choose",
+                desc: "Search for stadiums near you. See real-time availability, prices, camera status, and sport type in one view.",
               },
               {
-                name: "Fatima Hassan",
-                role: "Stadium Owner",
-                text: "Since joining ET Smart Fields, our bookings increased 40%. The microsite looks professional and our players love being able to watch their matches online.",
-                rating: 5,
+                step: "02",
+                emoji: "📅",
+                title: "Book & Pay",
+                desc: "Select your time slot, choose extras like AI video capture or a referee, and pay instantly with Telebirr or Chapa.",
               },
               {
-                name: "Daniel Tadesse",
-                role: "Team Captain",
-                text: "The AI highlights are amazing. We can share our best goals on social media directly from the platform. It feels like having a professional broadcast.",
-                rating: 5,
+                step: "03",
+                emoji: "🎮",
+                title: "Play & Watch",
+                desc: "Play your match, then watch the AI-generated replay or highlight reel on your personal dashboard.",
               },
-            ].map((testimonial) => (
-              <StaggerItem key={testimonial.name}>
-                <div className="p-6 rounded-2xl bg-white border border-slate-200 hover:shadow-lg transition-shadow h-full">
-                  <div className="flex gap-1 mb-4">
-                    {Array.from({ length: testimonial.rating }).map((_, i) => (
-                      <Star key={i} className="text-yellow-400" size={16} fill="currentColor" />
-                    ))}
+            ].map((item) => (
+              <StaggerItem key={item.step}>
+                <div className="photo-card p-8 h-full relative group">
+                  {/* Step number (background) */}
+                  <div
+                    className="absolute top-4 right-6 font-black text-7xl select-none pointer-events-none"
+                    style={{ color: "#f0faf4" }}
+                  >
+                    {item.step}
                   </div>
-                  <p className="text-slate-600 leading-relaxed mb-6">&quot;{testimonial.text}&quot;</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-bold text-sm">
-                      {testimonial.name[0]}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">{testimonial.name}</p>
-                      <p className="text-xs text-slate-500">{testimonial.role}</p>
-                    </div>
+
+                  {/* Emoji icon */}
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6"
+                    style={{ background: "#f0faf4" }}
+                  >
+                    {item.emoji}
+                  </div>
+
+                  <h3 className="text-xl font-black text-[#111] mb-3">{item.title}</h3>
+                  <p className="text-[#7a7a7a] leading-relaxed text-sm">{item.desc}</p>
+
+                  <div className="mt-6">
+                    <ArrowRight
+                      size={20}
+                      style={{ color: "#2d6a4f" }}
+                      className="group-hover:translate-x-2 transition-transform duration-300"
+                    />
                   </div>
                 </div>
               </StaggerItem>
@@ -550,101 +747,434 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
-          <FadeUp>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 text-white">
-              Ready to <span className="gradient-text">Play</span>?
-            </h2>
-            <p className="text-xl text-slate-300 mb-12 max-w-2xl mx-auto">
-              Join thousands of players and stadium owners across Ethiopia.
-              Your next match is just a tap away.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+      {/* ══════════════════════════════════════════
+          SECTION 8 — TESTIMONIALS
+          ══════════════════════════════════════════ */}
+      <section className="py-24 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+
+            {/* Left — Heading */}
+            <FadeUp className="lg:sticky lg:top-32">
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Testimonials</div>
+              <h2 className="heading-xl mb-6">
+                The ET Smart Fields Experience In Their Own Words
+              </h2>
               <Link
-                href="/auth/register"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl text-lg font-bold shadow-xl shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
+                href="/about"
+                className="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-full border transition-all hover:-translate-y-0.5"
+                style={{ borderColor: "#2d6a4f", color: "#2d6a4f" }}
               >
-                <Zap size={20} />
-                Sign Up Free
+                Learn More <ArrowRight size={14} />
               </Link>
-              <Link
-                href="/stadiums"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 glass-dark text-white rounded-2xl text-lg font-bold hover:bg-white/10 transition-all"
+
+              {/* Carousel controls */}
+              <div className="flex gap-3 mt-10">
+                <button
+                  onClick={() => setActiveTestimonial((t) => Math.max(0, t - 1))}
+                  className="btn-arrow-outline"
+                  disabled={activeTestimonial === 0}
+                  style={{ opacity: activeTestimonial === 0 ? 0.4 : 1 }}
+                  aria-label="Previous testimonial"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setActiveTestimonial((t) => Math.min(testimonials.length - 1, t + 1))}
+                  className="btn-arrow"
+                  disabled={activeTestimonial === testimonials.length - 1}
+                  style={{ opacity: activeTestimonial === testimonials.length - 1 ? 0.6 : 1, background: "#2d6a4f" }}
+                  aria-label="Next testimonial"
+                >
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </FadeUp>
+
+            {/* Right — Testimonial Card */}
+            <div>
+              <motion.div
+                key={activeTestimonial}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="photo-card overflow-hidden"
               >
-                <MapPin size={20} />
-                Browse Stadiums
-              </Link>
+                {/* Venue photo */}
+                <div className="relative h-52 overflow-hidden">
+                  <Image
+                    src={testimonials[activeTestimonial].image}
+                    alt={testimonials[activeTestimonial].venue}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 photo-overlay-dark" />
+                  <div className="absolute bottom-4 left-4">
+                    <span className="venue-tag">
+                      <MapPin size={9} style={{ color: "#2d6a4f" }} />
+                      {testimonials[activeTestimonial].venue}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quote */}
+                <div className="p-7">
+                  <p className="text-[#3d3d3d] text-base leading-relaxed mb-6 italic">
+                    &ldquo;{testimonials[activeTestimonial].text}&rdquo;
+                  </p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-lg"
+                        style={{ background: "linear-gradient(135deg, #2d6a4f, #40916c)" }}
+                      >
+                        {testimonials[activeTestimonial].name[0]}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#111] text-sm">{testimonials[activeTestimonial].name}</div>
+                        <div className="text-xs text-[#7a7a7a]">{testimonials[activeTestimonial].role}</div>
+                      </div>
+                    </div>
+
+                    {/* Rating */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-2xl font-black text-[#111]">{testimonials[activeTestimonial].rating}</span>
+                      <div className="flex">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} size={12} fill="#f59e0b" className="text-yellow-400" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Dots */}
+              <div className="flex gap-2 mt-5 justify-center">
+                {testimonials.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveTestimonial(i)}
+                    className="transition-all rounded-full"
+                    style={{
+                      width: i === activeTestimonial ? "28px" : "8px",
+                      height: "8px",
+                      background: i === activeTestimonial ? "#2d6a4f" : "#ddd",
+                    }}
+                    aria-label={`View testimonial ${i + 1}`}
+                  />
+                ))}
+              </div>
             </div>
-          </FadeUp>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-16 bg-white border-t border-slate-200">
+      {/* ══════════════════════════════════════════
+          SECTION 9 — PARTNER / INVESTOR
+          ══════════════════════════════════════════ */}
+      <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div>
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 bg-gradient-to-br from-green-600 to-green-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20">
-                  <span className="text-white text-lg">⚽</span>
-                </div>
-                <div className="flex items-baseline">
-                  <span className="text-lg font-bold text-slate-900">ET</span>
-                  <span className="text-lg font-bold text-green-600 ml-0.5">Smart Fields</span>
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+            {/* Left — Partner info */}
+            <FadeUp>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Partnership</div>
+              <h2 className="heading-xl mb-6">
+                Partner with Us to Build
+                <br />
+                Next Elite Fields
+              </h2>
+              <p className="text-[#7a7a7a] text-base leading-relaxed mb-8 max-w-md">
+                Our infrastructure solutions are designed to maximize ROI and simplify field management for investors and stadium operators across Ethiopia.
+              </p>
+
+              <div className="space-y-4 mb-10">
+                {[
+                  { icon: <TrendingUp size={18} />, label: "Optimized ROI Architecture" },
+                  { icon: <Calendar size={18} />, label: "Profitable Field Management System" },
+                  { icon: <Shield size={18} />, label: "Access Skilled ICT Field Technicians" },
+                  { icon: <Globe size={18} />, label: "Seamless Network Integration Across Ethiopia" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-3 text-[#3d3d3d] text-sm font-medium">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: "white", color: "#2d6a4f", boxShadow: "var(--shadow-card)" }}
+                    >
+                      {item.icon}
+                    </div>
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                href="/contact"
+                className="btn-primary btn-primary-lg"
+                style={{ background: "#2d6a4f" }}
+              >
+                Become a Partner
+                <ArrowUpRight size={16} />
+              </Link>
+            </FadeUp>
+
+            {/* Right — Investment CTA card */}
+            <ScaleIn delay={0.15}>
+              <div
+                className="rounded-3xl p-10 relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg, #0d2b1d 0%, #1a4731 60%, #2d6a4f 100%)" }}
+              >
+                {/* Decorative circles */}
+                <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-10" style={{ background: "#74c69d" }} />
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: "#74c69d" }} />
+
+                <div className="relative z-10">
+                  <div className="text-4xl mb-6">🏟️</div>
+                  <div className="text-xs font-bold tracking-widest uppercase text-[#74c69d] mb-3">Investment</div>
+                  <h3 className="text-2xl font-black text-white mb-4 leading-tight">
+                    Interested in Investing in the Future of Play?
+                  </h3>
+                  <p className="text-white/60 text-sm leading-relaxed mb-8">
+                    Join Ethiopia&apos;s growing sports infrastructure revolution. Earn consistent returns while building the communities of tomorrow.
+                  </p>
+
+                  {/* Mini stats */}
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    {[
+                      { value: "40%", label: "Avg. Booking Increase" },
+                      { value: "50+", label: "Active Venues" },
+                      { value: "10K+", label: "Registered Players" },
+                      { value: "6", label: "Sports Supported" },
+                    ].map((s) => (
+                      <div key={s.label} className="p-3 rounded-2xl" style={{ background: "rgba(255,255,255,0.08)" }}>
+                        <div className="text-xl font-black text-white">{s.value}</div>
+                        <div className="text-xs text-white/50">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link
+                    href="/contact"
+                    className="flex items-center justify-between w-full px-5 py-4 rounded-2xl text-[#1a4731] font-bold transition-all hover:opacity-90"
+                    style={{ background: "white" }}
+                  >
+                    Learn More
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{ background: "#2d6a4f", color: "white" }}
+                    >
+                      <ArrowUpRight size={14} />
+                    </span>
+                  </Link>
                 </div>
               </div>
-              <p className="text-slate-500 text-sm leading-relaxed">
-                Ethiopia&apos;s integrated football infrastructure platform.
+            </ScaleIn>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SECTION 10 — CTA DARK BANNER
+          ══════════════════════════════════════════ */}
+      <section
+        className="relative overflow-hidden py-24"
+        style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}
+      >
+        {/* Background field photo overlay */}
+        <div className="absolute inset-0">
+          <Image
+            src="/testimonial-venue.jpg"
+            alt=""
+            fill
+            className="object-cover object-top opacity-15"
+          />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left — App visual */}
+            <FadeUp>
+              <div
+                className="rounded-3xl p-8 max-w-sm relative overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.12)" }}
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    <span className="text-2xl">⚽</span>
+                  </div>
+                  <div>
+                    <div className="text-white font-black">ET Smart Fields</div>
+                    <div className="text-white/50 text-xs">Addis Ababa, Ethiopia</div>
+                  </div>
+                </div>
+
+                {/* Toggle / status */}
+                <div className="mb-6">
+                  <div className="text-white/60 text-xs mb-2 uppercase tracking-wider font-semibold">Field Availability</div>
+                  <div className="flex gap-3 flex-wrap">
+                    {["Bole Arena", "Kirkos FC", "Lideta Futsal", "Unity Court"].map((name, i) => (
+                      <span
+                        key={name}
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                        style={{
+                          background: i === 0 ? "#2d6a4f" : "rgba(255,255,255,0.1)",
+                          color: i === 0 ? "white" : "rgba(255,255,255,0.6)",
+                        }}
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-[#74c69d] text-xs font-bold uppercase tracking-wider mb-2">
+                  ● 12 Slots Available Now
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                  <div className="h-full rounded-full" style={{ width: "72%", background: "linear-gradient(90deg, #2d6a4f, #74c69d)" }} />
+                </div>
+                <div className="text-white/40 text-xs mt-1.5">72% of today&apos;s slots already booked</div>
+              </div>
+            </FadeUp>
+
+            {/* Right — Text */}
+            <FadeUp delay={0.1}>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#74c69d] mb-4">
+                Book Instantly
+              </div>
+              <h2
+                className="text-white font-black leading-tight mb-6"
+                style={{ fontSize: "clamp(2.2rem, 5vw, 3.8rem)", letterSpacing: "-0.02em" }}
+              >
+                Avoid Confusion —
+                <br />
+                Book Available Slot Instantly
+              </h2>
+              <p className="text-white/60 text-lg leading-relaxed mb-10 max-w-md">
+                Join thousands of players and stadium owners across Ethiopia. Your next match is just a tap away — no calls, no WhatsApp chains.
               </p>
-            </div>
+
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  href="/auth/register"
+                  className="btn-primary btn-primary-lg"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  <Zap size={18} />
+                  Sign Up Free
+                </Link>
+                <Link
+                  href="/stadiums"
+                  className="btn-ghost-white"
+                  style={{ paddingTop: "1rem", paddingBottom: "1rem" }}
+                >
+                  <MapPin size={16} />
+                  Browse Stadiums
+                </Link>
+              </div>
+            </FadeUp>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          FOOTER
+          ══════════════════════════════════════════ */}
+      <footer className="bg-white border-t" style={{ borderColor: "rgba(0,0,0,0.07)" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+
+            {/* Brand */}
             <div>
-              <h4 className="font-bold text-slate-900 mb-4">Platform</h4>
-              <ul className="space-y-3 text-sm text-slate-500">
-                <li><Link href="/stadiums" className="hover:text-green-600 transition-colors">Find Stadiums</Link></li>
-                <li><Link href="/bookings" className="hover:text-green-600 transition-colors">My Bookings</Link></li>
-                <li><Link href="/stadiums/live" className="hover:text-green-600 transition-colors">Live Matches</Link></li>
+              <div className="flex items-center gap-2.5 mb-4">
+                <Image
+                  src="/logo/et-smart-fields-icon.jpg"
+                  alt="ET Smart Fields"
+                  width={36}
+                  height={36}
+                  className="rounded-xl object-cover"
+                />
+                <div>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-base font-black text-[#111]">ET</span>
+                    <span className="text-base font-black" style={{ color: "#2d6a4f" }}>Smart Fields</span>
+                  </div>
+                  <div className="text-[10px] text-[#aaa] font-medium">Your Field, Your Time</div>
+                </div>
+              </div>
+              <p className="text-sm text-[#7a7a7a] leading-relaxed mb-5">
+                Ethiopia&apos;s integrated smart sports infrastructure platform.
+              </p>
+              {/* Social icons */}
+              <div className="flex gap-3">
+                {["𝕏", "📘", "📸", "📺"].map((icon, i) => (
+                  <a
+                    key={i}
+                    href="#"
+                    className="w-9 h-9 rounded-full border flex items-center justify-center text-sm transition-all hover:-translate-y-0.5"
+                    style={{ borderColor: "rgba(0,0,0,0.1)", color: "#7a7a7a" }}
+                    aria-label={`Social link ${i + 1}`}
+                  >
+                    {icon}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Core Services */}
+            <div>
+              <h4 className="font-bold text-[#111] text-sm mb-5">Core Services</h4>
+              <ul className="space-y-3 text-sm text-[#7a7a7a]">
+                <li><Link href="/stadiums" className="hover:text-[#2d6a4f] transition-colors">Find Stadiums</Link></li>
+                <li><Link href="/bookings" className="hover:text-[#2d6a4f] transition-colors">My Bookings</Link></li>
+                <li><Link href="/stadiums/live" className="hover:text-[#2d6a4f] transition-colors">Live Matches</Link></li>
+                <li><Link href="/pricing" className="hover:text-[#2d6a4f] transition-colors">Request Consultation</Link></li>
+                <li><Link href="/contact" className="hover:text-[#2d6a4f] transition-colors">Customer Service</Link></li>
               </ul>
             </div>
+
+            {/* Company */}
             <div>
-              <h4 className="font-bold text-slate-900 mb-4">For Owners</h4>
-              <ul className="space-y-3 text-sm text-slate-500">
-                <li><Link href="/auth/register" className="hover:text-green-600 transition-colors">Register Stadium</Link></li>
-                <li><Link href="/dashboard" className="hover:text-green-600 transition-colors">Owner Dashboard</Link></li>
-                <li><Link href="/pricing" className="hover:text-green-600 transition-colors">Pricing</Link></li>
+              <h4 className="font-bold text-[#111] text-sm mb-5">Company</h4>
+              <ul className="space-y-3 text-sm text-[#7a7a7a]">
+                <li><Link href="/about" className="hover:text-[#2d6a4f] transition-colors">About Us</Link></li>
+                <li><Link href="/auth/register" className="hover:text-[#2d6a4f] transition-colors">Join as Owner (ETSF)</Link></li>
+                <li><Link href="/contact" className="hover:text-[#2d6a4f] transition-colors">Partner with Us</Link></li>
+                <li><Link href="/careers" className="hover:text-[#2d6a4f] transition-colors">Careers</Link></li>
               </ul>
             </div>
+
+            {/* Legal */}
             <div>
-              <h4 className="font-bold text-slate-900 mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-slate-500">
-                <li><Link href="/about" className="hover:text-green-600 transition-colors">About Us</Link></li>
-                <li><Link href="/contact" className="hover:text-green-600 transition-colors">Contact</Link></li>
-                <li><Link href="/careers" className="hover:text-green-600 transition-colors">Careers</Link></li>
+              <h4 className="font-bold text-[#111] text-sm mb-5">Legal</h4>
+              <ul className="space-y-3 text-sm text-[#7a7a7a]">
+                <li><Link href="/terms" className="hover:text-[#2d6a4f] transition-colors">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:text-[#2d6a4f] transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/contact" className="hover:text-[#2d6a4f] transition-colors">Cookie Preferences</Link></li>
               </ul>
             </div>
           </div>
-          <div className="section-divider mb-8" />
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-slate-400 text-sm">© 2026 ET Smart Fields. All rights reserved.</p>
-            <div className="flex gap-6 text-sm text-slate-400">
-              <Link href="/privacy" className="hover:text-green-600 transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-green-600 transition-colors">Terms</Link>
+
+          {/* Bottom bar */}
+          <div
+            className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4"
+            style={{ borderTop: "1px solid rgba(0,0,0,0.07)" }}
+          >
+            <p className="text-xs text-[#aaa]">© 2026 ET Smart Fields. All Rights Reserved.</p>
+            <div className="flex gap-5 text-xs text-[#aaa]">
+              <Link href="/privacy" className="hover:text-[#2d6a4f] transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-[#2d6a4f] transition-colors">Terms of Service</Link>
             </div>
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
 
-function Download(props: React.SVGProps<SVGSVGElement> & { size?: number }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={props.size || 24} height={props.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" x2="12" y1="15" y2="3" />
-    </svg>
+    </div>
   );
 }
