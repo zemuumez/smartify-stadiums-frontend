@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Plus, Search, Users, Trophy, Calendar, Shield,
-  ArrowRight, Filter, ChevronDown, Star, MapPin
+  ArrowRight, Filter, ChevronDown, Star, MapPin, ArrowUpRight
 } from "lucide-react";
+import { FadeUp, SlideIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 const DEMO_TEAMS = [
   {
@@ -23,7 +25,7 @@ const DEMO_TEAMS = [
     captain: "Abebe Kebede",
     isPublic: true,
     avatar: "⭐",
-    color: "#16a34a",
+    sport: "Football",
   },
   {
     id: "t2",
@@ -39,7 +41,7 @@ const DEMO_TEAMS = [
     captain: "Daniel Tadesse",
     isPublic: true,
     avatar: "🦁",
-    color: "#2563eb",
+    sport: "Football",
   },
   {
     id: "t3",
@@ -55,7 +57,7 @@ const DEMO_TEAMS = [
     captain: "Yonas Tesfaye",
     isPublic: true,
     avatar: "🏟️",
-    color: "#7c3aed",
+    sport: "Futsal",
   },
   {
     id: "t4",
@@ -71,23 +73,23 @@ const DEMO_TEAMS = [
     captain: "Dawit Mengistu",
     isPublic: true,
     avatar: "⛪",
-    color: "#dc2626",
+    sport: "Football",
   },
   {
     id: "t5",
-    name: "Bole United",
+    name: "Bole Hoops",
     city: "Addis Ababa",
-    players: 11,
+    players: 8,
     matches: 18,
-    wins: 8,
-    draws: 5,
-    losses: 5,
-    points: 29,
-    rank: 8,
+    wins: 14,
+    draws: 0,
+    losses: 4,
+    points: 42,
+    rank: 4,
     captain: "Fatuma Hassan",
     isPublic: true,
-    avatar: "🔵",
-    color: "#0891b2",
+    avatar: "🏀",
+    sport: "Basketball",
   },
   {
     id: "t6",
@@ -103,7 +105,7 @@ const DEMO_TEAMS = [
     captain: "Meron Bekele",
     isPublic: true,
     avatar: "🐯",
-    color: "#ea580c",
+    sport: "Futsal",
   },
 ];
 
@@ -113,7 +115,7 @@ export default function TeamsPage() {
   const [showMyTeams, setShowMyTeams] = useState(false);
 
   const filteredTeams = DEMO_TEAMS
-    .filter((t) => t.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((t) => t.name.toLowerCase().includes(search.toLowerCase()) || t.city.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === "rank") return a.rank - b.rank;
       if (sortBy === "name") return a.name.localeCompare(b.name);
@@ -121,148 +123,160 @@ export default function TeamsPage() {
     });
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Hero */}
-      <section className="pt-32 pb-16 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-            <span className="text-green-400 font-semibold tracking-wider uppercase text-sm">Teams</span>
-            <h1 className="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">
-              Find or Create a <span className="gradient-text">Team</span>
+    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
+
+      {/* ── HERO WITH PHOTO BACKGROUND ── */}
+      <section className="relative min-h-[50vh] flex flex-col justify-end overflow-hidden">
+        <div className="absolute inset-0">
+          <Image
+            src="/venue-card-2.jpg"
+            alt="Ethiopian Sports Teams"
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          <div className="absolute inset-0 photo-overlay-hero" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-36 pb-20">
+          <div className="max-w-2xl">
+            <span className="trust-badge mb-4 inline-flex">
+              🏆 Official League System
+            </span>
+            <h1
+              className="text-white font-black leading-tight mb-4"
+              style={{ fontSize: "clamp(2.4rem, 5.5vw, 3.8rem)", letterSpacing: "-0.025em" }}
+            >
+              Teams &amp; League Standings
             </h1>
-            <p className="text-lg text-slate-300 max-w-2xl">
-              Join a team, manage your roster, and track your performance across leagues and tournaments.
+            <p className="text-white/80 text-lg leading-relaxed max-w-xl">
+              Create a team, manage your roster, schedule scrimmages, and track your ranking across Ethiopia&apos;s verified sports venues.
             </p>
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      {/* ── ACTION BAR ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20 mb-12">
+        <div className="photo-card p-4 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-1 relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#aaa]" size={18} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search teams..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all shadow-sm"
+              placeholder="Search team by name or city..."
+              className="w-full pl-11 pr-4 py-3 bg-transparent text-sm font-semibold text-[#111] placeholder-[#aaa] focus:outline-none"
             />
           </div>
-          <Link
-            href="/teams/create"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
-          >
-            <Plus size={18} /> Create Team
-          </Link>
-        </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => setShowMyTeams(false)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              !showMyTeams ? "bg-green-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            All Teams
-          </button>
-          <button
-            onClick={() => setShowMyTeams(true)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              showMyTeams ? "bg-green-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            My Teams
-          </button>
-          <div className="flex-1" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-600 focus:border-green-500 outline-none"
-          >
-            <option value="rank">Rank</option>
-            <option value="name">Name</option>
-            <option value="players">Players</option>
-          </select>
-        </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-4 py-3 rounded-full text-xs font-bold text-[#111] border border-black/10 bg-white focus:outline-none"
+            >
+              <option value="rank">Sort by Rank</option>
+              <option value="name">Sort by Name</option>
+              <option value="players">Sort by Players</option>
+            </select>
 
-        {/* League Table */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-8 shadow-sm">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-            <Trophy className="text-green-600" size={18} />
-            <h2 className="font-bold text-slate-900">League Standings</h2>
+            <Link
+              href="/teams/create"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-full text-white font-bold text-xs whitespace-nowrap transition-all hover:opacity-90"
+              style={{ background: "#2d6a4f", boxShadow: "0 4px 14px rgba(45,106,79,0.3)" }}
+            >
+              <Plus size={15} /> Create Team
+            </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="text-left px-6 py-3 text-xs font-bold text-slate-500 uppercase">#</th>
-                  <th className="text-left px-6 py-3 text-xs font-bold text-slate-500 uppercase">Team</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase hidden sm:table-cell">P</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase hidden md:table-cell">W</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase hidden md:table-cell">D</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase hidden md:table-cell">L</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase">Pts</th>
-                  <th className="text-right px-6 py-3 text-xs font-bold text-slate-500 uppercase"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTeams.map((team, i) => (
-                  <motion.tr
-                    key={team.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <span className={`text-sm font-bold ${
-                        team.rank <= 3 ? "text-green-600" : "text-slate-500"
-                      }`}>
-                        {team.rank}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link href={`/teams/${team.id}`} className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-                          style={{ backgroundColor: team.color + "15" }}
-                        >
-                          {team.avatar}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm hover:text-green-600 transition-colors">{team.name}</p>
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <MapPin size={10} /> {team.city}
-                          </p>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-4 text-center text-sm text-slate-600 hidden sm:table-cell">{team.matches}</td>
-                    <td className="px-4 py-4 text-center text-sm text-green-600 font-medium hidden md:table-cell">{team.wins}</td>
-                    <td className="px-4 py-4 text-center text-sm text-yellow-600 font-medium hidden md:table-cell">{team.draws}</td>
-                    <td className="px-4 py-4 text-center text-sm text-red-500 font-medium hidden md:table-cell">{team.losses}</td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="text-sm font-black text-slate-900">{team.points}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link href={`/teams/${team.id}`} className="text-slate-400 hover:text-green-600 transition-colors">
-                        <ArrowRight size={16} />
-                      </Link>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+        {/* ── LEAGUE TABLE ── */}
+        <div className="mb-14">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">Division 1</div>
+              <h2 className="heading-xl">Addis Ababa Premier Table</h2>
+            </div>
+          </div>
+
+          <div className="photo-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "rgba(0,0,0,0.06)", background: "#fafafa" }}>
+                    <th className="text-left px-6 py-4 text-xs font-bold text-[#7a7a7a] uppercase">#</th>
+                    <th className="text-left px-6 py-4 text-xs font-bold text-[#7a7a7a] uppercase">Team</th>
+                    <th className="text-center px-4 py-4 text-xs font-bold text-[#7a7a7a] uppercase hidden sm:table-cell">Played</th>
+                    <th className="text-center px-4 py-4 text-xs font-bold text-[#7a7a7a] uppercase hidden md:table-cell">W</th>
+                    <th className="text-center px-4 py-4 text-xs font-bold text-[#7a7a7a] uppercase hidden md:table-cell">D</th>
+                    <th className="text-center px-4 py-4 text-xs font-bold text-[#7a7a7a] uppercase hidden md:table-cell">L</th>
+                    <th className="text-center px-4 py-4 text-xs font-bold text-[#7a7a7a] uppercase">Pts</th>
+                    <th className="text-right px-6 py-4 text-xs font-bold text-[#7a7a7a] uppercase"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTeams.map((team, i) => (
+                    <motion.tr
+                      key={team.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="border-b transition-colors hover:bg-[#fbfbf9]"
+                      style={{ borderColor: "rgba(0,0,0,0.04)" }}
+                    >
+                      <td className="px-6 py-4">
+                        <span className={`text-sm font-black ${
+                          team.rank <= 3 ? "text-[#2d6a4f]" : "text-[#7a7a7a]"
+                        }`}>
+                          {team.rank}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link href={`/teams/${team.id}`} className="flex items-center gap-3 group">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-[#f0faf4]">
+                            {team.avatar}
+                          </div>
+                          <div>
+                            <p className="font-bold text-[#111] text-sm group-hover:text-[#2d6a4f] transition-colors">{team.name}</p>
+                            <p className="text-xs text-[#7a7a7a] flex items-center gap-1">
+                              <MapPin size={10} style={{ color: "#2d6a4f" }} /> {team.city} • <span className="font-semibold">{team.sport}</span>
+                            </p>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-4 text-center text-sm font-semibold text-[#5a5a5a] hidden sm:table-cell">{team.matches}</td>
+                      <td className="px-4 py-4 text-center text-sm font-bold text-[#2d6a4f] hidden md:table-cell">{team.wins}</td>
+                      <td className="px-4 py-4 text-center text-sm font-semibold text-[#b45309] hidden md:table-cell">{team.draws}</td>
+                      <td className="px-4 py-4 text-center text-sm font-semibold text-[#dc2626] hidden md:table-cell">{team.losses}</td>
+                      <td className="px-4 py-4 text-center">
+                        <span className="text-base font-black text-[#111]">{team.points}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link href={`/teams/${team.id}`} className="inline-flex p-2 rounded-full hover:bg-[#f0faf4] text-[#2d6a4f] transition-colors">
+                          <ArrowRight size={15} />
+                        </Link>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        {/* Team Cards Grid */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Browse Teams</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* ── TEAM CARDS GRID ── */}
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">Browse Roster</div>
+              <h2 className="heading-xl">Registered Teams</h2>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredTeams.map((team, i) => (
               <motion.div
                 key={team.id}
@@ -270,37 +284,41 @@ export default function TeamsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Link href={`/teams/${team.id}`} className="block p-6 rounded-2xl bg-white border border-slate-200 hover:border-green-200 hover:shadow-lg transition-all group">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
-                      style={{ backgroundColor: team.color + "15" }}
-                    >
-                      {team.avatar}
+                <Link href={`/teams/${team.id}`} className="photo-card p-7 block group hover:shadow-lg transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl bg-[#f0faf4]">
+                        {team.avatar}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-[#111] text-base group-hover:text-[#2d6a4f] transition-colors">{team.name}</h3>
+                        <p className="text-xs text-[#7a7a7a] flex items-center gap-1"><MapPin size={10} /> {team.city}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 group-hover:text-green-600 transition-colors">{team.name}</h3>
-                      <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={10} /> {team.city}</p>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold text-[#2d6a4f] bg-[#f0faf4]">
+                      Rank #{team.rank}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="text-center p-2 rounded-xl bg-[#f4f3ef]">
+                      <div className="text-base font-black text-[#111]">{team.players}</div>
+                      <div className="text-[10px] text-[#7a7a7a]">Players</div>
+                    </div>
+                    <div className="text-center p-2 rounded-xl bg-[#f0faf4]">
+                      <div className="text-base font-black text-[#2d6a4f]">{team.wins}</div>
+                      <div className="text-[10px] text-[#2d6a4f]">Wins</div>
+                    </div>
+                    <div className="text-center p-2 rounded-xl bg-[#f4f3ef]">
+                      <div className="text-base font-black text-[#111]">{team.points}</div>
+                      <div className="text-[10px] text-[#7a7a7a]">Points</div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="text-center p-2 bg-slate-50 rounded-xl">
-                      <div className="text-lg font-black text-slate-900">{team.players}</div>
-                      <div className="text-[10px] text-slate-500">Players</div>
-                    </div>
-                    <div className="text-center p-2 bg-green-50 rounded-xl">
-                      <div className="text-lg font-black text-green-600">{team.wins}</div>
-                      <div className="text-[10px] text-slate-500">Wins</div>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 rounded-xl">
-                      <div className="text-lg font-black text-blue-600">{team.points}</div>
-                      <div className="text-[10px] text-slate-500">Points</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">Captain: {team.captain}</span>
-                    <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                      View <ArrowRight size={12} />
+
+                  <div className="flex items-center justify-between text-xs pt-3 border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+                    <span className="text-[#7a7a7a]">Captain: <strong className="text-[#111]">{team.captain}</strong></span>
+                    <span className="font-bold text-[#2d6a4f] flex items-center gap-1">
+                      Profile <ArrowUpRight size={13} />
                     </span>
                   </div>
                 </Link>
@@ -309,6 +327,7 @@ export default function TeamsPage() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
