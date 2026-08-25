@@ -11,193 +11,181 @@ import {
   Mail,
   Building2,
   Save,
-  Camera,
-  Globe,
-  CreditCard,
+  CheckCircle2,
+  Lock,
+  Smartphone
 } from "lucide-react";
-import { GlowCard } from "@/components/ui/GlassCard";
-import { MagneticButton } from "@/components/ui/MagneticButton";
 import { FadeUp } from "@/components/ui/AnimatedSection";
 import { useAuthStore } from "@/lib/auth-store";
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState("profile");
+  const [saved, setSaved] = useState(false);
 
   const tabs = [
-    { id: "profile", label: "Profile", icon: User },
-    { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "security", label: "Security", icon: Shield },
-    { id: "integrations", label: "Integrations", icon: Key },
+    { id: "profile", label: "Profile & Business", icon: User },
+    { id: "notifications", label: "SMS & Notifications", icon: Bell },
+    { id: "security", label: "Security & Passwords", icon: Shield },
+    { id: "integrations", label: "Telebirr & API Gateways", icon: Key },
   ];
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
 
   return (
     <div className="space-y-6">
+
+      {/* ── HEADER ── */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Settings</h2>
-        <p className="text-gray-400 text-sm mt-1">Manage your account and preferences</p>
+        <h2 className="text-2xl font-black text-[#111] tracking-tight">Account &amp; Stadium Settings</h2>
+        <p className="text-[#7a7a7a] text-xs sm:text-sm mt-0.5">
+          Configure business details, notification webhooks, and manager permissions
+        </p>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto pb-1">
+      {/* ── TABS ── */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
+          const active = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.id
-                  ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
+                active
+                  ? "bg-[#2d6a4f] text-white shadow-sm"
+                  : "bg-white text-[#5a5a5a] border border-black/[0.06] hover:text-[#111]"
               }`}
             >
-              <Icon size={16} />
+              <Icon size={14} />
               {tab.label}
             </button>
           );
         })}
       </div>
 
+      {/* ── PROFILE TAB ── */}
       {activeTab === "profile" && (
         <FadeUp>
-          <GlowCard>
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white">Personal Information</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-500 to-yellow-500 flex items-center justify-center text-2xl font-bold text-white">
-                  {user?.full_name?.[0] || "U"}
-                </div>
-                <div>
-                  <button className="px-4 py-2 rounded-xl bg-white/5 text-white text-sm hover:bg-white/10 transition-colors">Change Photo</button>
-                  <p className="text-xs text-gray-500 mt-1">JPG, PNG. Max 2MB</p>
-                </div>
+          <div className="bg-white rounded-3xl p-7 sm:p-8 shadow-sm border border-black/[0.05] space-y-6">
+            <h3 className="text-lg font-black text-[#111]">Stadium Owner Profile</h3>
+
+            <div className="flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white shadow-sm"
+                style={{ background: "#2d6a4f" }}
+              >
+                {user?.full_name ? user.full_name[0] : "A"}
               </div>
+              <div>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-[#f4f3ef] text-[#111] font-bold text-xs hover:bg-[#eae8e1] transition-colors"
+                >
+                  Change Avatar
+                </button>
+                <p className="text-[11px] text-[#8a8a8a] mt-1">PNG, JPG up to 2MB</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Full Name</label>
-                  <input type="text" defaultValue={user?.full_name || ""} className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Email</label>
-                  <input type="email" defaultValue={user?.email || ""} className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Phone</label>
-                  <input type="tel" defaultValue={user?.phone || ""} className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Business Name</label>
-                  <input type="text" defaultValue={user?.business_name || ""} className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <MagneticButton variant="primary" size="md" icon={<Save size={16} />}>Save Changes</MagneticButton>
-              </div>
-            </div>
-          </GlowCard>
-        </FadeUp>
-      )}
-
-      {activeTab === "notifications" && (
-        <FadeUp>
-          <GlowCard>
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Notification Preferences</h3>
-              {[
-                { label: "New Booking", desc: "When someone books a field", default: true },
-                { label: "Booking Cancellation", desc: "When a booking is cancelled", default: true },
-                { label: "Payment Received", desc: "When payment is confirmed", default: true },
-                { label: "Camera Offline", desc: "When a camera goes offline", default: true },
-                { label: "Weekly Report", desc: "Summary of your analytics", default: false },
-                { label: "Marketing Updates", desc: "New features and promotions", default: false },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <div>
-                    <p className="text-sm font-medium text-white">{item.label}</p>
-                    <p className="text-xs text-gray-400">{item.desc}</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked={item.default} className="sr-only peer" />
-                    <div className="w-9 h-5 bg-gray-700 peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600" />
+                  <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                    Full Name
                   </label>
+                  <input
+                    type="text"
+                    defaultValue={user?.full_name || "Abebe Kebede"}
+                    className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                  />
                 </div>
-              ))}
-            </div>
-          </GlowCard>
-        </FadeUp>
-      )}
 
-      {activeTab === "security" && (
-        <FadeUp>
-          <div className="space-y-4">
-            <GlowCard>
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white">Change Password</h3>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Current Password</label>
-                  <input type="password" className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
+                  <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                    Phone Number (Login ID)
+                  </label>
+                  <input
+                    type="tel"
+                    defaultValue={user?.phone || "0911234567"}
+                    className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">New Password</label>
-                  <input type="password" className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
+                  <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    defaultValue={user?.email || "owner@bambismeda.com"}
+                    className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Confirm New Password</label>
-                  <input type="password" className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50" />
+                  <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                    Registered Business Name
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="Bambis Meda Sports PLC"
+                    className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                  />
                 </div>
-                <MagneticButton variant="primary" size="md" icon={<Save size={16} />}>Update Password</MagneticButton>
               </div>
-            </GlowCard>
-            <GlowCard>
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white">Two-Factor Authentication</h3>
-                <p className="text-sm text-gray-400">Add an extra layer of security to your account</p>
-                <MagneticButton variant="outline" size="md" icon={<Shield size={16} />}>Enable 2FA</MagneticButton>
+
+              {saved && (
+                <div className="p-3 rounded-xl bg-[#f0faf4] text-xs font-bold text-[#2d6a4f] flex items-center gap-2">
+                  <CheckCircle2 size={14} /> Profile changes saved successfully!
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-6 py-3 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  <Save size={14} /> Save Profile Changes
+                </button>
               </div>
-            </GlowCard>
-            <GlowCard>
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-red-400">Danger Zone</h3>
-                <p className="text-sm text-gray-400">Permanently delete your account and all data</p>
-                <MagneticButton variant="outline" size="md">Delete Account</MagneticButton>
-              </div>
-            </GlowCard>
+            </form>
           </div>
         </FadeUp>
       )}
 
+      {/* ── INTEGRATIONS TAB ── */}
       {activeTab === "integrations" && (
         <FadeUp>
-          <GlowCard>
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-white">Connected Services</h3>
+          <div className="bg-white rounded-3xl p-7 sm:p-8 shadow-sm border border-black/[0.05] space-y-5">
+            <h3 className="text-lg font-black text-[#111]">Payment &amp; Hardware Gateways</h3>
+            <div className="space-y-3">
               {[
-                { name: "Chapa Payments", desc: "Accept online payments", connected: true, icon: CreditCard },
-                { name: "SMS Provider", desc: "Send OTP and notifications", connected: true, icon: Phone },
-                { name: "WhatsApp Business", desc: "Send booking confirmations", connected: false, icon: Mail },
-              ].map((service, i) => {
-                const Icon = service.icon;
-                return (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                        <Icon size={20} className="text-gray-300" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">{service.name}</p>
-                        <p className="text-xs text-gray-400">{service.desc}</p>
-                      </div>
-                    </div>
-                    <MagneticButton variant={service.connected ? "ghost" : "primary"} size="sm">
-                      {service.connected ? "Connected" : "Connect"}
-                    </MagneticButton>
+                { name: "Telebirr Merchant Gateway", status: "Connected", desc: "Instant mobile QR & in-app checkout sync", active: true },
+                { name: "CBE Birr Integration", status: "Connected", desc: "Direct commercial bank of Ethiopia settlement", active: true },
+                { name: "Veo Cam 3 Cloud Sync", status: "Active (2 Cameras)", desc: "Autonomous AI match video pipeline", active: true },
+              ].map((item) => (
+                <div key={item.name} className="flex items-center justify-between p-4 rounded-2xl bg-[#f4f3ef]">
+                  <div>
+                    <div className="text-xs font-bold text-[#111]">{item.name}</div>
+                    <div className="text-[11px] text-[#7a7a7a]">{item.desc}</div>
                   </div>
-                );
-              })}
+                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase text-[#2d6a4f] bg-[#f0faf4]">
+                    {item.status}
+                  </span>
+                </div>
+              ))}
             </div>
-          </GlowCard>
+          </div>
         </FadeUp>
       )}
+
     </div>
   );
 }

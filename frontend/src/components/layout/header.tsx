@@ -14,6 +14,11 @@ export function Header() {
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthStore();
 
+  // Hide on dashboard and admin routes (they have their own navigation)
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
+    return null;
+  }
+
   const isDarkHeroPage = pathname === "/" || pathname === "/stadiums";
   const isSolid = scrolled || !isDarkHeroPage;
 

@@ -8,254 +8,158 @@ import {
   Users,
   Eye,
   Calendar,
-  Video,
   Download,
   ArrowUpRight,
-  ArrowDownRight,
   Clock,
   BarChart3,
-  PieChart,
+  Smartphone
 } from "lucide-react";
-import { GlowCard } from "@/components/ui/GlassCard";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState("month");
 
   const metrics = [
-    { label: "Total Revenue", value: "895,000", change: "+23%", up: true, prefix: "ETB", icon: DollarSign, color: "from-green-500 to-emerald-600" },
-    { label: "Total Bookings", value: "47", change: "+12%", up: true, prefix: "", icon: Calendar, color: "from-blue-500 to-cyan-600" },
-    { label: "Video Views", value: "12,340", change: "+8%", up: true, prefix: "", icon: Eye, color: "from-purple-500 to-pink-500" },
-    { label: "Downloads", value: "856", change: "+15%", up: true, prefix: "", icon: Download, color: "from-yellow-500 to-orange-500" },
-    { label: "Unique Players", value: "286", change: "+18", up: true, prefix: "", icon: Users, color: "from-rose-500 to-pink-600" },
-    { label: "Avg Session", value: "12:34", change: "+2:15", up: true, prefix: "", icon: Clock, color: "from-cyan-500 to-blue-500" },
+    { label: "Total Revenue", value: "135,000", change: "+24%", prefix: "ETB", icon: DollarSign },
+    { label: "Total Bookings", value: "54", change: "+14%", prefix: "", icon: Calendar },
+    { label: "AI Video Views", value: "14,250", change: "+18%", prefix: "", icon: Eye },
+    { label: "Clip Downloads", value: "980", change: "+22%", prefix: "", icon: Download },
+    { label: "Active Players", value: "312", change: "+28", prefix: "", icon: Users },
+    { label: "Avg Slot Usage", value: "84%", change: "+6%", prefix: "", icon: Clock },
   ];
 
-  const dailyData = [12, 19, 15, 22, 18, 25, 20, 28, 24, 32, 28, 35, 30, 38];
-  const weeklyData = [65, 78, 52, 92, 85, 70, 95, 88, 102, 78, 95, 110];
+  const weeklyData = [65, 78, 52, 92, 85, 70, 95, 88, 102, 78, 95, 120];
 
   const topFields = [
-    { name: "Bambis - Field 1", bookings: 18, revenue: 45000, views: 4200 },
-    { name: "Bambis - Field 2", bookings: 15, revenue: 37500, views: 3100 },
-    { name: "St George - Field 1", bookings: 12, revenue: 30000, views: 2800 },
-    { name: "St George - Field 2", bookings: 2, revenue: 7000, views: 2240 },
-  ];
-
-  const popularMatches = [
-    { title: "Bambis vs Lion City", views: 2340, downloads: 156, date: "Aug 20" },
-    { title: "Sunday League Final", views: 1890, downloads: 203, date: "Aug 18" },
-    { title: "Bambis Youth Cup", views: 1456, downloads: 98, date: "Aug 15" },
+    { name: "Bambis Meda — Pitch A (11v11)", bookings: 22, revenue: 55000, views: 5200 },
+    { name: "Bambis Meda — Pitch B (7v7)", bookings: 18, revenue: 32400, views: 4100 },
+    { name: "Unity Complex — Indoor Court", bookings: 14, revenue: 21000, views: 3400 },
   ];
 
   const revenueByMethod = [
-    { method: "Telebirr", percent: 62, color: "bg-green-500" },
-    { method: "CBE Birr", percent: 21, color: "bg-blue-500" },
-    { method: "Credit Card", percent: 12, color: "bg-purple-500" },
-    { method: "Cash", percent: 5, color: "bg-yellow-500" },
+    { method: "Telebirr", percent: 68, amount: "91,800 ETB", color: "#2d6a4f" },
+    { method: "CBE Birr", percent: 22, amount: "29,700 ETB", color: "#40916c" },
+    { method: "Chapa / Card", percent: 10, amount: "13,500 ETB", color: "#52b788" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+      {/* ── HEADER & PERIOD SELECTOR ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Analytics</h2>
-          <p className="text-gray-400 text-sm mt-1">Track your performance and revenue</p>
+          <h2 className="text-2xl font-black text-[#111] tracking-tight">Revenue &amp; Venue Analytics</h2>
+          <p className="text-[#7a7a7a] text-xs sm:text-sm mt-0.5">
+            Real-time telemetry, payment breakdowns, and player engagement stats
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-black/[0.06] shadow-sm">
           {["week", "month", "quarter", "year"].map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
                 period === p
-                  ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                  : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+                  ? "bg-[#2d6a4f] text-white shadow-sm"
+                  : "text-[#5a5a5a] hover:text-[#111]"
               }`}
             >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
+              {p}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Metrics Grid */}
-      <StaggerChildren className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      {/* ── METRICS GRID (Solid Styling) ── */}
+      <StaggerChildren className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metrics.map((m) => {
           const Icon = m.icon;
           return (
             <StaggerItem key={m.label}>
-              <GlowCard className="!p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${m.color} flex items-center justify-center`}>
-                    <Icon size={16} className="text-white" />
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-black/[0.05] flex flex-col justify-between hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#f0faf4] text-[#2d6a4f]">
+                    <Icon size={16} />
                   </div>
-                  <p className="text-xs text-gray-400">{m.label}</p>
+                  <span className="text-[10px] font-bold text-[#2d6a4f] bg-[#f0faf4] px-2 py-0.5 rounded-full">
+                    {m.change}
+                  </span>
                 </div>
-                <p className="text-xl font-bold text-white">
-                  {m.prefix && <span className="text-sm text-gray-400 mr-1">{m.prefix}</span>}
-                  {m.value}
-                </p>
-                <div className={`flex items-center gap-1 mt-1 text-xs ${m.up ? "text-green-400" : "text-red-400"}`}>
-                  {m.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-                  {m.change}
+                <div>
+                  <div className="text-xl font-black text-[#111] tracking-tight">
+                    {m.value} {m.prefix && <span className="text-xs text-[#7a7a7a] font-normal">{m.prefix}</span>}
+                  </div>
+                  <div className="text-[11px] text-[#7a7a7a] font-semibold mt-0.5">{m.label}</div>
                 </div>
-              </GlowCard>
+              </div>
             </StaggerItem>
           );
         })}
       </StaggerChildren>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue Chart */}
-        <FadeUp className="lg:col-span-2">
-          <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
+      {/* ── PERFORMANCE BARS & PAYMENT METHOD ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+
+        {/* Weekly Revenue Visualizer */}
+        <div className="lg:col-span-8 bg-white rounded-3xl p-7 shadow-sm border border-black/[0.05] flex flex-col justify-between">
+          <div>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Revenue Trend</h3>
-              <BarChart3 size={20} className="text-gray-500" />
+              <div>
+                <h3 className="text-lg font-black text-[#111]">Weekly Booking Distribution</h3>
+                <p className="text-xs text-[#7a7a7a]">Number of booked slots per week across all fields</p>
+              </div>
+              <span className="text-xs font-bold text-[#2d6a4f] bg-[#f0faf4] px-3 py-1 rounded-full">
+                Target: 90% Capacity
+              </span>
             </div>
-            <div className="h-48 flex items-end gap-1">
-              {dailyData.map((h, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(h / 40) * 100}%` }}
-                  transition={{ duration: 0.6, delay: i * 0.03 }}
-                  className="flex-1 bg-gradient-to-t from-green-600 to-green-400 rounded-t-sm hover:from-green-500 hover:to-green-300 transition-colors cursor-pointer relative group min-w-[4px]"
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {(h * 1000).toLocaleString()} ETB
+
+            <div className="h-48 flex items-end justify-between gap-2 pt-6">
+              {weeklyData.map((val, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
+                  <div className="w-full bg-[#f4f3ef] rounded-2xl h-36 flex items-end p-1">
+                    <div
+                      className="w-full rounded-xl transition-all duration-300 bg-[#2d6a4f]"
+                      style={{ height: `${(val / 120) * 100}%` }}
+                    />
                   </div>
-                </motion.div>
+                  <span className="text-[10px] font-bold text-[#7a7a7a]">W{idx + 1}</span>
+                </div>
               ))}
             </div>
-            <p className="text-center text-xs text-gray-500 mt-3">Daily revenue (last 14 days)</p>
           </div>
-        </FadeUp>
+        </div>
 
-        {/* Payment Methods */}
-        <FadeUp delay={0.1}>
-          <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Payment Methods</h3>
-              <PieChart size={20} className="text-gray-500" />
-            </div>
+        {/* Payment Methods (Telebirr / CBE Birr) */}
+        <div className="lg:col-span-4 bg-white rounded-3xl p-7 shadow-sm border border-black/[0.05] flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-black text-[#111] mb-1">Payment Gateways</h3>
+            <p className="text-xs text-[#7a7a7a] mb-6">Instant synchronization ratio</p>
+
             <div className="space-y-4">
-              {revenueByMethod.map((m) => (
-                <div key={m.method}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-300">{m.method}</span>
-                    <span className="text-white font-medium">{m.percent}%</span>
+              {revenueByMethod.map((item) => (
+                <div key={item.method} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-[#111]">{item.method}</span>
+                    <span className="font-bold text-[#2d6a4f]">{item.percent}% ({item.amount})</span>
                   </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${m.percent}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={`h-full rounded-full ${m.color}`}
+                  <div className="h-2.5 rounded-full bg-[#f4f3ef] overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${item.percent}%`, backgroundColor: item.color }}
                     />
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-6 pt-4 border-t border-white/10">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">Total Revenue</span>
-                <span className="text-white font-bold">895,000 ETB</span>
-              </div>
-              <div className="flex items-center justify-between text-sm mt-1">
-                <span className="text-gray-400">Platform Fee (5%)</span>
-                <span className="text-yellow-400 font-medium">44,750 ETB</span>
-              </div>
-            </div>
           </div>
-        </FadeUp>
-      </div>
 
-      {/* Views Chart & Top Fields */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Views Chart */}
-        <FadeUp>
-          <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Video Views</h3>
-            <div className="h-48 flex items-end gap-1">
-              {weeklyData.map((h, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(h / 120) * 100}%` }}
-                  transition={{ duration: 0.6, delay: i * 0.03 }}
-                  className="flex-1 bg-gradient-to-t from-purple-600 to-purple-400 rounded-t-sm hover:from-purple-500 hover:to-purple-300 transition-colors cursor-pointer relative group min-w-[4px]"
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {h.toLocaleString()} views
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            <p className="text-center text-xs text-gray-500 mt-3">Weekly views (last 12 weeks)</p>
-          </div>
-        </FadeUp>
-
-        {/* Top Fields */}
-        <FadeUp delay={0.1}>
-          <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Top Performing Fields</h3>
-            <div className="space-y-3">
-              {topFields.map((field, i) => (
-                <motion.div
-                  key={field.name}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-yellow-500 flex items-center justify-center text-sm font-bold text-white">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{field.name}</p>
-                    <p className="text-xs text-gray-400">{field.bookings} bookings · {field.views.toLocaleString()} views</p>
-                  </div>
-                  <p className="text-sm font-medium text-green-400">{field.revenue.toLocaleString()} ETB</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </FadeUp>
-      </div>
-
-      {/* Popular Matches */}
-      <FadeUp>
-        <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Popular Match Replays</h3>
-            <span className="text-xs text-gray-500">Last 30 days</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {popularMatches.map((match, i) => (
-              <motion.div
-                key={match.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-green-500/30 transition-all"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Video size={16} className="text-purple-400" />
-                  <span className="text-xs text-gray-500">{match.date}</span>
-                </div>
-                <h4 className="text-sm font-medium text-white mb-2">{match.title}</h4>
-                <div className="flex items-center gap-4 text-xs text-gray-400">
-                  <span className="flex items-center gap-1"><Eye size={12} /> {match.views.toLocaleString()}</span>
-                  <span className="flex items-center gap-1"><Download size={12} /> {match.downloads}</span>
-                </div>
-              </motion.div>
-            ))}
+          <div className="pt-4 mt-6 border-t border-black/[0.06] text-xs text-[#7a7a7a]">
+            Automatic payouts transferred weekly to verified CBE bank account.
           </div>
         </div>
-      </FadeUp>
+
+      </div>
+
     </div>
   );
 }

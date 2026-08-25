@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
   const { requestOTP, login, setDemoUser } = useAuthStore();
 
   const handleRequestOtp = async (e: React.FormEvent) => {
@@ -35,7 +37,7 @@ export default function LoginPage() {
     setError("");
     try {
       await login(phone, otp);
-      window.location.href = "/dashboard";
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err?.response?.data?.message || err.message || "Invalid OTP");
     } finally {
@@ -45,7 +47,7 @@ export default function LoginPage() {
 
   const handleQuickDemo = (role: "player" | "owner") => {
     setDemoUser(role);
-    window.location.href = role === "owner" ? "/dashboard" : "/stadiums";
+    router.push(role === "owner" ? "/dashboard" : "/stadiums");
   };
 
   return (

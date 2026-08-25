@@ -15,7 +15,7 @@ interface AuthState {
 
 const createDemoUser = (phone = '0911234567', role: 'player' | 'owner' | 'admin' = 'player'): User => ({
   id: 'demo-user-1',
-  phone,
+  phone: phone || '0911234567',
   full_name: role === 'owner' ? 'Fatima Hassan (Owner)' : 'Abebe Kebede (Captain)',
   role,
   is_verified: true,
@@ -23,16 +23,35 @@ const createDemoUser = (phone = '0911234567', role: 'player' | 'owner' | 'admin'
   created_at: new Date().toISOString(),
 });
 
+// Helper to safely get initial auth state from localStorage
+const getInitialState = () => {
+  if (typeof window === 'undefined') {
+    return { user: null, isAuthenticated: false, isLoading: true };
+  }
+  try {
+    const token = localStorage.getItem('access_token');
+    const userData = localStorage.getItem('user_data');
+    if (token && userData) {
+      return { user: JSON.parse(userData), isAuthenticated: true, isLoading: false };
+    }
+    if (token) {
+      const demo = createDemoUser('0911234567', 'player');
+      return { user: demo, isAuthenticated: true, isLoading: false };
+    }
+  } catch {
+    // ignore parsing errors
+  }
+  return { user: null, isAuthenticated: false, isLoading: false };
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
+  ...getInitialState(),
 
   requestOTP: async (phone: string, purpose: string = 'login') => {
     try {
       await api.post('/auth/request-otp', { phone, purpose });
     } catch {
-      console.log(`[Demo] OTP requested for ${phone}. Use code: 123456`);
+      console.log(`[Demo Mode] OTP requested for ${phone}. Use code: 123456`);
     }
   },
 
@@ -42,9 +61,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       const tokens = response.data;
       localStorage.setItem('access_token', tokens.access_token);
       localStorage.setItem('refresh_token', tokens.refresh_token);
-      set({ user: tokens.user, isAuthenticated: true });
+      localStorage.setItem('user_data', JSON.stringify(tokens.user));
+      set({ user: tokens.user, isAuthenticated: true, isLoading: false });
       return tokens;
     } catch {
+      // Offline / Demo fallback
       const demoUser = createDemoUser(phone, (role as 'player' | 'owner' | 'admin') || 'player');
       const mockTokens: TokenPair = {
         access_token: 'mock-access-token-jwt',
@@ -54,7 +75,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       };
       localStorage.setItem('access_token', mockTokens.access_token);
       localStorage.setItem('refresh_token', mockTokens.refresh_token);
-      set({ user: demoUser, isAuthenticated: true });
+      localStorage.setItem('user_data', JSON.stringify(demoUser));
+      set({ user: demoUser, isAuthenticated: true, isLoading: false });
       return mockTokens;
     }
   },
@@ -70,7 +92,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       const tokens = response.data;
       localStorage.setItem('access_token', tokens.access_token);
       localStorage.setItem('refresh_token', tokens.refresh_token);
-      set({ user: tokens.user, isAuthenticated: true });
+      localStorage.setItem('user_data', JSON.stringify(tokens.user));
+      set({ user: tokens.user, isAuthenticated: true, isLoading: false });
       return tokens;
     } catch {
       const demoUser: User = {
@@ -85,7 +108,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       };
       localStorage.setItem('access_token', mockTokens.access_token);
       localStorage.setItem('refresh_token', mockTokens.refresh_token);
-      set({ user: demoUser, isAuthenticated: true });
+      localStorage.setItem('user_data', JSON.stringify(demoUser));
+      set({ user: demoUser, isAuthenticated: true, isLoading: false });
       return mockTokens;
     }
   },
@@ -94,37 +118,56 @@ export const useAuthStore = create<AuthState>((set) => ({
     const demoUser = createDemoUser('0911234567', role);
     localStorage.setItem('access_token', 'mock-access-token-jwt');
     localStorage.setItem('refresh_token', 'mock-refresh-token-jwt');
-    set({ user: demoUser, isAuthenticated: true });
+    localStorage.setItem('user_data', JSON.stringify(demoUser));
+    set({ user: demoUser, isAuthenticated: true, isLoading: false });
   },
 
   logout: () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    set({ user: null, isAuthenticated: false });
+    localStorage.removeItem('user_data');
+    set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
   loadUser: async () => {
+    if (typeof window === 'undefined') return;
     try {
       const token = localStorage.getItem('access_token');
+      const savedUserData = localStorage.getItem('user_data');
+
       if (!token) {
-        set({ isLoading: false });
+        set({ user: null, isAuthenticated: false, isLoading: false });
         return;
       }
-      const response = await api.get<User>('/users/me');
-      set({ user: response.data, isAuthenticated: true, isLoading: false });
-    } catch {
-      const token = localStorage.getItem('access_token');
-      if (token && token.startsWith('mock-')) {
-        set({
-          user: createDemoUser('0911234567', 'player'),
-          isAuthenticated: true,
-          isLoading: false,
-        });
-      } else {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        set({ user: null, isAuthenticated: false, isLoading: false });
+
+      // If we already have saved user data, populate it immediately
+      if (savedUserData) {
+        try {
+          const parsed = JSON.parse(savedUserData);
+          set({ user: parsed, isAuthenticated: true, isLoading: false });
+        } catch {
+          // ignore
+        }
       }
+
+      // Try background sync with API
+      try {
+        const response = await api.get<User>('/users/me');
+        if (response.data) {
+          localStorage.setItem('user_data', JSON.stringify(response.data));
+          set({ user: response.data, isAuthenticated: true, isLoading: false });
+        }
+      } catch (networkErr: any) {
+        // If network error / backend offline, KEEP existing authentication
+        if (token) {
+          const fallbackUser = savedUserData
+            ? JSON.parse(savedUserData)
+            : createDemoUser('0911234567', 'player');
+          set({ user: fallbackUser, isAuthenticated: true, isLoading: false });
+        }
+      }
+    } catch {
+      set({ isLoading: false });
     }
   },
 }));

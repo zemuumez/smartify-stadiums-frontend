@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -19,12 +19,12 @@ import {
   Zap,
   Menu,
   X,
-  Sun,
-  Moon,
+  User,
+  Shield,
+  Bell,
+  ArrowUpRight
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { useTheme } from "@/lib/theme-provider";
-import { FadeUp } from "@/components/ui/AnimatedSection";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -45,55 +45,64 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuthStore();
-  const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
 
   useEffect(() => {
-    if (!isAuthenticated && typeof window !== "undefined") {
-      window.location.href = "/auth/login";
+    if (!isLoading && !isAuthenticated) {
+      router.push("/auth/login");
     }
-  }, [isAuthenticated]);
+  }, [isLoading, isAuthenticated, router]);
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   };
 
+  const getPageTitle = () => {
+    const current = sidebarLinks.find((l) => isActive(l.href));
+    return current ? current.label : "Dashboard";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f4f3ef]">
+        <div className="w-8 h-8 border-3 border-[#2d6a4f]/20 border-t-[#2d6a4f] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-gray-950 transition-colors">
-      {/* Desktop Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ width: collapsed ? 72 : 260 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="hidden lg:flex fixed left-0 top-0 h-screen flex-col bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-white/10 z-40 transition-colors"
+    <div className="min-h-screen flex bg-[#f4f3ef] text-[#111] overflow-x-hidden">
+
+      {/* ── DESKTOP SIDEBAR (Auto adjusts width with smooth transition) ── */}
+      <aside
+        className={`hidden lg:flex flex-col flex-shrink-0 bg-white border-r border-black/[0.06] sticky top-0 h-screen z-30 transition-all duration-300 ease-in-out ${
+          collapsed ? "w-[78px]" : "w-[260px]"
+        }`}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-20 border-b border-slate-200 dark:border-white/10">
-          <Image
-            src="/logo/et-smart-fields-icon.jpg"
-            alt="ET Smart Fields"
-            width={40}
-            height={40}
-            className="w-10 h-10 rounded-xl flex-shrink-0"
-          />
-          <AnimatePresence>
+        {/* Brand Logo */}
+        <div className="flex items-center gap-3 px-5 h-20 border-b border-black/[0.06] flex-shrink-0">
+          <Link href="/" className="flex items-center gap-3 group overflow-hidden">
+            <Image
+              src="/logo/et-smart-fields-icon.jpg"
+              alt="ET Smart Fields"
+              width={38}
+              height={38}
+              className="rounded-xl object-cover flex-shrink-0"
+              priority
+            />
             {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                className="overflow-hidden whitespace-nowrap"
-              >
-                <span className="text-lg font-bold text-slate-900 dark:text-white">ET</span>
-                <span className="text-lg font-bold text-green-600 dark:text-green-400 ml-1">Smart Fields</span>
-              </motion.div>
+              <div className="flex items-baseline gap-0.5 whitespace-nowrap overflow-hidden">
+                <span className="text-lg font-black text-[#111]">ET</span>
+                <span className="text-lg font-black text-[#2d6a4f]">Smart Fields</span>
+              </div>
             )}
-          </AnimatePresence>
+          </Link>
         </div>
 
-        {/* Nav Links */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        {/* Navigation Items */}
+        <nav className="flex-1 py-5 px-3 space-y-1.5 overflow-y-auto">
           {sidebarLinks.map((link) => {
             const Icon = link.icon;
             const active = isActive(link.href);
@@ -101,113 +110,105 @@ export default function DashboardLayout({
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 group relative ${
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 ${
                   active
-                    ? "bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5"
+                    ? "bg-[#2d6a4f] text-white shadow-md shadow-[#2d6a4f]/20"
+                    : "text-[#5a5a5a] hover:text-[#111] hover:bg-[#f0faf4]"
                 }`}
+                title={collapsed ? link.label : undefined}
               >
-                {active && (
-                  <motion.div
-                    layoutId="sidebar-active"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-green-500 rounded-r-full"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
+                <Icon size={18} className="flex-shrink-0" />
+                {!collapsed && (
+                  <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+                    {link.label}
+                  </span>
                 )}
-                <Icon size={20} className="flex-shrink-0" />
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="overflow-hidden whitespace-nowrap"
-                    >
-                      {link.label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
               </Link>
             );
           })}
         </nav>
 
-        {/* User & Collapse */}
-        <div className="border-t border-slate-200 dark:border-white/10 p-3 space-y-2">
-          {user && !collapsed && (
-            <div className="px-3 py-2 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                {user.full_name?.[0] || user.phone?.[0] || "U"}
+        {/* Sidebar Footer — User & Collapse Button */}
+        <div className="p-3 border-t border-black/[0.06] flex-shrink-0 space-y-2">
+          {!collapsed && (
+            <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#f4f3ef]">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
+                style={{ background: "#2d6a4f" }}
+              >
+                {user?.full_name ? user.full_name[0] : "A"}
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user.full_name || "Owner"}</p>
-                <p className="text-xs text-slate-500 dark:text-gray-500 truncate">{user.business_name || "Stadium Owner"}</p>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-[#111] truncate">
+                  {user?.full_name || "Stadium Owner"}
+                </div>
+                <div className="text-[10px] text-[#7a7a7a] font-semibold truncate capitalize">
+                  {user?.role || "Owner"} Account
+                </div>
               </div>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className="flex-shrink-0 p-2 rounded-xl text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
-              aria-label="Toggle theme"
-            >
-              {theme === "light" ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+
+          <div className="flex items-center justify-between gap-1">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all text-sm"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold text-[#5a5a5a] hover:text-[#111] hover:bg-[#f4f3ef] transition-colors"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-              {!collapsed && <span>Collapse</span>}
+              {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /> <span>Collapse</span></>}
+            </button>
+
+            <button
+              onClick={() => logout()}
+              className="p-2 rounded-xl text-[#7a7a7a] hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut size={16} />
             </button>
           </div>
-          <button
-            onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all text-sm"
-          >
-            <LogOut size={18} />
-            {!collapsed && <span>Sign Out</span>}
-          </button>
         </div>
-      </motion.aside>
+      </aside>
 
-      {/* Mobile Sidebar */}
+      {/* ── MOBILE SLIDE-OUT DRAWER ── */}
       <AnimatePresence>
         {mobileOpen && (
-          <>
+          <div className="fixed inset-0 z-50 lg:hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50 lg:hidden"
               onClick={() => setMobileOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            <motion.aside
-              initial={{ x: -300 }}
+            <motion.div
+              initial={{ x: "-100%" }}
               animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 h-screen w-[260px] bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-white/10 z-50 lg:hidden transition-colors"
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="absolute left-0 top-0 bottom-0 w-[280px] bg-white flex flex-col shadow-2xl"
             >
-              <div className="flex items-center justify-between px-5 h-20 border-b border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-5 h-20 border-b border-black/[0.06]">
+                <div className="flex items-center gap-2.5">
                   <Image
                     src="/logo/et-smart-fields-icon.jpg"
                     alt="ET Smart Fields"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-xl"
+                    width={36}
+                    height={36}
+                    className="rounded-xl object-cover"
                   />
-                  <div>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">ET</span>
-                    <span className="text-lg font-bold text-green-600 dark:text-green-400 ml-1">Smart Fields</span>
-                  </div>
+                  <span className="text-base font-black text-[#111]">Owner Dashboard</span>
                 </div>
-                <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                  <X size={24} />
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="p-2 text-[#7a7a7a] hover:text-[#111]"
+                >
+                  <X size={18} />
                 </button>
               </div>
-              <nav className="py-4 px-3 space-y-1">
+
+              {/* Drawer Links */}
+              <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                 {sidebarLinks.map((link) => {
                   const Icon = link.icon;
                   const active = isActive(link.href);
@@ -216,49 +217,98 @@ export default function DashboardLayout({
                       key={link.href}
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                         active
-                          ? "bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400"
-                          : "text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5"
+                          ? "bg-[#2d6a4f] text-white shadow-md"
+                          : "text-[#5a5a5a] hover:bg-[#f0faf4] hover:text-[#111]"
                       }`}
                     >
-                      <Icon size={20} />
+                      <Icon size={18} />
                       {link.label}
                     </Link>
                   );
                 })}
               </nav>
-            </motion.aside>
-          </>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-black/[0.06]">
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileOpen(false);
+                  }}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-full text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <LogOut size={14} /> Sign Out
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
-      <div className="flex-1 transition-all duration-300" style={{ marginLeft: 0 }}>
-        {/* Top Bar */}
-        <div className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/10 flex items-center px-4 lg:px-8 transition-colors">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden mr-4 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white"
-          >
-            <Menu size={24} />
-          </button>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {sidebarLinks.find((l) => isActive(l.href))?.label || "Dashboard"}
-          </h1>
-          <div className="flex-1" />
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium border border-green-200 dark:border-green-500/20">
-              ULS Verified
-            </div>
-          </div>
-        </div>
+      {/* ── MAIN CONTENT AREA (Dynamically occupies remaining space) ── */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
 
-        {/* Page Content */}
-        <div className="p-4 lg:p-8">
-          <FadeUp>{children}</FadeUp>
-        </div>
+        {/* Dashboard Top Header Bar */}
+        <header className="bg-white border-b border-black/[0.06] sticky top-0 z-20 shadow-sm">
+          <div className="px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+
+            {/* Left: Mobile menu toggle + Page title */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="p-2.5 rounded-xl border border-black/10 text-[#111] lg:hidden hover:bg-[#f4f3ef]"
+                aria-label="Open menu"
+              >
+                <Menu size={20} />
+              </button>
+
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#2d6a4f]">
+                  Owner Portal
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black text-[#111] tracking-tight">
+                  {getPageTitle()}
+                </h1>
+              </div>
+            </div>
+
+            {/* Right: Quick shortcuts & user badge */}
+            <div className="flex items-center gap-3">
+              <Link
+                href="/microsite"
+                target="_blank"
+                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-[#2d6a4f] bg-[#f0faf4] border border-[#2d6a4f]/20 hover:bg-[#2d6a4f] hover:text-white transition-all shadow-sm"
+              >
+                <Globe size={13} /> View Live Microsite <ArrowUpRight size={11} />
+              </Link>
+
+              <div className="flex items-center gap-2.5 pl-2 border-l border-black/[0.06]">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-sm"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  {user?.full_name ? user.full_name[0] : "A"}
+                </div>
+                <div className="hidden md:block text-left">
+                  <div className="text-xs font-black text-[#111]">
+                    {user?.full_name || "Abebe Kebede"}
+                  </div>
+                  <div className="text-[10px] text-[#7a7a7a] font-medium">Bambis Meda Stadium</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </header>
+
+        {/* Dashboard Main Content Body */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full max-w-[1440px] mx-auto">
+          {children}
+        </main>
       </div>
+
     </div>
   );
 }

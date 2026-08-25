@@ -11,11 +11,9 @@ import {
   Zap,
   Star,
   Crown,
-  Building2,
-  Clock,
+  Check,
+  Building2
 } from "lucide-react";
-import { GlowCard } from "@/components/ui/GlassCard";
-import { MagneticButton } from "@/components/ui/MagneticButton";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 export default function BillingPage() {
@@ -28,15 +26,13 @@ export default function BillingPage() {
       price: "2,500",
       period: "month",
       icon: Zap,
-      color: "from-blue-500 to-cyan-500",
       features: [
         "1 Stadium",
         "2 Fields",
         "1 Camera",
-        "500 GB Storage",
+        "500 GB Cloud Storage",
         "Basic Analytics",
-        "Microsite",
-        "Email Support",
+        "Public Microsite",
       ],
       current: false,
     },
@@ -46,16 +42,14 @@ export default function BillingPage() {
       price: "7,500",
       period: "month",
       icon: Star,
-      color: "from-green-500 to-emerald-500",
       features: [
         "3 Stadiums",
         "10 Fields",
-        "5 Cameras",
-        "2 TB Storage",
-        "Advanced Analytics",
-        "Custom Microsite",
+        "5 AI Cameras",
+        "2 TB Cloud Storage",
+        "Advanced Telemetry & Analytics",
+        "Custom Microsite Themes",
         "Priority Support",
-        "API Access",
       ],
       current: true,
     },
@@ -65,16 +59,13 @@ export default function BillingPage() {
       price: "20,000",
       period: "month",
       icon: Crown,
-      color: "from-yellow-500 to-orange-500",
       features: [
         "Unlimited Stadiums",
         "Unlimited Fields",
         "Unlimited Cameras",
         "10 TB Storage",
-        "Real-time Analytics",
-        "White-label Microsite",
-        "24/7 Support",
-        "Custom Integrations",
+        "Real-time Streaming",
+        "White-label Custom Domains",
         "Dedicated Account Manager",
       ],
       current: false,
@@ -82,170 +73,159 @@ export default function BillingPage() {
   ];
 
   const invoices = [
-    { id: "INV-001", date: "Aug 2026", amount: "7,500 ETB", status: "paid", plan: "Professional" },
-    { id: "INV-002", date: "Jul 2026", amount: "7,500 ETB", status: "paid", plan: "Professional" },
-    { id: "INV-003", date: "Jun 2026", amount: "7,500 ETB", status: "paid", plan: "Professional" },
-    { id: "INV-004", date: "May 2026", amount: "2,500 ETB", status: "paid", plan: "Starter" },
-    { id: "INV-005", date: "Apr 2026", amount: "2,500 ETB", status: "paid", plan: "Starter" },
+    { id: "INV-2026-08", date: "01 Aug 2026", amount: "7,500 ETB", status: "paid", plan: "Professional Plan" },
+    { id: "INV-2026-07", date: "01 Jul 2026", amount: "7,500 ETB", status: "paid", plan: "Professional Plan" },
+    { id: "INV-2026-06", date: "01 Jun 2026", amount: "7,500 ETB", status: "paid", plan: "Professional Plan" },
+    { id: "INV-2026-05", date: "01 May 2026", amount: "2,500 ETB", status: "paid", plan: "Starter Plan" },
   ];
 
   const usage = [
     { label: "Stadiums", used: 2, limit: 3, unit: "" },
-    { label: "Fields", used: 4, limit: 10, unit: "" },
-    { label: "Cameras", used: 2, limit: 5, unit: "" },
-    { label: "Storage", used: 423, limit: 2000, unit: "GB" },
-    { label: "API Calls", used: 12400, limit: 50000, unit: "" },
+    { label: "Operational Fields", used: 4, limit: 10, unit: "" },
+    { label: "Linked AI Cameras", used: 2, limit: 5, unit: "" },
+    { label: "Cloud Video Storage", used: 423, limit: 2000, unit: "GB" },
   ];
 
   return (
     <div className="space-y-8">
-      {/* Current Plan */}
-      <FadeUp>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-green-600/20 via-gray-900 to-yellow-600/20 border border-white/10 p-6 lg:p-8">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Star size={20} className="text-yellow-400" />
-                <span className="text-sm font-medium text-yellow-400">Current Plan</span>
-              </div>
-              <h2 className="text-2xl font-bold text-white">Professional</h2>
-              <p className="text-gray-400 text-sm mt-1">7,500 ETB/month · Next billing: Sep 15, 2026</p>
-            </div>
-            <div className="flex gap-3">
-              <MagneticButton variant="outline" size="md" icon={<CreditCard size={16} />}>
-                Update Payment
-              </MagneticButton>
-              <MagneticButton variant="ghost" size="md" icon={<Receipt size={16} />}>
-                View Invoices
-              </MagneticButton>
-            </div>
-          </div>
+
+      {/* ── HEADER ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-[#111] tracking-tight">Subscription &amp; Invoices</h2>
+          <p className="text-[#7a7a7a] text-xs sm:text-sm mt-0.5">
+            Manage your stadium software plan, storage limits, and receipt history
+          </p>
         </div>
-      </FadeUp>
-
-      {/* Usage */}
-      <FadeUp>
-        <GlowCard>
-          <h3 className="text-lg font-semibold text-white mb-4">Current Usage</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {usage.map((u) => {
-              const percent = (u.used / u.limit) * 100;
-              return (
-                <div key={u.label} className="p-3 rounded-xl bg-white/5">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-400">{u.label}</span>
-                    <span className="text-gray-300">{u.used.toLocaleString()}/{u.limit.toLocaleString()}{u.unit}</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={`h-full rounded-full ${percent > 80 ? "bg-red-500" : percent > 60 ? "bg-yellow-500" : "bg-green-500"}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </GlowCard>
-      </FadeUp>
-
-      {/* Plans */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Plans</h3>
-        <StaggerChildren className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {plans.map((plan) => {
-            const Icon = plan.icon;
-            return (
-              <StaggerItem key={plan.id}>
-                <GlowCard className={`h-full ${plan.current ? "ring-2 ring-green-500/50" : ""}`}>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center`}>
-                        <Icon size={24} className="text-white" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-white">{plan.name}</h4>
-                        {plan.current && (
-                          <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">Current</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-3xl font-bold text-white">{plan.price}</span>
-                      <span className="text-gray-400 text-sm ml-1">ETB/{plan.period}</span>
-                    </div>
-                    <ul className="space-y-2">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
-                          <CheckCircle2 size={14} className="text-green-400 flex-shrink-0" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <MagneticButton
-                      variant={plan.current ? "ghost" : "primary"}
-                      size="md"
-                      className="w-full"
-                    >
-                      {plan.current ? "Current Plan" : "Upgrade"}
-                    </MagneticButton>
-                  </div>
-                </GlowCard>
-              </StaggerItem>
-            );
-          })}
-        </StaggerChildren>
+        <button
+          className="flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all"
+          style={{ background: "#2d6a4f" }}
+        >
+          <CreditCard size={14} /> Update Payment Method
+        </button>
       </div>
 
-      {/* Invoices */}
-      <FadeUp>
-        <div className="rounded-2xl bg-gray-900/50 border border-white/10 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Invoices</h3>
-            <MagneticButton variant="ghost" size="sm" icon={<Download size={14} />}>
-              Export All
-            </MagneticButton>
+      {/* ── ACTIVE PLAN & USAGE CARD ── */}
+      <div className="bg-white rounded-3xl p-7 shadow-sm border border-black/[0.05]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-black/[0.06]">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-[#2d6a4f] bg-[#f0faf4] mb-2">
+              <CheckCircle2 size={12} /> Active Subscription
+            </div>
+            <h3 className="text-xl font-black text-[#111]">Professional Stadium Plan</h3>
+            <p className="text-xs text-[#7a7a7a]">Renews automatically on Sep 1, 2026 via Telebirr Auto-Debit</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left text-xs text-gray-400 font-medium pb-3">Invoice</th>
-                  <th className="text-left text-xs text-gray-400 font-medium pb-3">Date</th>
-                  <th className="text-left text-xs text-gray-400 font-medium pb-3">Plan</th>
-                  <th className="text-left text-xs text-gray-400 font-medium pb-3">Amount</th>
-                  <th className="text-left text-xs text-gray-400 font-medium pb-3">Status</th>
-                  <th className="text-right text-xs text-gray-400 font-medium pb-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-3 text-sm text-white font-mono">{inv.id}</td>
-                    <td className="py-3 text-sm text-gray-300">{inv.date}</td>
-                    <td className="py-3 text-sm text-gray-300">{inv.plan}</td>
-                    <td className="py-3 text-sm text-white font-medium">{inv.amount}</td>
-                    <td className="py-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                        <CheckCircle2 size={10} />
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button className="text-gray-400 hover:text-white">
-                        <Download size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="text-right">
+            <div className="text-2xl font-black text-[#111]">7,500 ETB <span className="text-xs font-normal text-[#7a7a7a]">/ month</span></div>
           </div>
         </div>
-      </FadeUp>
+
+        {/* Quota Progress */}
+        <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {usage.map((u) => {
+            const percent = Math.round((u.used / u.limit) * 100);
+            return (
+              <div key={u.label} className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#7a7a7a] font-semibold">{u.label}</span>
+                  <span className="font-bold text-[#111]">{u.used} / {u.limit} {u.unit}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[#f4f3ef] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[#2d6a4f]"
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── PLAN OPTIONS ── */}
+      <div>
+        <h3 className="text-lg font-black text-[#111] mb-4">Available Software Plans</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map((plan) => (
+            <div
+              key={plan.id}
+              className={`bg-white rounded-3xl p-7 shadow-sm border flex flex-col justify-between ${
+                plan.current ? "border-[#2d6a4f] ring-2 ring-[#2d6a4f]/20 shadow-md" : "border-black/[0.05]"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-black text-[#111]">{plan.name}</h4>
+                  {plan.current && (
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase text-[#2d6a4f] bg-[#f0faf4]">
+                      Current Plan
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-2xl font-black text-[#111] mb-6">
+                  {plan.price} ETB <span className="text-xs font-normal text-[#7a7a7a]">/ month</span>
+                </div>
+
+                <div className="space-y-2.5 mb-8">
+                  {plan.features.map((feat) => (
+                    <div key={feat} className="flex items-center gap-2 text-xs text-[#3d3d3d]">
+                      <Check size={13} className="text-[#2d6a4f] flex-shrink-0" />
+                      <span>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                disabled={plan.current}
+                className={`w-full py-3 rounded-full text-xs font-bold transition-all ${
+                  plan.current
+                    ? "bg-[#f0faf4] text-[#2d6a4f] cursor-default"
+                    : "bg-white border border-black/15 text-[#111] hover:bg-[#f4f3ef]"
+                }`}
+              >
+                {plan.current ? "Current Active Plan" : "Switch to " + plan.name}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── INVOICE HISTORY ── */}
+      <div className="bg-white rounded-3xl p-7 shadow-sm border border-black/[0.05]">
+        <h3 className="text-lg font-black text-[#111] mb-4">Billing History &amp; Receipts</h3>
+        <div className="space-y-2">
+          {invoices.map((inv) => (
+            <div
+              key={inv.id}
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#f4f3ef] hover:bg-[#eae8e1] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white text-[#2d6a4f] shadow-sm">
+                  <Receipt size={16} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-[#111]">{inv.id} — {inv.plan}</div>
+                  <div className="text-[11px] text-[#7a7a7a]">{inv.date}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-black text-[#111]">{inv.amount}</span>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#f0faf4] text-[#2d6a4f] uppercase">
+                  {inv.status}
+                </span>
+                <button className="text-[#8a8a8a] hover:text-[#111] p-1">
+                  <Download size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
