@@ -321,7 +321,7 @@ export default function MicrositeHome() {
 
                   <div className="p-5">
                     <h3 className="font-black text-[#111] mb-1">{h.title}</h3>
-                    <p className="text-sm text-[#7a7a7a] mb-3">{h.description || (h as any).desc}</p>
+                    <p className="text-sm text-[#7a7a7a] mb-3">{(h as any).description || (h as any).desc}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-[#3d3d3d]">
                         by <strong>{h.player}</strong>

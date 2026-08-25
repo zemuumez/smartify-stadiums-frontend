@@ -113,8 +113,8 @@ export default function PricingPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                className={`photo-card p-8 relative ${plan.popular ? "ring-2" : ""}`}
-                style={plan.popular ? { ringColor: "#2d6a4f", outline: "2.5px solid #2d6a4f" } : {}}
+                className={`photo-card p-8 relative ${plan.popular ? "border-2 border-[#2d6a4f]" : ""}`}
+                style={plan.popular ? { boxShadow: "0 12px 36px rgba(45,106,79,0.12)" } : {}}
               >
                 {plan.popular && (
                   <div
