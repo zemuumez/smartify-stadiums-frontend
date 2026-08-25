@@ -3,33 +3,36 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Calendar, CheckCircle2, ArrowRight, Zap } from "lucide-react";
+import {
+  Calendar, CheckCircle2, ArrowRight, Zap, Lightbulb,
+  Camera, Shirt, Wifi, CreditCard, Activity
+} from "lucide-react";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 const SPORTS = ["All", "Football", "Futsal", "Basketball", "Volleyball"];
 
 const fields = [
   {
-    id: 1, name: "Field 1 — Artificial Turf", sport: "Football",
+    id: 1, name: "Field 1 - Artificial Turf", sport: "Football",
     surface: "Artificial Turf (FIFA Quality)", size: "7v7", price: "1,200",
     lighting: true, camera: true, changing: true, wifi: true,
-    schedule: "Mon–Sun: 6:00 AM – 10:00 PM",
+    schedule: "Mon-Sun: 6:00 AM - 10:00 PM",
     desc: "Our flagship 7-a-side pitch with FIFA-quality synthetic turf, LED floodlights, and a live AI camera.",
     amenities: ["AI Camera Recording", "LED Floodlights", "Changing Rooms", "Ball Provided", "Free WiFi"],
   },
   {
-    id: 2, name: "Field 2 — 5-a-Side Turf", sport: "Football",
+    id: 2, name: "Field 2 - 5-a-Side Turf", sport: "Football",
     surface: "Artificial Turf (3G)", size: "5v5", price: "900",
     lighting: true, camera: true, changing: true, wifi: true,
-    schedule: "Mon–Sun: 6:00 AM – 10:00 PM",
+    schedule: "Mon-Sun: 6:00 AM - 10:00 PM",
     desc: "Compact and fast. Our 5-a-side pitch is perfect for small squads and futsal-style play.",
     amenities: ["AI Camera Recording", "LED Floodlights", "Shared Changing Rooms", "Free WiFi"],
   },
   {
-    id: 3, name: "Futsal Hall — Indoor", sport: "Futsal",
+    id: 3, name: "Futsal Hall - Indoor", sport: "Futsal",
     surface: "Hardwood / Polyurethane", size: "5v5", price: "800",
     lighting: true, camera: true, changing: true, wifi: true,
-    schedule: "Mon–Sun: 7:00 AM – 11:00 PM",
+    schedule: "Mon-Sun: 7:00 AM - 11:00 PM",
     desc: "A professional indoor futsal hall with wooden flooring, regulation markings, and full AI camera coverage.",
     amenities: ["AI Camera Recording", "Indoor Climate Control", "Changing Rooms", "Scoreboards", "Free WiFi"],
   },
@@ -37,7 +40,7 @@ const fields = [
     id: 4, name: "Basketball Court", sport: "Basketball",
     surface: "Hardwood (NBA-spec)", size: "5v5", price: "600",
     lighting: true, camera: false, changing: false, wifi: true,
-    schedule: "Mon–Sun: 7:00 AM – 9:00 PM",
+    schedule: "Mon-Sun: 7:00 AM - 9:00 PM",
     desc: "Full-size outdoor basketball court with NBA-specification hardwood surface and adjustable hoops.",
     amenities: ["LED Floodlights", "Adjustable Hoops", "Free WiFi"],
   },
@@ -45,8 +48,8 @@ const fields = [
     id: 5, name: "Volleyball Court", sport: "Volleyball",
     surface: "Synthetic Sand / Hardwood", size: "6v6", price: "500",
     lighting: false, camera: false, changing: false, wifi: false,
-    schedule: "Mon–Fri: 8:00 AM – 6:00 PM",
-    desc: "Outdoor volleyball court — available for casual play and competitive matches. Equipment provided.",
+    schedule: "Mon-Fri: 8:00 AM - 6:00 PM",
+    desc: "Outdoor volleyball court available for casual play and competitive matches. Equipment provided.",
     amenities: ["Net & Equipment Provided", "Outdoor Court"],
   },
 ];
@@ -68,7 +71,7 @@ export default function MicrositeFields() {
   return (
     <div style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── PAGE HEADER ─────────────────── */}
+      {/* ── PAGE HEADER ── */}
       <section className="pt-16 pb-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
@@ -81,7 +84,7 @@ export default function MicrositeFields() {
         </div>
       </section>
 
-      {/* ── SPORT FILTER ───────────────── */}
+      {/* ── SPORT FILTER ── */}
       <section className="py-8" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp>
@@ -100,7 +103,7 @@ export default function MicrositeFields() {
         </div>
       </section>
 
-      {/* ── FIELD LISTINGS ─────────────── */}
+      {/* ── FIELD LISTINGS ── */}
       <section className="pb-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <StaggerChildren className="space-y-5">
@@ -117,7 +120,7 @@ export default function MicrositeFields() {
                       >
                         {field.sport}
                       </span>
-                      <span className="text-xs text-[#7a7a7a] font-semibold">{field.size} · {field.surface}</span>
+                      <span className="text-xs text-[#7a7a7a] font-semibold">{field.size} - {field.surface}</span>
                     </div>
 
                     <h2 className="font-black text-[#111] text-xl mb-2">{field.name}</h2>
@@ -137,7 +140,7 @@ export default function MicrositeFields() {
                     </div>
 
                     <p className="text-xs text-[#aaa]">
-                      🕐 {field.schedule}
+                      {field.schedule}
                     </p>
                   </div>
 
@@ -149,11 +152,11 @@ export default function MicrositeFields() {
                     </div>
 
                     {/* Amenity icons */}
-                    <div className="flex gap-3 text-xl">
-                      {field.lighting  && <span title="LED Lighting">💡</span>}
-                      {field.camera    && <span title="AI Camera">📹</span>}
-                      {field.changing  && <span title="Changing Room">🚿</span>}
-                      {field.wifi      && <span title="Free WiFi">📶</span>}
+                    <div className="flex gap-3 text-[#2d6a4f]">
+                      {field.lighting  && <span title="LED Lighting"><Lightbulb size={18} /></span>}
+                      {field.camera    && <span title="AI Camera"><Camera size={18} /></span>}
+                      {field.changing  && <span title="Changing Room"><Shirt size={18} /></span>}
+                      {field.wifi      && <span title="Free WiFi"><Wifi size={18} /></span>}
                     </div>
 
                     <Link
@@ -171,7 +174,7 @@ export default function MicrositeFields() {
         </div>
       </section>
 
-      {/* ── BOOKING INFO ─────────────────── */}
+      {/* ── BOOKING INFO ── */}
       <section className="py-16 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-10">
@@ -181,13 +184,15 @@ export default function MicrositeFields() {
 
           <div className="grid md:grid-cols-3 gap-5">
             {[
-              { step: "01", emoji: "📅", title: "Pick a Field & Time", desc: "Browse fields above and select a date and time slot that suits you." },
-              { step: "02", emoji: "💳", title: "Pay Online",          desc: "Complete payment via Telebirr, CBE Birr, or credit card. Instant confirmation." },
-              { step: "03", emoji: "⚽", title: "Show Up & Play",      desc: "Arrive at the stadium. We&apos;ll have your field ready with equipment." },
+              { step: "01", icon: <Calendar size={24} style={{ color: "#2d6a4f" }} />, title: "Pick a Field & Time", desc: "Browse fields above and select a date and time slot that suits you." },
+              { step: "02", icon: <CreditCard size={24} style={{ color: "#2d6a4f" }} />, title: "Pay Online",          desc: "Complete payment via Telebirr, CBE Birr, or credit card. Instant confirmation." },
+              { step: "03", icon: <Activity size={24} style={{ color: "#2d6a4f" }} />, title: "Show Up & Play",      desc: "Arrive at the stadium. We will have your field ready with equipment." },
             ].map((s) => (
               <div key={s.step} className="photo-card p-6 text-center relative">
                 <div className="absolute top-4 right-4 font-black text-6xl text-[#f0faf4] select-none">{s.step}</div>
-                <div className="text-3xl mb-3">{s.emoji}</div>
+                <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-[#f0faf4]">
+                  {s.icon}
+                </div>
                 <h3 className="font-black text-[#111] mb-2">{s.title}</h3>
                 <p className="text-sm text-[#7a7a7a]">{s.desc}</p>
               </div>

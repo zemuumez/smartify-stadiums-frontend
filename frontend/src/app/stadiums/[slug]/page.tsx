@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Star, Video, Shield, Clock, Users, Calendar,
-  ArrowLeft, Play, Download, Share2, Phone, Mail, CheckCircle2, Award
+  ArrowLeft, Play, Download, Share2, Phone, Mail, CheckCircle2, Award, Building2
 } from "lucide-react";
 import { MicrositeHero } from "@/components/microsite/MicrositeHero";
 import { FieldCard } from "@/components/microsite/FieldCard";
@@ -94,11 +94,12 @@ export default function StadiumDetailPage() {
   if (!stadium) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f4f3ef" }}>
-        <div className="text-center photo-card p-10 max-w-md">
-          <span className="text-5xl mb-4 block">🏟️</span>
-          <h2 className="text-xl font-black text-[#111] mb-2">Stadium Not Found</h2>
-          <Link href="/stadiums" className="text-sm font-bold" style={{ color: "#2d6a4f" }}>
-            ← Back to All Stadiums
+        <div className="text-center py-20">
+          <Building2 size={40} className="text-[#2d6a4f] mx-auto mb-4" />
+          <h2 className="text-2xl font-black text-[#111] mb-2">Stadium Not Found</h2>
+          <p className="text-[#7a7a7a] mb-6">The sports venue you are looking for does not exist or has been relocated.</p>
+          <Link href="/stadiums" className="btn-primary inline-flex items-center gap-2" style={{ background: "#2d6a4f" }}>
+            Back to All Stadiums
           </Link>
         </div>
       </div>

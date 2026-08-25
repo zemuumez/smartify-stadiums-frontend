@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MapPin, Phone, Mail, Globe, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, Globe, Clock, Building2 } from "lucide-react";
 
 interface MicrositeLayoutProps {
   stadium: {
@@ -31,8 +31,8 @@ export function MicrositeLayout({ stadium, children }: MicrositeLayoutProps) {
               {stadium.logo ? (
                 <img src={stadium.logo} alt={stadium.name} className="w-8 h-8 rounded-lg" />
               ) : (
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                  <span className="text-sm">⚽</span>
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white">
+                  <Building2 size={16} />
                 </div>
               )}
               <span className="font-bold text-white">{stadium.name}</span>
@@ -75,8 +75,8 @@ export function MicrositeLayout({ stadium, children }: MicrositeLayoutProps) {
                 {stadium.logo ? (
                   <img src={stadium.logo} alt={stadium.name} className="w-10 h-10 rounded-lg" />
                 ) : (
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                    <span className="text-lg">⚽</span>
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white">
+                    <Building2 size={20} />
                   </div>
                 )}
                 <span className="font-bold text-white">{stadium.name}</span>
@@ -117,8 +117,8 @@ export function MicrositeLayout({ stadium, children }: MicrositeLayoutProps) {
             <div>
               <h4 className="font-bold text-white mb-4">Powered By</h4>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                  <span className="text-sm">⚽</span>
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white">
+                  <Building2 size={16} />
                 </div>
                 <div>
                   <span className="font-bold text-white text-sm">Play</span>

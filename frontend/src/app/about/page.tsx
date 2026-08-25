@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import {
   Globe, Users, Shield, Zap, Target, Heart,
   ArrowRight, Camera, Video, CheckCircle2,
-  TrendingUp, Smartphone, Award
+  TrendingUp, Smartphone, Award, Search, Building2,
+  Trophy, Film, Activity, ShieldCheck
 } from "lucide-react";
 import { FadeUp, SlideIn, ScaleIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
@@ -21,7 +22,7 @@ const values = [
   {
     icon: <Target size={28} style={{ color: "#2d6a4f" }} />,
     title: "Innovation",
-    desc: "We bring cutting-edge AI camera systems and digital infrastructure tools to Ethiopian sports — making professional broadcast quality accessible to every stadium.",
+    desc: "We bring cutting-edge AI camera systems and digital infrastructure tools to Ethiopian sports, making professional broadcast quality accessible to every stadium.",
   },
   {
     icon: <Heart size={28} style={{ color: "#2d6a4f" }} />,
@@ -36,21 +37,21 @@ const values = [
 ];
 
 const differentiators = [
-  { emoji: "⚽", title: "Multi-Sport Support", desc: "Football, Basketball, Volleyball, Badminton, Tennis, and Futsal — all supported from day one." },
-  { emoji: "📹", title: "AI Camera Integration", desc: "Automatic match recording with AI-powered highlight generation. No manual filming needed." },
-  { emoji: "⚡", title: "Zero Double-Booking", desc: "Real-time slot synchronization ensures a field can never be booked twice at the same time." },
-  { emoji: "🌐", title: "Stadium Microsites", desc: "Every stadium owner gets a fully customizable public website with events, highlights, and booking links." },
-  { emoji: "🎬", title: "Video Replay Platform", desc: "Players watch full match replays and share highlight clips — something no competitor in Ethiopia offers." },
-  { emoji: "📱", title: "Ethiopian Payments", desc: "Native support for Telebirr and CBE Birr — the dominant mobile payment methods in Ethiopia." },
-  { emoji: "🏆", title: "Team & League Management", desc: "Built-in team creation, roster management, league tables, and standings for organized play." },
-  { emoji: "✅", title: "Verified Stadium Program", desc: "The ULS badge builds trust between players and stadium owners through verified quality guarantees." },
+  { icon: <Activity size={22} style={{ color: "#2d6a4f" }} />, title: "Multi-Sport Support", desc: "Football, Basketball, Volleyball, Badminton, Tennis, and Futsal supported from day one." },
+  { icon: <Camera size={22} style={{ color: "#2d6a4f" }} />, title: "AI Camera Integration", desc: "Automatic match recording with AI-powered highlight generation. No manual filming needed." },
+  { icon: <Zap size={22} style={{ color: "#2d6a4f" }} />, title: "Zero Double-Booking", desc: "Real-time slot synchronization ensures a field can never be booked twice at the same time." },
+  { icon: <Globe size={22} style={{ color: "#2d6a4f" }} />, title: "Stadium Microsites", desc: "Every stadium owner gets a fully customizable public website with events, highlights, and booking links." },
+  { icon: <Film size={22} style={{ color: "#2d6a4f" }} />, title: "Video Replay Platform", desc: "Players watch full match replays and share highlight clips from their personal dashboard." },
+  { icon: <Smartphone size={22} style={{ color: "#2d6a4f" }} />, title: "Ethiopian Payments", desc: "Native support for Telebirr and CBE Birr, the dominant mobile payment methods in Ethiopia." },
+  { icon: <Trophy size={22} style={{ color: "#2d6a4f" }} />, title: "Team & League Management", desc: "Built-in team creation, roster management, league tables, and standings for organized play." },
+  { icon: <ShieldCheck size={22} style={{ color: "#2d6a4f" }} />, title: "Verified Stadium Program", desc: "The ULS badge builds trust between players and stadium owners through verified quality guarantees." },
 ];
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── HERO ───────────────────────────────────── */}
+      {/* ── HERO ── */}
       <section className="relative overflow-hidden" style={{ minHeight: "520px" }}>
         <div className="absolute inset-0">
           <Image
@@ -81,13 +82,13 @@ export default function AboutPage() {
               <span style={{ color: "#74c69d" }}>Smart Sports Future</span>
             </h1>
             <p className="text-white/75 text-xl leading-relaxed">
-              ET Smart Fields is on a mission to digitize and elevate sports infrastructure across Ethiopia — connecting players, stadiums, and technology in one seamless platform.
+              ET Smart Fields is on a mission to digitize and elevate sports infrastructure across Ethiopia, connecting players, stadiums, and technology in one seamless platform.
             </p>
           </motion.div>
         </div>
       </section>
 
-      {/* ── MISSION + STATS ─────────────────────────── */}
+      {/* ── MISSION + STATS ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -98,10 +99,10 @@ export default function AboutPage() {
                 <br />to Every Ethiopian
               </h2>
               <p className="text-[#7a7a7a] text-lg leading-relaxed mb-5">
-                We believe every athlete in Ethiopia — whether a footballer in Bole, a basketball player in Kirkos, or a volleyball team in Gondar — deserves access to quality facilities, fair pricing, and the ability to relive their best moments through technology.
+                We believe every athlete in Ethiopia, whether a footballer in Bole, a basketball player in Kirkos, or a volleyball team in Gondar, deserves access to quality facilities, fair pricing, and the ability to relive their best moments through technology.
               </p>
               <p className="text-[#7a7a7a] leading-relaxed mb-8">
-                Founded in Addis Ababa by Unity Link Solutions, ET Smart Fields is Ethiopia&apos;s first integrated multi-sport infrastructure platform. We provide stadiums with modern booking systems, AI-powered camera technology, and professional microsites — all under one roof.
+                Founded in Addis Ababa by Unity Link Solutions, ET Smart Fields is Ethiopia&apos;s first integrated multi-sport infrastructure platform. We provide stadiums with modern booking systems, AI-powered camera technology, and professional microsites, all under one roof.
               </p>
               <Link href="/auth/register" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
                 Register Your Stadium <ArrowRight size={16} />
@@ -125,7 +126,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── WHAT WE DO ──────────────────────────────── */}
+      {/* ── WHAT WE DO ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">
@@ -137,17 +138,17 @@ export default function AboutPage() {
           <StaggerChildren className="grid md:grid-cols-3 gap-6">
             {[
               {
-                emoji: "🔍",
+                icon: <Search size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Field Discovery & Booking",
-                desc: "Players find, compare, and book sports fields across Ethiopia in under 2 minutes — by sport, location, date, time, and price. Instant confirmation via Telebirr or Chapa.",
+                desc: "Players find, compare, and book sports fields across Ethiopia in under 2 minutes by sport, location, date, time, and price. Instant confirmation via Telebirr or Chapa.",
               },
               {
-                emoji: "🏟️",
+                icon: <Building2 size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Smart Stadium Management",
                 desc: "Stadium owners manage fields, cameras, bookings, revenue, and their public microsite from a single dashboard. No more WhatsApp chaos or manual scheduling.",
               },
               {
-                emoji: "🎬",
+                icon: <Film size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Match Intelligence",
                 desc: "AI cameras record every match, generate highlights automatically within minutes, and provide full video replays accessible to players and teams.",
               },
@@ -155,10 +156,10 @@ export default function AboutPage() {
               <StaggerItem key={item.title}>
                 <div className="photo-card p-8 h-full">
                   <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6"
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6"
                     style={{ background: "#f0faf4" }}
                   >
-                    {item.emoji}
+                    {item.icon}
                   </div>
                   <h3 className="text-xl font-black text-[#111] mb-3">{item.title}</h3>
                   <p className="text-[#7a7a7a] leading-relaxed text-sm">{item.desc}</p>
@@ -169,7 +170,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── VALUES ──────────────────────────────────── */}
+      {/* ── VALUES ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">
@@ -193,7 +194,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── 8 KEY DIFFERENTIATORS ───────────────────── */}
+      {/* ── 8 KEY DIFFERENTIATORS ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-16">
@@ -204,10 +205,14 @@ export default function AboutPage() {
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {differentiators.map((d) => (
               <StaggerItem key={d.title}>
-                <div className="photo-card p-6 h-full">
-                  <div className="text-3xl mb-4">{d.emoji}</div>
-                  <h3 className="font-black text-[#111] text-base mb-2">{d.title}</h3>
-                  <p className="text-[#7a7a7a] text-sm leading-relaxed">{d.desc}</p>
+                <div className="photo-card p-6 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: "#f0faf4" }}>
+                      {d.icon}
+                    </div>
+                    <h3 className="font-black text-[#111] text-base mb-2">{d.title}</h3>
+                    <p className="text-[#7a7a7a] text-sm leading-relaxed">{d.desc}</p>
+                  </div>
                 </div>
               </StaggerItem>
             ))}
@@ -215,7 +220,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── TEAM ────────────────────────────────────── */}
+      {/* ── TEAM ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">
@@ -235,7 +240,7 @@ export default function AboutPage() {
                 letter: "E",
                 name: "Engineering Team",
                 role: "Product & Engineering",
-                desc: "Building scalable systems with Go, PostgreSQL, Next.js, and Three.js — focused on reliability and performance at scale.",
+                desc: "Building scalable systems with Go, PostgreSQL, Next.js, and Three.js, focused on reliability and performance at scale.",
               },
               {
                 letter: "F",
@@ -262,7 +267,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── CTA ─────────────────────────────────────── */}
+      {/* ── CTA ── */}
       <section
         className="py-24 relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}

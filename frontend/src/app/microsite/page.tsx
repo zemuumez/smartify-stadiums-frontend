@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   Calendar, Star, Play, ArrowRight, Shield, MapPin,
   Users, Zap, Camera, Video, Award, CheckCircle2,
-  Wifi, User
+  Wifi, User, Trophy, Heart, Sparkles, Lightbulb, Shirt, Lock, Activity
 } from "lucide-react";
 import { useStadium, useEvents, useHighlights, useTestimonials } from "@/lib/sanity/hooks";
 import { FadeUp, SlideIn, ScaleIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
@@ -17,19 +17,19 @@ const DEMO_ID = "demo-stadium-1";
 /* ── Demo data (shown when CMS is empty) ─ */
 const demoEvents = [
   {
-    _id: "e1", title: "Bole Premier League — Season 4",
+    _id: "e1", title: "Bole Premier League - Season 4",
     startDate: "Sep 6, 2026", time: "8:00 AM", spotsLeft: 8,
-    sport: "⚽ Football", desc: "A 16-team round-robin league played every Saturday morning.",
+    sport: "Football", desc: "A 16-team round-robin league played every Saturday morning.",
   },
   {
     _id: "e2", title: "3v3 Basketball Weekend Cup",
     startDate: "Sep 13, 2026", time: "10:00 AM", spotsLeft: 6,
-    sport: "🏀 Basketball", desc: "Weekend knockout tournament on our newly surfaced outdoor court.",
+    sport: "Basketball", desc: "Weekend knockout tournament on our newly surfaced outdoor court.",
   },
   {
     _id: "e3", title: "Ramadan Futsal Championship",
     startDate: "Sep 20, 2026", time: "7:30 AM", spotsLeft: 12,
-    sport: "⚽ Futsal", desc: "Annual community futsal cup — open to all registered teams.",
+    sport: "Futsal", desc: "Annual community futsal cup open to all registered teams.",
   },
 ];
 
@@ -40,14 +40,14 @@ const demoHighlights = [
 ];
 
 const demoTestimonials = [
-  { _id: "t1", name: "Abebe Kebede",  role: "Team Captain",    rating: 5, text: "We play here every Friday. The AI replay system is incredible — our whole team watches the match highlights the same evening." },
+  { _id: "t1", name: "Abebe Kebede",  role: "Team Captain",    rating: 5, text: "We play here every Friday. The AI replay system is incredible, our whole team watches the match highlights the same evening." },
   { _id: "t2", name: "Fatima Hassan", role: "Basketball Coach", rating: 5, text: "The court quality is excellent and the online booking means I never have to call ahead. Instant confirmation every time." },
   { _id: "t3", name: "Daniel Tadesse", role: "Weekend Player",  rating: 5, text: "Best futsal facility in Addis. Great lights, clean changing rooms, and the referee booking feature is a game-changer." },
 ];
 
 const fields = [
-  { id: 1, name: "Field 1 — Artificial Turf", sport: "Football", surface: "Artificial Turf", size: "7v7", price: "1,200", lighting: true, camera: true, changing: true },
-  { id: 2, name: "Field 2 — 5-a-Side",        sport: "Futsal",   surface: "Hardwood",        size: "5v5", price: "800",   lighting: true, camera: true, changing: true },
+  { id: 1, name: "Field 1 - Artificial Turf", sport: "Football", surface: "Artificial Turf", size: "7v7", price: "1,200", lighting: true, camera: true, changing: true },
+  { id: 2, name: "Field 2 - 5-a-Side",        sport: "Futsal",   surface: "Hardwood",        size: "5v5", price: "800",   lighting: true, camera: true, changing: true },
   { id: 3, name: "Basketball Court",           sport: "Basketball", surface: "Hardwood",      size: "5v5", price: "600",  lighting: true, camera: false, changing: false },
   { id: 4, name: "Volleyball Court",           sport: "Volleyball", surface: "Artificial",    size: "6v6", price: "500",  lighting: false, camera: false, changing: false },
 ];
@@ -73,9 +73,7 @@ export default function MicrositeHome() {
   return (
     <div>
 
-      {/* ══════════════════════════════════════
-          SECTION 1 — HERO
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 1 — HERO ── */}
       <section className="relative min-h-[85vh] flex items-center overflow-hidden">
         <div className="absolute inset-0">
           <Image
@@ -112,10 +110,10 @@ export default function MicrositeHome() {
                   {stadiumRating} Rating
                 </span>
                 <span
-                  className="px-3 py-1.5 rounded-full text-xs font-bold"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold"
                   style={{ background: "rgba(0,0,0,0.4)", color: "white", backdropFilter: "blur(8px)" }}
                 >
-                  📍 {stadiumCity}
+                  <MapPin size={11} /> {stadiumCity}
                 </span>
               </div>
 
@@ -129,7 +127,7 @@ export default function MicrositeHome() {
                 <span style={{ color: "#74c69d" }}>{stadiumName.split(" ").slice(1).join(" ")}</span>
               </h1>
               <p className="text-white/75 text-lg leading-relaxed mb-10 max-w-md">
-                {fieldsCount} premium fields · AI camera systems · Instant booking via Telebirr — all in one place.
+                {fieldsCount} premium fields, AI camera systems, and instant booking via Telebirr all in one place.
               </p>
 
               {/* CTAs */}
@@ -174,9 +172,7 @@ export default function MicrositeHome() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          SECTION 2 — EVENTS & TOURNAMENTS
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 2 — EVENTS & TOURNAMENTS ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="flex items-end justify-between flex-wrap gap-4 mb-12">
@@ -193,7 +189,9 @@ export default function MicrositeHome() {
             {displayEvents.map((event) => (
               <StaggerItem key={event._id}>
                 <div className="photo-card p-7 h-full flex flex-col">
-                  <div className="text-2xl mb-4">🏆</div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-[#f0faf4] text-[#2d6a4f]">
+                    <Trophy size={20} />
+                  </div>
                   <div className="text-xs font-bold text-[#2d6a4f] mb-1 uppercase tracking-wide">
                     {(event as any).sport || "Football"}
                   </div>
@@ -204,7 +202,7 @@ export default function MicrositeHome() {
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <div className="text-[#111] font-semibold">{(event as any).startDate}</div>
-                      <div className="text-[#7a7a7a] text-xs">{(event as any).time} · {(event as any).spotsLeft} spots left</div>
+                      <div className="text-[#7a7a7a] text-xs">{(event as any).time} - {(event as any).spotsLeft} spots left</div>
                     </div>
                     <Link
                       href="/bookings/new"
@@ -221,9 +219,7 @@ export default function MicrositeHome() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          SECTION 3 — OUR FIELDS PREVIEW
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 3 — OUR FIELDS PREVIEW ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="flex items-end justify-between flex-wrap gap-4 mb-12">
@@ -239,29 +235,31 @@ export default function MicrositeHome() {
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {fields.map((f) => (
               <StaggerItem key={f.id}>
-                <div className="photo-card p-6 h-full flex flex-col">
-                  {/* Sport + size */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span
-                      className="text-xs font-bold px-3 py-1.5 rounded-full"
-                      style={{ background: "#f0faf4", color: "#2d6a4f" }}
-                    >
-                      {f.sport}
-                    </span>
-                    <span className="text-xs text-[#aaa] font-semibold">{f.size}</span>
+                <div className="photo-card p-6 h-full flex flex-col justify-between">
+                  <div>
+                    {/* Sport + size */}
+                    <div className="flex items-center justify-between mb-4">
+                      <span
+                        className="text-xs font-bold px-3 py-1.5 rounded-full"
+                        style={{ background: "#f0faf4", color: "#2d6a4f" }}
+                      >
+                        {f.sport}
+                      </span>
+                      <span className="text-xs text-[#aaa] font-semibold">{f.size}</span>
+                    </div>
+
+                    <h3 className="font-black text-[#111] mb-1 text-base">{f.name}</h3>
+                    <p className="text-xs text-[#7a7a7a] mb-4">{f.surface}</p>
+
+                    {/* Amenity icons */}
+                    <div className="flex gap-3 mb-5 text-[#2d6a4f]">
+                      {f.lighting  && <span title="Lighting"><Lightbulb size={16} /></span>}
+                      {f.camera    && <span title="AI Camera"><Camera size={16} /></span>}
+                      {f.changing  && <span title="Changing Room"><Shirt size={16} /></span>}
+                    </div>
                   </div>
 
-                  <h3 className="font-black text-[#111] mb-1 text-base">{f.name}</h3>
-                  <p className="text-xs text-[#7a7a7a] mb-4">{f.surface}</p>
-
-                  {/* Amenity icons */}
-                  <div className="flex gap-3 mb-5 flex-1">
-                    {f.lighting  && <span title="Lighting"       className="text-lg">💡</span>}
-                    {f.camera    && <span title="AI Camera"      className="text-lg">📹</span>}
-                    {f.changing  && <span title="Changing Room"  className="text-lg">🚿</span>}
-                  </div>
-
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
                     <div>
                       <span className="text-xl font-black text-[#111]">{f.price}</span>
                       <span className="text-xs text-[#7a7a7a] ml-1">ETB/hr</span>
@@ -281,9 +279,7 @@ export default function MicrositeHome() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          SECTION 4 — AI CAMERA HIGHLIGHTS
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 4 — AI CAMERA HIGHLIGHTS ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
@@ -304,7 +300,7 @@ export default function MicrositeHome() {
                       className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-white/30 transition-transform group-hover:scale-110"
                       style={{ background: "rgba(45,106,79,0.7)", backdropFilter: "blur(8px)" }}
                     >
-                      <Play className="ml-1 text-white" size={26} />
+                      <Play className="ml-1 text-white" size={26} fill="currentColor" />
                     </div>
                     <div
                       className="absolute top-3 left-3 text-white text-xs font-bold px-2.5 py-1 rounded-lg"
@@ -326,8 +322,8 @@ export default function MicrositeHome() {
                       <span className="text-sm text-[#3d3d3d]">
                         by <strong>{h.player}</strong>
                       </span>
-                      <span className="text-sm font-semibold" style={{ color: "#2d6a4f" }}>
-                        ❤️ {h.votes} votes
+                      <span className="text-sm font-semibold flex items-center gap-1" style={{ color: "#2d6a4f" }}>
+                        <Heart size={14} fill="#2d6a4f" /> {h.votes} votes
                       </span>
                     </div>
                   </div>
@@ -348,9 +344,7 @@ export default function MicrositeHome() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          SECTION 5 — SERVICES
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 5 — SERVICES ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">
@@ -360,20 +354,24 @@ export default function MicrositeHome() {
 
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { emoji: "📹", title: "AI Camera Recording", desc: "Every match is automatically recorded at HD quality." },
-              { emoji: "🎬", title: "Match Replays",       desc: "Full match replay available to all booked players." },
-              { emoji: "👮", title: "Referee Booking",     desc: "Book a certified referee at checkout." },
-              { emoji: "🚿", title: "Changing Rooms",      desc: "Secure, modern locker facilities on-site." },
-              { emoji: "⚽", title: "Equipment Rental",    desc: "Balls, bibs, cones — available at the reception." },
-              { emoji: "📶", title: "Free WiFi",           desc: "Stadium-wide connectivity for all visitors." },
-              { emoji: "🏥", title: "First Aid",           desc: "On-site first aid station and trained personnel." },
-              { emoji: "🔒", title: "24/7 Security",       desc: "CCTV surveillance and on-site security team." },
+              { icon: <Camera size={22} style={{ color: "#2d6a4f" }} />, title: "AI Camera Recording", desc: "Every match is automatically recorded at HD quality." },
+              { icon: <Video size={22} style={{ color: "#2d6a4f" }} />, title: "Match Replays",       desc: "Full match replay available to all booked players." },
+              { icon: <Shield size={22} style={{ color: "#2d6a4f" }} />, title: "Referee Booking",     desc: "Book a certified referee at checkout." },
+              { icon: <Shirt size={22} style={{ color: "#2d6a4f" }} />, title: "Changing Rooms",      desc: "Secure, modern locker facilities on-site." },
+              { icon: <Activity size={22} style={{ color: "#2d6a4f" }} />, title: "Equipment Rental",    desc: "Balls, bibs, cones available at the reception." },
+              { icon: <Wifi size={22} style={{ color: "#2d6a4f" }} />, title: "Free WiFi",           desc: "Stadium-wide connectivity for all visitors." },
+              { icon: <Award size={22} style={{ color: "#2d6a4f" }} />, title: "First Aid",           desc: "On-site first aid station and trained personnel." },
+              { icon: <Lock size={22} style={{ color: "#2d6a4f" }} />, title: "24/7 Security",       desc: "CCTV surveillance and on-site security team." },
             ].map((s) => (
               <StaggerItem key={s.title}>
-                <div className="photo-card p-6 h-full">
-                  <div className="text-3xl mb-4">{s.emoji}</div>
-                  <h3 className="font-black text-[#111] text-sm mb-1">{s.title}</h3>
-                  <p className="text-xs text-[#7a7a7a] leading-relaxed">{s.desc}</p>
+                <div className="photo-card p-6 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-[#f0faf4]">
+                      {s.icon}
+                    </div>
+                    <h3 className="font-black text-[#111] text-sm mb-1">{s.title}</h3>
+                    <p className="text-xs text-[#7a7a7a] leading-relaxed">{s.desc}</p>
+                  </div>
                 </div>
               </StaggerItem>
             ))}
@@ -381,9 +379,7 @@ export default function MicrositeHome() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          SECTION 6 — TESTIMONIALS
-          ══════════════════════════════════════ */}
+      {/* ── SECTION 6 — TESTIMONIALS ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-16">

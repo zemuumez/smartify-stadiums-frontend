@@ -165,10 +165,8 @@ function BookingsContent() {
             ))}
           </div>
         ) : filteredBookings.length === 0 ? (
-          <div className="photo-card p-16 text-center">
-            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl bg-[#f0faf4]">
-              📅
-            </div>
+          <div className="photo-card p-12 text-center max-w-md mx-auto">
+            <Calendar size={36} className="text-[#2d6a4f] mx-auto mb-3" />
             <h3 className="text-xl font-black text-[#111] mb-2">No {activeTab} bookings found</h3>
             <p className="text-[#7a7a7a] text-sm mb-6 max-w-sm mx-auto">
               You don&apos;t have any {activeTab} field slots. Browse verified stadiums across Ethiopia and reserve a pitch.

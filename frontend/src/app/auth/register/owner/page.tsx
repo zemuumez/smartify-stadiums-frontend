@@ -146,8 +146,8 @@ export default function OwnerRegisterPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30">
-              <span className="text-white text-2xl">⚽</span>
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 text-white">
+              <Building2 size={24} />
             </div>
             <div>
               <span className="text-2xl font-bold text-white">Play</span>
@@ -421,7 +421,7 @@ export default function OwnerRegisterPage() {
                         {cam.popular && <span className="absolute top-2 right-2 px-2 py-0.5 bg-yellow-500/10 text-yellow-400 text-[10px] font-bold rounded-full border border-yellow-500/20">Recommended</span>}
                         <p className="font-bold text-white text-sm">{cam.name}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{cam.brand} · {cam.resolution} · {cam.fov}</p>
-                        <p className="text-xs text-green-400 mt-1 font-medium">{cam.price === "Included" ? "✅ Included in plan" : cam.price === "BYO" ? "🔌 Bring your own" : cam.price}</p>
+                        <p className="text-xs text-green-400 mt-1 font-medium">{cam.price === "Included" ? "Included in plan" : cam.price === "BYO" ? "Bring your own" : cam.price}</p>
                       </button>
                     ))}
                   </div>
@@ -463,7 +463,7 @@ export default function OwnerRegisterPage() {
                   </div>
 
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300">
-                    💡 <strong>RTMP URL:</strong> <code className="font-mono text-xs">rtmp://stream.etsmartfields.com/live</code> — Enter this in your camera&apos;s streaming settings along with the stream key above.
+                    <strong>RTMP URL:</strong> <code className="font-mono text-xs">rtmp://stream.etsmartfields.com/live</code> - Enter this in your camera&apos;s streaming settings along with the stream key above.
                   </div>
                 </div>
 
@@ -487,7 +487,7 @@ export default function OwnerRegisterPage() {
                     {cameraCertStatus === "passed" && (
                       <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-400 rounded-xl border border-green-500/20">
                         <CheckCircle2 size={18} />
-                        <span className="text-sm font-medium">Camera Certified ✅</span>
+                        <span className="text-sm font-medium flex items-center gap-1"><CheckCircle2 size={14} /> Camera Certified</span>
                       </div>
                     )}
                     {cameraCertStatus === "failed" && (
@@ -575,7 +575,7 @@ export default function OwnerRegisterPage() {
                         <div className={`mt-4 w-full py-2 rounded-xl text-center text-sm font-bold transition-all ${
                           selectedPlan === plan.id ? "bg-green-500 text-white" : "bg-white/10 text-white"
                         }`}>
-                          {selectedPlan === plan.id ? "Selected ✓" : "Select Plan"}
+                          {selectedPlan === plan.id ? "Selected" : "Select Plan"}
                         </div>
                       </button>
                     );
@@ -607,7 +607,7 @@ export default function OwnerRegisterPage() {
                     { label: "Account", value: fullName || "Not set", done: !!fullName && !!phone },
                     { label: "Stadium", value: stadiumName || "Not set", done: !!stadiumName },
                     { label: "Fields", value: `${fields.length} field(s) configured`, done: fields.length > 0 },
-                    { label: "Camera", value: cameraCertStatus === "passed" ? "Certified ✅" : "Not certified", done: cameraCertStatus === "passed" },
+                    { label: "Camera", value: cameraCertStatus === "passed" ? "Certified" : "Not certified", done: cameraCertStatus === "passed" },
                     { label: "Plan", value: PLANS.find((p) => p.id === selectedPlan)?.name || "", done: !!selectedPlan },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
@@ -638,7 +638,7 @@ export default function OwnerRegisterPage() {
                   <button onClick={handleLaunch} disabled={!agreedToTerms || loading}
                     className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 flex items-center gap-2">
                     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Globe size={18} />}
-                    {loading ? "Launching..." : "Launch My Stadium 🚀"}
+                    {loading ? "Launching..." : "Launch My Stadium"}
                   </button>
                 </div>
               </div>
@@ -654,7 +654,7 @@ export default function OwnerRegisterPage() {
               </motion.div>
 
               <div>
-                <h2 className="text-3xl font-bold text-white">You&apos;re Live! 🎉</h2>
+                <h2 className="text-3xl font-bold text-white">You&apos;re Live!</h2>
                 <p className="text-gray-400 mt-2">Your stadium is now on PlayEth</p>
               </div>
 

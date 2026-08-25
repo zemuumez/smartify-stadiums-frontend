@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight, MapPin, Rocket, GraduationCap, Globe } from "lucide-react";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 const openings = [
@@ -67,7 +67,7 @@ export default function CareersPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── HERO ───────────────────────────────────── */}
+      {/* ── HERO ── */}
       <section className="pt-40 pb-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
@@ -89,7 +89,7 @@ export default function CareersPage() {
         </div>
       </section>
 
-      {/* ── WHY JOIN ────────────────────────────────── */}
+      {/* ── WHY JOIN ── */}
       <section className="py-20" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
@@ -99,16 +99,20 @@ export default function CareersPage() {
 
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { emoji: "🇪🇹", title: "Real Impact", desc: "Your work directly enables thousands of Ethiopian athletes to play, record, and share their sport." },
-              { emoji: "🚀", title: "Early Stage", desc: "Join early and have real ownership over product decisions, architecture, and team culture." },
-              { emoji: "🎓", title: "Grow Fast", desc: "We invest in your growth — conferences, courses, and a learning budget for every team member." },
-              { emoji: "🌍", title: "Mission-Driven", desc: "We're building something that has never existed in Ethiopia. That's a rare opportunity." },
+              { icon: <MapPin size={24} style={{ color: "#2d6a4f" }} />, title: "Real Impact", desc: "Your work directly enables thousands of Ethiopian athletes to play, record, and share their sport." },
+              { icon: <Rocket size={24} style={{ color: "#2d6a4f" }} />, title: "Early Stage", desc: "Join early and have real ownership over product decisions, architecture, and team culture." },
+              { icon: <GraduationCap size={24} style={{ color: "#2d6a4f" }} />, title: "Grow Fast", desc: "We invest in your growth through conferences, courses, and a dedicated learning budget." },
+              { icon: <Globe size={24} style={{ color: "#2d6a4f" }} />, title: "Mission-Driven", desc: "We're building infrastructure that has never existed in Ethiopia. That's a rare opportunity." },
             ].map((c) => (
               <StaggerItem key={c.title}>
-                <div className="photo-card p-7 h-full">
-                  <div className="text-3xl mb-4">{c.emoji}</div>
-                  <h3 className="font-black text-[#111] text-base mb-2">{c.title}</h3>
-                  <p className="text-sm text-[#7a7a7a] leading-relaxed">{c.desc}</p>
+                <div className="photo-card p-7 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#f0faf4" }}>
+                      {c.icon}
+                    </div>
+                    <h3 className="font-black text-[#111] text-base mb-2">{c.title}</h3>
+                    <p className="text-sm text-[#7a7a7a] leading-relaxed">{c.desc}</p>
+                  </div>
                 </div>
               </StaggerItem>
             ))}
@@ -116,7 +120,7 @@ export default function CareersPage() {
         </div>
       </section>
 
-      {/* ── OPEN ROLES ──────────────────────────────── */}
+      {/* ── OPEN ROLES ── */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
@@ -136,7 +140,7 @@ export default function CareersPage() {
                       >
                         {role.team}
                       </span>
-                      <span className="text-xs text-[#7a7a7a] font-medium">{role.type} · {role.location}</span>
+                      <span className="text-xs text-[#7a7a7a] font-medium">{role.type} - {role.location}</span>
                     </div>
                     <h3 className="font-black text-[#111] text-xl mb-2">{role.title}</h3>
                     <p className="text-sm text-[#7a7a7a] leading-relaxed mb-3 max-w-xl">{role.desc}</p>
@@ -167,7 +171,7 @@ export default function CareersPage() {
         </div>
       </section>
 
-      {/* ── CTA ─────────────────────────────────────── */}
+      {/* ── CTA ── */}
       <section
         className="py-20 relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}

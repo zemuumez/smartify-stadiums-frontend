@@ -14,6 +14,8 @@ import {
   ArrowDownRight,
   Clock,
   Zap,
+  BarChart3,
+  Globe,
 } from "lucide-react";
 import { GlowCard } from "@/components/ui/GlassCard";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
@@ -165,7 +167,7 @@ export default function DashboardPage() {
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-yellow-500/10 rounded-full blur-3xl" />
         <div className="relative z-10">
           <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2">
-            Welcome back! 👋
+            Welcome back
           </h1>
           <p className="text-gray-400 text-sm lg:text-base">
             Here&apos;s what&apos;s happening with your stadiums today.
@@ -289,17 +291,17 @@ export default function DashboardPage() {
           <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Add Stadium", href: "/dashboard/stadiums/new", icon: "🏟️" },
-              { label: "Add Camera", href: "/dashboard/cameras", icon: "📹" },
-              { label: "View Analytics", href: "/dashboard/analytics", icon: "📊" },
-              { label: "Edit Microsite", href: "/dashboard/microsite", icon: "🌐" },
+              { label: "Add Stadium", href: "/dashboard/stadiums/new", icon: Building2 },
+              { label: "Add Camera", href: "/dashboard/cameras", icon: Camera },
+              { label: "View Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+              { label: "Edit Microsite", href: "/dashboard/microsite", icon: Globe },
             ].map((action) => (
               <a
                 key={action.label}
                 href={action.href}
                 className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-green-500/30 transition-all text-center group"
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform">{action.icon}</span>
+                <action.icon size={22} className="text-[#74c69d] group-hover:scale-110 transition-transform" />
                 <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{action.label}</span>
               </a>
             ))}

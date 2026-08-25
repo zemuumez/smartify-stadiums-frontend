@@ -15,6 +15,7 @@ import {
   Plus,
   Trash2,
   GripVertical,
+  Building2,
 } from "lucide-react";
 import { GlowCard } from "@/components/ui/GlassCard";
 import { MagneticButton } from "@/components/ui/MagneticButton";
@@ -282,7 +283,7 @@ export default function MicrositePage() {
                 </div>
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="aspect-video rounded-xl bg-gradient-to-br from-green-500/20 to-yellow-500/10 border border-white/10 flex items-center justify-center">
-                    <span className="text-2xl">🏟️</span>
+                    <Building2 size={24} className="text-gray-400" />
                   </div>
                 ))}
               </div>

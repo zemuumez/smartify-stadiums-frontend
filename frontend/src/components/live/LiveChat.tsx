@@ -18,13 +18,13 @@ interface LiveChatProps {
 }
 
 const DEMO_MESSAGES: ChatMessage[] = [
-  { id: "1", user: "Abebe K.", avatar: "A", text: "What a goal! 🔥", timestamp: new Date(), isSystem: false },
+  { id: "1", user: "Abebe K.", avatar: "A", text: "What a goal!", timestamp: new Date(), isSystem: false },
   { id: "2", user: "Fatuma A.", avatar: "F", text: "The camera angle is amazing today", timestamp: new Date(), isSystem: false },
-  { id: "3", user: "System", avatar: "⚽", text: "GOAL! Addis Stars 1-0 (23')", timestamp: new Date(), isSystem: true },
+  { id: "3", user: "System", avatar: "SYS", text: "GOAL! Addis Stars 1-0 (23')", timestamp: new Date(), isSystem: true },
   { id: "4", user: "Daniel T.", avatar: "D", text: "Great pass from midfield!", timestamp: new Date(), isSystem: false },
   { id: "5", user: "Yonas T.", avatar: "Y", text: "Lion City FC needs to step up", timestamp: new Date(), isSystem: false },
-  { id: "6", user: "System", avatar: "⚽", text: "GOAL! Addis Stars 2-0 (34')", timestamp: new Date(), isSystem: true },
-  { id: "7", user: "Meron B.", avatar: "M", text: "This team is on fire today!", timestamp: new Date(), isSystem: false },
+  { id: "6", user: "System", avatar: "SYS", text: "GOAL! Addis Stars 2-0 (34')", timestamp: new Date(), isSystem: true },
+  { id: "7", user: "Meron B.", avatar: "M", text: "This team is in top form today!", timestamp: new Date(), isSystem: false },
 ];
 
 export default function LiveChat({ matchId }: LiveChatProps) {

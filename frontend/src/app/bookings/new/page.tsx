@@ -52,10 +52,10 @@ const extras = [
 ];
 
 const paymentMethods = [
-  { id: "telebirr", label: "Telebirr", icon: "📱", desc: "Pay with Telebirr mobile wallet", color: "from-green-500 to-emerald-600" },
-  { id: "cbe", label: "CBE Birr", icon: "🏦", desc: "Commercial Bank of Ethiopia", color: "from-blue-500 to-cyan-600" },
-  { id: "card", label: "Credit/Debit Card", icon: "💳", desc: "Visa, Mastercard, Amex", color: "from-purple-500 to-pink-600" },
-  { id: "cash", label: "Pay at Stadium", icon: "💵", desc: "Pay when you arrive", color: "from-yellow-500 to-orange-500" },
+  { id: "telebirr", label: "Telebirr", icon: Smartphone, desc: "Pay with Telebirr mobile wallet", color: "from-green-500 to-emerald-600" },
+  { id: "cbe", label: "CBE Birr", icon: Building2, desc: "Commercial Bank of Ethiopia", color: "from-blue-500 to-cyan-600" },
+  { id: "card", label: "Credit/Debit Card", icon: CreditCard, desc: "Visa, Mastercard, Amex", color: "from-purple-500 to-pink-600" },
+  { id: "cash", label: "Pay at Stadium", icon: Lock, desc: "Pay when you arrive", color: "from-yellow-500 to-orange-500" },
 ];
 
 // ─── Helper: generate calendar days ───────────────────────────────────────────
@@ -226,7 +226,7 @@ export default function NewBookingPage() {
                       }`}
                     >
                       <p className="font-bold text-white">{f.name}</p>
-                      <p className="text-xs text-gray-400 mt-1">{f.surface} · {f.hasLighting ? "🌙 Lights" : "☀️ Day"}</p>
+                      <p className="text-xs text-gray-400 mt-1">{f.surface} · {f.hasLighting ? "LED Floodlights" : "Daylight Only"}</p>
                       <p className="text-lg font-bold text-green-400 mt-2">{f.hourlyRate.toLocaleString()} <span className="text-xs text-gray-400">ETB/hr</span></p>
                     </button>
                   ))}
@@ -315,7 +315,7 @@ export default function NewBookingPage() {
                     >
                       <span className="text-sm font-bold">{slot}</span>
                       {isNight && selectedFieldData?.hasLighting && !isBooked && (
-                        <span className="absolute top-1 right-1 text-[8px]">🌙</span>
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400" />
                       )}
                       {isBooked && <span className="text-[10px] block text-gray-600 mt-0.5">Booked</span>}
                     </button>
@@ -447,7 +447,9 @@ export default function NewBookingPage() {
                           : "bg-white/5 border-white/10 hover:bg-white/10"
                       }`}
                     >
-                      <span className="text-2xl">{pm.icon}</span>
+                      <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white">
+                        <pm.icon size={20} />
+                      </span>
                       <div className="flex-1">
                         <p className="font-bold text-white">{pm.label}</p>
                         <p className="text-xs text-gray-400">{pm.desc}</p>
@@ -497,7 +499,7 @@ export default function NewBookingPage() {
               </motion.div>
 
               <div>
-                <h2 className="text-3xl font-bold text-white">Booking Confirmed! 🎉</h2>
+                <h2 className="text-3xl font-bold text-white">Booking Confirmed!</h2>
                 <p className="text-gray-400 mt-2">Your field has been booked successfully</p>
               </div>
 

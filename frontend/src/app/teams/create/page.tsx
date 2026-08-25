@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Check, Users, MapPin, Shield,
-  Upload, Globe, Lock, Zap
+  Upload, Globe, Lock, Zap, Trophy
 } from "lucide-react";
 
 const STEPS = ["Team Info", "Details", "Settings", "Review"];
@@ -196,8 +196,8 @@ export default function CreateTeamPage() {
                 <h2 className="text-xl font-bold text-slate-900">Review Your Team</h2>
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ backgroundColor: form.color + "15" }}>
-                      ⚽
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white" style={{ backgroundColor: form.color }}>
+                      <Trophy size={24} />
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900">{form.name || "Untitled Team"}</h3>

@@ -200,10 +200,10 @@ export default function PricingPage() {
               style={{ background: "linear-gradient(135deg, #f0faf4 0%, #e8f5ee 100%)", border: "1.5px solid #b7e4c7" }}
             >
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
-                style={{ background: "white" }}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "white", color: "#2d6a4f" }}
               >
-                💰
+                <Zap size={24} />
               </div>
               <div className="flex-1">
                 <h3 className="font-black text-[#111] text-xl mb-2">5% Platform Fee on Bookings</h3>

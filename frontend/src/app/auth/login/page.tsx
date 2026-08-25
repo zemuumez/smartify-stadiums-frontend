@@ -60,7 +60,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30">
-                <span className="text-white text-2xl">⚽</span>
+                <Zap size={24} className="text-white" />
               </div>
               <div>
                 <span className="text-2xl font-bold text-white">Play</span>

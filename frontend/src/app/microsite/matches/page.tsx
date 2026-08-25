@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Play, Trophy, Calendar, Video, Clock, Filter, Eye, Star } from "lucide-react";
+import { Play, Trophy, Calendar, Video, Clock, Filter, Eye, Star, Camera, Zap } from "lucide-react";
 import { useStadium, useMatches } from "@/lib/sanity/hooks";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
@@ -15,8 +15,8 @@ const demoMatches = [
     _id: "m1",
     date: "Aug 24, 2026",
     time: "4:00 PM",
-    field: "Field 1 — Artificial Turf",
-    sport: "⚽ Football",
+    field: "Field 1 - Artificial Turf",
+    sport: "Football",
     homeTeam: "Bole Lions FC",
     awayTeam: "Kirkos United",
     homeScore: 3,
@@ -30,8 +30,8 @@ const demoMatches = [
     _id: "m2",
     date: "Aug 23, 2026",
     time: "6:00 PM",
-    field: "Field 3 — Futsal Hall",
-    sport: "⚽ Futsal",
+    field: "Field 3 - Futsal Hall",
+    sport: "Futsal",
     homeTeam: "Addis Strikers",
     awayTeam: "Raya Futsal Club",
     homeScore: 5,
@@ -45,8 +45,8 @@ const demoMatches = [
     _id: "m3",
     date: "Aug 22, 2026",
     time: "10:00 AM",
-    field: "Court 1 — Basketball",
-    sport: "🏀 Basketball",
+    field: "Court 1 - Basketball",
+    sport: "Basketball",
     homeTeam: "Ethio Ballers",
     awayTeam: "Unity Dunkers",
     homeScore: 68,
@@ -60,8 +60,8 @@ const demoMatches = [
     _id: "m4",
     date: "Aug 20, 2026",
     time: "5:00 PM",
-    field: "Field 2 — 5-a-Side Turf",
-    sport: "⚽ Football",
+    field: "Field 2 - 5-a-Side Turf",
+    sport: "Football",
     homeTeam: "Sheger Warriors",
     awayTeam: "Entoto Hawks",
     homeScore: 1,
@@ -75,8 +75,8 @@ const demoMatches = [
     _id: "m5",
     date: "Aug 18, 2026",
     time: "7:00 PM",
-    field: "Field 1 — Artificial Turf",
-    sport: "⚽ Football",
+    field: "Field 1 - Artificial Turf",
+    sport: "Football",
     homeTeam: "Yeka Stars",
     awayTeam: "Bole Lions FC",
     homeScore: 2,
@@ -128,9 +128,6 @@ export default function MicrositeMatches() {
                   onClick={() => setSelectedSport(sport)}
                   className={`sport-pill ${selectedSport === sport ? "active" : "inactive"}`}
                 >
-                  {sport === "Football" && "⚽ "}
-                  {sport === "Futsal" && "⚡ "}
-                  {sport === "Basketball" && "🏀 "}
                   {sport}
                 </button>
               ))}
@@ -162,7 +159,7 @@ export default function MicrositeMatches() {
                         <Clock size={12} /> {match.time || "Full Time"}
                       </span>
                       <span className="text-xs font-semibold text-[#5a5a5a]">
-                        • {match.field}
+                        - {match.field}
                       </span>
                     </div>
 
@@ -226,9 +223,15 @@ export default function MicrositeMatches() {
                       <h4 className="text-white font-black text-xl mb-1">{match.homeTeam} vs {match.awayTeam}</h4>
                       <p className="text-white/60 text-sm max-w-md">Full 90-Minute AI Camera Recording with 4K Tracking &amp; Key Highlights</p>
                       <div className="mt-4 flex gap-3">
-                        <span className="px-3 py-1 rounded-full text-xs font-bold text-white" style={{ background: "rgba(255,255,255,0.15)" }}>⏱ 90:00 Recorded</span>
-                        <span className="px-3 py-1 rounded-full text-xs font-bold text-white" style={{ background: "rgba(255,255,255,0.15)" }}>📹 AI Veo Cam 3</span>
-                        <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: "#74c69d", color: "#0d2b1d" }}>⚡ 1080p HD</span>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold text-white flex items-center gap-1" style={{ background: "rgba(255,255,255,0.15)" }}>
+                          <Clock size={11} /> 90:00 Recorded
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold text-white flex items-center gap-1" style={{ background: "rgba(255,255,255,0.15)" }}>
+                          <Camera size={11} /> AI Veo Cam 3
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1" style={{ background: "#74c69d", color: "#0d2b1d" }}>
+                          <Zap size={11} /> 1080p HD
+                        </span>
                       </div>
                     </div>
                   </motion.div>
@@ -243,8 +246,8 @@ export default function MicrositeMatches() {
       <section className="py-16 bg-white border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
         <div className="max-w-4xl mx-auto px-4 text-center">
           <FadeUp>
-            <div className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center text-2xl" style={{ background: "#f0faf4" }}>
-              📹
+            <div className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-[#f0faf4] text-[#2d6a4f]">
+              <Camera size={24} />
             </div>
             <h3 className="text-2xl font-black text-[#111] mb-3">Want Your Match Recorded?</h3>
             <p className="text-[#7a7a7a] text-sm leading-relaxed mb-6 max-w-lg mx-auto">

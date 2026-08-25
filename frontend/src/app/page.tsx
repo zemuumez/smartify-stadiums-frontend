@@ -8,7 +8,8 @@ import {
   MapPin, Star, ArrowUpRight, ArrowRight, ArrowLeft,
   CheckCircle2, ChevronDown, Play, Shield, Camera,
   TrendingUp, Users, Globe, Zap, Video, Calendar,
-  Smartphone, Award
+  Smartphone, Award, Clock, Timer, Activity,
+  Dumbbell, Trophy, Layers
 } from "lucide-react";
 import { FadeUp, SlideIn, ScaleIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
@@ -22,12 +23,12 @@ function ThreeFallback() {
    Sport category data
 ───────────────────────────────────────────── */
 const sports = [
-  { id: "football",   emoji: "⚽", label: "Football" },
-  { id: "basketball", emoji: "🏀", label: "Basketball" },
-  { id: "volleyball", emoji: "🏐", label: "Volleyball" },
-  { id: "badminton",  emoji: "🏸", label: "Badminton" },
-  { id: "tennis",     emoji: "🎾", label: "Tennis" },
-  { id: "futsal",     emoji: "⚽", label: "Futsal" },
+  { id: "football",   label: "Football" },
+  { id: "basketball", label: "Basketball" },
+  { id: "volleyball", label: "Volleyball" },
+  { id: "badminton",  label: "Badminton" },
+  { id: "tennis",     label: "Tennis" },
+  { id: "futsal",     label: "Futsal" },
 ];
 
 /* ─────────────────────────────────────────────
@@ -147,8 +148,8 @@ export default function HomePage() {
                   className="mb-6"
                 >
                   <span className="trust-badge">
-                    <MapPin size={12} className="text-[#74c69d]" />
-                    Trusted Across Ethiopia 🇪🇹
+                    <Shield size={12} className="text-[#74c69d]" />
+                    Verified Sports Infrastructure Network
                   </span>
                 </motion.div>
 
@@ -224,7 +225,7 @@ export default function HomePage() {
                 </motion.div>
               </div>
 
-              {/* Right — Floating Info Card (SpotNow style) */}
+              {/* Right — Floating Info Card */}
               <motion.div
                 initial={{ opacity: 0, x: 40, y: 20 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
@@ -232,13 +233,13 @@ export default function HomePage() {
                 className="hidden lg:block"
               >
                 <div className="glass-hero rounded-3xl p-6 max-w-sm ml-auto">
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2.5 mb-4">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#2d6a4f" }}>
-                      <span className="text-white text-base">⚽</span>
+                      <Activity size={16} className="text-white" />
                     </div>
                     <div>
-                      <div className="text-sm font-black text-[#111]">50+ Fields</div>
-                      <div className="text-xs text-[#7a7a7a] font-medium">Active &amp; Growing</div>
+                      <div className="text-sm font-black text-[#111]">50+ Active Fields</div>
+                      <div className="text-xs text-[#7a7a7a] font-medium">Verified Network</div>
                     </div>
                   </div>
 
@@ -251,17 +252,17 @@ export default function HomePage() {
 
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {[
-                      { icon: "✅", label: "ULS Verified" },
-                      { icon: "📹", label: "AI Camera" },
-                      { icon: "⚡", label: "Instant Book" },
-                      { icon: "📱", label: "Telebirr Pay" },
+                      { icon: <CheckCircle2 size={13} style={{ color: "#2d6a4f" }} />, label: "ULS Verified" },
+                      { icon: <Camera size={13} style={{ color: "#2d6a4f" }} />, label: "AI Camera" },
+                      { icon: <Zap size={13} style={{ color: "#2d6a4f" }} />, label: "Instant Book" },
+                      { icon: <Smartphone size={13} style={{ color: "#2d6a4f" }} />, label: "Telebirr Pay" },
                     ].map((f) => (
                       <div
                         key={f.label}
                         className="flex items-center gap-1.5 text-xs font-semibold text-[#3d3d3d] px-2.5 py-2 rounded-xl"
                         style={{ background: "#f4f3ef" }}
                       >
-                        <span>{f.icon}</span> {f.label}
+                        {f.icon} {f.label}
                       </div>
                     ))}
                   </div>
@@ -312,11 +313,11 @@ export default function HomePage() {
               {/* Filters */}
               <div className="flex flex-col sm:flex-row flex-1 divide-y sm:divide-y-0 sm:divide-x divide-black/[0.06]">
                 {[
-                  { icon: <MapPin size={12} />, label: "Location", value: "Addis Ababa" },
-                  { icon: <Calendar size={12} />, label: "Date", value: "Pick a Date" },
-                  { icon: <span className="text-xs">🕐</span>, label: "Time", value: "00:00" },
-                  { icon: <span className="text-xs">⏱</span>, label: "Duration", value: "1 Hour" },
-                  { icon: <span className="text-xs">⚽</span>, label: "Sport", value: "Football" },
+                  { icon: <MapPin size={13} />, label: "Location", value: "Addis Ababa" },
+                  { icon: <Calendar size={13} />, label: "Date", value: "Pick a Date" },
+                  { icon: <Clock size={13} />, label: "Time", value: "00:00" },
+                  { icon: <Timer size={13} />, label: "Duration", value: "1 Hour" },
+                  { icon: <Activity size={13} />, label: "Sport", value: "Football" },
                 ].map((filter) => (
                   <button
                     key={filter.label}
@@ -370,7 +371,6 @@ export default function HomePage() {
                   onClick={() => setActiveSport(sport.id)}
                   className={`sport-pill ${activeSport === sport.id ? "active" : "inactive"}`}
                 >
-                  <span>{sport.emoji}</span>
                   {sport.label}
                 </button>
               ))}
@@ -649,23 +649,16 @@ export default function HomePage() {
                 className="photo-card p-8 flex-1 relative overflow-hidden"
                 style={{ background: "linear-gradient(135deg, #1a4731 0%, #2d6a4f 100%)" }}
               >
-                {/* Sport icon pills */}
-                <div className="flex gap-2 mb-5 flex-wrap">
-                  {["⚽", "🏀", "🏐", "🏸", "🎾"].map((emoji) => (
-                    <span
-                      key={emoji}
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-                      style={{ background: "rgba(255,255,255,0.12)" }}
-                    >
-                      {emoji}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#74c69d] px-3 py-1 rounded-full bg-white/10">
+                    Multi-Sport Hub
+                  </span>
                 </div>
                 <h3 className="text-xl font-black text-white mb-2">
                   Play Seamlessly — Everything You Need Is Here
                 </h3>
                 <p className="text-white/65 text-sm leading-relaxed">
-                  The platform provides everything from booking to broadcast. One app for every sport in Ethiopia.
+                  The platform provides everything from booking to broadcast. One unified app for every sport in Ethiopia.
                 </p>
                 {/* Decorative circle */}
                 <div
@@ -687,7 +680,7 @@ export default function HomePage() {
             <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">How It Works</div>
             <h2 className="heading-xl mb-4">Three Steps to Play</h2>
             <p className="text-[#7a7a7a] text-lg max-w-xl mx-auto">
-              From discovery to watching your highlights — we've made the whole journey effortless.
+              From discovery to watching your highlights — we&apos;ve made the whole journey effortless.
             </p>
           </FadeUp>
 
@@ -695,19 +688,19 @@ export default function HomePage() {
             {[
               {
                 step: "01",
-                emoji: "🔍",
+                icon: <Activity size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Find & Choose",
                 desc: "Search for stadiums near you. See real-time availability, prices, camera status, and sport type in one view.",
               },
               {
                 step: "02",
-                emoji: "📅",
+                icon: <Calendar size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Book & Pay",
                 desc: "Select your time slot, choose extras like AI video capture or a referee, and pay instantly with Telebirr or Chapa.",
               },
               {
                 step: "03",
-                emoji: "🎮",
+                icon: <Play size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Play & Watch",
                 desc: "Play your match, then watch the AI-generated replay or highlight reel on your personal dashboard.",
               },
@@ -722,12 +715,12 @@ export default function HomePage() {
                     {item.step}
                   </div>
 
-                  {/* Emoji icon */}
+                  {/* Icon */}
                   <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6"
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6"
                     style={{ background: "#f0faf4" }}
                   >
-                    {item.emoji}
+                    {item.icon}
                   </div>
 
                   <h3 className="text-xl font-black text-[#111] mb-3">{item.title}</h3>
@@ -931,7 +924,9 @@ export default function HomePage() {
                 <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: "#74c69d" }} />
 
                 <div className="relative z-10">
-                  <div className="text-4xl mb-6">🏟️</div>
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 bg-white/10 text-white">
+                    <Award size={24} />
+                  </div>
                   <div className="text-xs font-bold tracking-widest uppercase text-[#74c69d] mb-3">Investment</div>
                   <h3 className="text-2xl font-black text-white mb-4 leading-tight">
                     Interested in Investing in the Future of Play?
@@ -1003,10 +998,10 @@ export default function HomePage() {
               >
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white"
                     style={{ background: "#2d6a4f" }}
                   >
-                    <span className="text-2xl">⚽</span>
+                    <Activity size={24} />
                   </div>
                   <div>
                     <div className="text-white font-black">ET Smart Fields</div>
@@ -1034,7 +1029,7 @@ export default function HomePage() {
                 </div>
 
                 <div className="text-[#74c69d] text-xs font-bold uppercase tracking-wider mb-2">
-                  ● 12 Slots Available Now
+                  12 Slots Available Now
                 </div>
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
                   <div className="h-full rounded-full" style={{ width: "72%", background: "linear-gradient(90deg, #2d6a4f, #74c69d)" }} />
@@ -1111,20 +1106,6 @@ export default function HomePage() {
               <p className="text-sm text-[#7a7a7a] leading-relaxed mb-5">
                 Ethiopia&apos;s integrated smart sports infrastructure platform.
               </p>
-              {/* Social icons */}
-              <div className="flex gap-3">
-                {["𝕏", "📘", "📸", "📺"].map((icon, i) => (
-                  <a
-                    key={i}
-                    href="#"
-                    className="w-9 h-9 rounded-full border flex items-center justify-center text-sm transition-all hover:-translate-y-0.5"
-                    style={{ borderColor: "rgba(0,0,0,0.1)", color: "#7a7a7a" }}
-                    aria-label={`Social link ${i + 1}`}
-                  >
-                    {icon}
-                  </a>
-                ))}
-              </div>
             </div>
 
             {/* Core Services */}

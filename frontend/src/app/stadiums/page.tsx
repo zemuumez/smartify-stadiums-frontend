@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Search, MapPin, Star, Video, Shield, ArrowUpRight,
   Filter, SlidersHorizontal, ArrowRight, Zap, Calendar,
-  ChevronDown, CheckCircle2, Award, Clock
+  ChevronDown, CheckCircle2, Award, Clock, Smartphone, Activity, Camera
 } from "lucide-react";
 import { FadeUp, SlideIn, StaggerChildren, StaggerItem, ScaleIn } from "@/components/ui/AnimatedSection";
 import api from "@/lib/api";
@@ -32,13 +32,13 @@ interface Stadium {
 const cities = ["All Cities", "Addis Ababa", "Dire Dawa", "Bahir Dar", "Hawassa", "Mekelle"];
 
 const sports = [
-  { id: "All",        label: "All Sports", emoji: "🏟️" },
-  { id: "Football",   label: "Football",   emoji: "⚽" },
-  { id: "Basketball", label: "Basketball", emoji: "🏀" },
-  { id: "Volleyball", label: "Volleyball", emoji: "🏐" },
-  { id: "Badminton",  label: "Badminton",  emoji: "🏸" },
-  { id: "Tennis",     label: "Tennis",     emoji: "🎾" },
-  { id: "Futsal",     label: "Futsal",     emoji: "⚡" },
+  { id: "All",        label: "All Sports" },
+  { id: "Football",   label: "Football" },
+  { id: "Basketball", label: "Basketball" },
+  { id: "Volleyball", label: "Volleyball" },
+  { id: "Badminton",  label: "Badminton" },
+  { id: "Tennis",     label: "Tennis" },
+  { id: "Futsal",     label: "Futsal" },
 ];
 
 export default function StadiumsPage() {
@@ -81,11 +81,8 @@ export default function StadiumsPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ══════════════════════════════════════════
-          SECTION 1 — HERO WITH FULL-BLEED PHOTO
-          ══════════════════════════════════════════ */}
+      {/* ── HERO WITH FULL-BLEED PHOTO ── */}
       <section className="relative min-h-[65vh] flex flex-col justify-end overflow-hidden">
-        {/* Background photo */}
         <div className="absolute inset-0">
           <Image
             src="/hero-sports-field.jpg"
@@ -99,7 +96,6 @@ export default function StadiumsPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
 
-        {/* Hero Content */}
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-36 pb-20">
           <div className="max-w-2xl">
             <motion.div
@@ -109,7 +105,7 @@ export default function StadiumsPage() {
               className="mb-4"
             >
               <span className="trust-badge">
-                <MapPin size={12} className="text-[#74c69d]" />
+                <Shield size={12} className="text-[#74c69d]" />
                 50+ Verified Sports Venues in Ethiopia
               </span>
             </motion.div>
@@ -137,15 +133,11 @@ export default function StadiumsPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          SECTION 2 — FLOATING SEARCH & FILTER BAR
-          ══════════════════════════════════════════ */}
+      {/* ── FLOATING SEARCH & FILTER BAR ── */}
       <section className="relative z-20 -mt-8 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp>
-            <div
-              className="search-bar-float flex flex-col lg:flex-row items-stretch lg:items-center p-2"
-            >
+            <div className="search-bar-float flex flex-col lg:flex-row items-stretch lg:items-center p-2">
               {/* Search text input */}
               <div className="flex-1 flex items-center px-4 py-2 border-b lg:border-b-0 lg:border-r border-black/[0.06]">
                 <Search size={18} className="text-[#8a8a8a] mr-3 flex-shrink-0" />
@@ -177,7 +169,7 @@ export default function StadiumsPage() {
 
               {/* Sport selector */}
               <div className="flex-1 flex items-center px-4 py-2 border-b lg:border-b-0 lg:border-r border-black/[0.06]">
-                <span className="text-base mr-2 flex-shrink-0">⚽</span>
+                <Activity size={16} className="text-[#2d6a4f] mr-2 flex-shrink-0" />
                 <div className="flex-1">
                   <div className="text-[10px] text-[#aaa] font-bold uppercase">Sport</div>
                   <select
@@ -186,7 +178,7 @@ export default function StadiumsPage() {
                     className="w-full text-sm font-bold text-[#111] bg-transparent focus:outline-none cursor-pointer"
                   >
                     {sports.map((sp) => (
-                      <option key={sp.id} value={sp.id}>{sp.emoji} {sp.label}</option>
+                      <option key={sp.id} value={sp.id}>{sp.label}</option>
                     ))}
                   </select>
                 </div>
@@ -208,9 +200,7 @@ export default function StadiumsPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          SECTION 3 — SPORT PILLS & QUICK FILTERS
-          ══════════════════════════════════════════ */}
+      {/* ── SPORT PILLS & QUICK FILTERS ── */}
       <section className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -222,7 +212,6 @@ export default function StadiumsPage() {
                   onClick={() => setSelectedSport(sp.id)}
                   className={`sport-pill ${selectedSport === sp.id ? "active" : "inactive"}`}
                 >
-                  <span>{sp.emoji}</span>
                   {sp.label}
                 </button>
               ))}
@@ -238,7 +227,7 @@ export default function StadiumsPage() {
                     : "bg-white text-[#5a5a5a] border-black/10 hover:border-black/20"
                 }`}
               >
-                ✓ ULS Verified Only
+                ULS Verified Only
               </button>
               <button
                 onClick={() => setOnlyCamera(!onlyCamera)}
@@ -248,16 +237,14 @@ export default function StadiumsPage() {
                     : "bg-white text-[#5a5a5a] border-black/10 hover:border-black/20"
                 }`}
               >
-                📹 AI Camera Only
+                AI Camera Only
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          SECTION 4 — VENUE LISTINGS GRID
-          ══════════════════════════════════════════ */}
+      {/* ── VENUE LISTINGS GRID ── */}
       <section className="py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
@@ -351,8 +338,12 @@ export default function StadiumsPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-[#5a5a5a] pt-4 border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
-                          <span className="flex items-center gap-1">⚡ Instant Booking</span>
-                          <span className="flex items-center gap-1">📱 Telebirr / Chapa</span>
+                          <span className="flex items-center gap-1.5">
+                            <Zap size={12} style={{ color: "#2d6a4f" }} /> Instant Booking
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Smartphone size={12} style={{ color: "#2d6a4f" }} /> Telebirr / Chapa
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -383,7 +374,9 @@ export default function StadiumsPage() {
 
           {!loading && filteredStadiums.length === 0 && (
             <div className="text-center py-24 photo-card p-12 max-w-xl mx-auto">
-              <span className="text-5xl mb-4 block">🏟️</span>
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[#f0faf4] text-[#2d6a4f]">
+                <Activity size={32} />
+              </div>
               <h3 className="text-xl font-black text-[#111] mb-2">No Stadiums Match Your Filters</h3>
               <p className="text-[#7a7a7a] text-sm mb-6">
                 Try resetting your city or sport filters to see all available sports venues in Ethiopia.
@@ -406,33 +399,31 @@ export default function StadiumsPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          SECTION 5 — GUARANTEE / QUALITY SECTION
-          ══════════════════════════════════════════ */}
+      {/* ── GUARANTEE / QUALITY SECTION ── */}
       <section className="py-20 bg-white border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-3 gap-8">
             {[
               {
-                emoji: "🛡️",
+                icon: <Shield size={24} style={{ color: "#2d6a4f" }} />,
                 title: "100% Guaranteed Slot Sync",
                 desc: "Our real-time database locks your booked time slot the millisecond payment is confirmed. Zero double-booking risk.",
               },
               {
-                emoji: "📹",
+                icon: <Camera size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Certified AI Cameras",
                 desc: "Look for the camera badge on stadiums equipped with 4K autonomous match tracking and automatic highlight reels.",
               },
               {
-                emoji: "📱",
+                icon: <Smartphone size={24} style={{ color: "#2d6a4f" }} />,
                 title: "Native Ethiopian Payments",
                 desc: "Pay instantly with Telebirr, CBE Birr, or Chapa. Automated digital receipts sent via SMS and WhatsApp.",
               },
             ].map((feature) => (
               <div key={feature.title} className="photo-card p-8 flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-5" style={{ background: "#f0faf4" }}>
-                    {feature.emoji}
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ background: "#f0faf4" }}>
+                    {feature.icon}
                   </div>
                   <h3 className="font-black text-[#111] text-lg mb-2">{feature.title}</h3>
                   <p className="text-[#7a7a7a] text-sm leading-relaxed">{feature.desc}</p>
@@ -443,9 +434,7 @@ export default function StadiumsPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          SECTION 6 — CTA BANNER
-          ══════════════════════════════════════════ */}
+      {/* ── CTA BANNER ── */}
       <section
         className="py-20 relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}

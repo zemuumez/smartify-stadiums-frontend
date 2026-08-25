@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, Users, Trophy, Calendar, MapPin, UserPlus, Crown, Star, TrendingUp, MoreVertical, Trash2 } from "lucide-react";
 
-const TEAM = { id: "t1", name: "Addis Stars FC", city: "Addis Ababa", description: "Competitive 7-a-side team based in Addis Ababa.", players: 14, maxPlayers: 18, matches: 28, wins: 18, draws: 5, losses: 5, goalsFor: 62, goalsAgainst: 28, points: 59, rank: 1, captain: "Abebe Kebede", color: "#16a34a", avatar: "⭐", created: "Jan 2026" };
+const TEAM = { id: "t1", name: "Addis Stars FC", city: "Addis Ababa", description: "Competitive 7-a-side team based in Addis Ababa.", players: 14, maxPlayers: 18, matches: 28, wins: 18, draws: 5, losses: 5, goalsFor: 62, goalsAgainst: 28, points: 59, rank: 1, captain: "Abebe Kebede", color: "#16a34a", initials: "AS", created: "Jan 2026" };
 
 const ROSTER = [
   { id: "p1", name: "Abebe Kebede", position: "Forward", goals: 18, assists: 7, rating: 4.8, isCaptain: true, status: "active", joined: "Jan 2026" },
@@ -41,7 +41,7 @@ export default function TeamDetailPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/teams" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6"><ArrowLeft size={16} /> All Teams</Link>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl" style={{ backgroundColor: TEAM.color + "20" }}>{TEAM.avatar}</div>
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style={{ backgroundColor: TEAM.color }}>{TEAM.initials}</div>
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-black text-white">{TEAM.name}</h1>

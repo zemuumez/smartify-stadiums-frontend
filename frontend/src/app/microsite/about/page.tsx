@@ -3,7 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Shield, Camera, Star, Calendar, MapPin, Phone, CheckCircle2, ArrowRight, Award } from "lucide-react";
+import {
+  Shield, Camera, Star, Calendar, MapPin, Phone,
+  CheckCircle2, ArrowRight, Award, Zap, Activity,
+  Building2, ShieldCheck
+} from "lucide-react";
 import { useStadium } from "@/lib/sanity/hooks";
 import { FadeUp, SlideIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
@@ -12,7 +16,7 @@ export default function MicrositeAbout() {
 
   const stadiumName   = stadium?.name || "Bambis Meda Stadium";
   const stadiumCity   = stadium?.city || "Bole, Addis Ababa";
-  const description   = stadium?.description || "One of Addis Ababa's premier multi-sport facilities — with AI-powered cameras, fully resurfaced fields, and a professional booking system.";
+  const description   = stadium?.description || "One of Addis Ababa's premier multi-sport facilities with AI-powered cameras, fully resurfaced fields, and a professional booking system.";
   const rating        = stadium?.rating || 4.9;
   const totalBookings = stadium?.totalBookings || 1247;
   const fieldsCount   = stadium?.fields?.length || 4;
@@ -21,7 +25,7 @@ export default function MicrositeAbout() {
   return (
     <div style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── HERO ─────────────────────────── */}
+      {/* ── HERO ── */}
       <section className="relative overflow-hidden" style={{ minHeight: "420px" }}>
         <div className="absolute inset-0">
           <Image src="/venue-card-2.jpg" alt={stadiumName} fill className="object-cover" />
@@ -51,7 +55,7 @@ export default function MicrositeAbout() {
         </div>
       </section>
 
-      {/* ── ABOUT TEXT + HIGHLIGHTS ─────── */}
+      {/* ── ABOUT TEXT + HIGHLIGHTS ── */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-start">
@@ -60,7 +64,7 @@ export default function MicrositeAbout() {
               <h2 className="heading-xl mb-6">Built for the Game,<br />Built for the Community</h2>
               <p className="text-[#7a7a7a] text-lg leading-relaxed mb-5">{description}</p>
               <p className="text-[#7a7a7a] leading-relaxed mb-8">
-                Since joining the ET Smart Fields ULS network, Bambis Meda Stadium has digitized operations, attracted players from across Addis through online bookings, and given our community the ability to watch match replays and share highlights. We&apos;re not just a football field — we&apos;re a sports hub.
+                Since joining the ET Smart Fields ULS network, Bambis Meda Stadium has digitized operations, attracted players from across Addis through online bookings, and given our community the ability to watch match replays and share highlights. We are a dedicated smart sports hub.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href="/bookings/new" className="btn-primary" style={{ background: "#2d6a4f", padding: "0.875rem 1.75rem", borderRadius: "999px", display: "flex", alignItems: "center", gap: "8px", color: "white", fontWeight: 700, fontSize: "0.875rem" }}>
@@ -78,7 +82,7 @@ export default function MicrositeAbout() {
                   { icon: <Shield size={22} style={{ color: "#2d6a4f" }} />, title: "ULS Verified",   desc: "Certified quality, technology, and safety standards." },
                   { icon: <Camera size={22} style={{ color: "#2d6a4f" }} />, title: "AI Cameras",    desc: "Automated HD match recording and highlight generation." },
                   { icon: <Star   size={22} style={{ color: "#2d6a4f" }} />, title: `${rating} Stars`, desc: `${totalBookings.toLocaleString()}+ bookings rated.` },
-                  { icon: <Calendar size={22} style={{ color: "#2d6a4f" }} />, title: "Open 7 Days", desc: "6:00 AM – 10:00 PM, every day of the week." },
+                  { icon: <Calendar size={22} style={{ color: "#2d6a4f" }} />, title: "Open 7 Days", desc: "6:00 AM - 10:00 PM, every day of the week." },
                 ].map((item) => (
                   <div key={item.title} className="photo-card p-5">
                     <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style={{ background: "#f0faf4" }}>
@@ -94,7 +98,7 @@ export default function MicrositeAbout() {
         </div>
       </section>
 
-      {/* ── FACILITIES STATS ─────────────── */}
+      {/* ── FACILITIES STATS ── */}
       <section className="py-20" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-14">
@@ -122,7 +126,7 @@ export default function MicrositeAbout() {
         </div>
       </section>
 
-      {/* ── WHAT MAKES US DIFFERENT ─────── */}
+      {/* ── WHAT MAKES US DIFFERENT ── */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="text-center mb-14">
@@ -132,16 +136,18 @@ export default function MicrositeAbout() {
 
           <StaggerChildren className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { emoji: "📹", title: "AI Camera System",         desc: "Every match is automatically recorded in HD. Players can watch replays the same evening." },
-              { emoji: "⚡", title: "Instant Online Booking",   desc: "No more phone calls. Reserve your field, pick your time, and pay — all in under 2 minutes." },
-              { emoji: "⚽", title: "Multi-Sport Courts",       desc: "Football, Futsal, Basketball, and Volleyball — all available in one location." },
-              { emoji: "👮", title: "Referee Booking",          desc: "Add a certified referee to any booking at checkout. We handle the scheduling." },
-              { emoji: "🏟️", title: "Professional Facilities",  desc: "Artificial turf, LED floodlights, changing rooms, and free WiFi across the stadium." },
-              { emoji: "✅", title: "ULS Verified Quality",     desc: "ET Smart Fields independently verified our facility for quality, safety, and technology standards." },
+              { icon: <Camera size={24} style={{ color: "#2d6a4f" }} />, title: "AI Camera System",         desc: "Every match is automatically recorded in HD. Players can watch replays the same evening." },
+              { icon: <Zap size={24} style={{ color: "#2d6a4f" }} />, title: "Instant Online Booking",   desc: "No more phone calls. Reserve your field, pick your time, and pay all in under 2 minutes." },
+              { icon: <Activity size={24} style={{ color: "#2d6a4f" }} />, title: "Multi-Sport Courts",       desc: "Football, Futsal, Basketball, and Volleyball all available in one location." },
+              { icon: <ShieldCheck size={24} style={{ color: "#2d6a4f" }} />, title: "Referee Booking",          desc: "Add a certified referee to any booking at checkout. We handle the scheduling." },
+              { icon: <Building2 size={24} style={{ color: "#2d6a4f" }} />, title: "Professional Facilities",  desc: "Artificial turf, LED floodlights, changing rooms, and free WiFi across the stadium." },
+              { icon: <Shield size={24} style={{ color: "#2d6a4f" }} />, title: "ULS Verified Quality",     desc: "ET Smart Fields independently verified our facility for quality, safety, and technology standards." },
             ].map((item) => (
               <StaggerItem key={item.title}>
                 <div className="photo-card p-7 h-full flex gap-4">
-                  <div className="text-3xl flex-shrink-0">{item.emoji}</div>
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[#f0faf4]">
+                    {item.icon}
+                  </div>
                   <div>
                     <h3 className="font-black text-[#111] mb-1">{item.title}</h3>
                     <p className="text-sm text-[#7a7a7a] leading-relaxed">{item.desc}</p>

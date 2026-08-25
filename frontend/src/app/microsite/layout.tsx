@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Shield, Calendar, MapPin, Phone, ChevronRight } from "lucide-react";
+import { Menu, X, Shield, Calendar, MapPin, Phone, ChevronRight, Clock, Building2 } from "lucide-react";
 import { useStadium } from "@/lib/sanity/hooks";
 
 const DEMO_STADIUM = {
@@ -34,7 +34,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
   const stadiumCity = stadium?.city || DEMO_STADIUM.city;
   const primaryColor = stadium?.primaryColor || DEMO_STADIUM.primaryColor;
   const isVerified = stadium?.isVerified ?? true;
-  const openingHours = stadium?.openingHours || "Mon–Sun: 6:00 AM – 10:00 PM";
+  const openingHours = stadium?.openingHours || "Mon-Sun: 6:00 AM - 10:00 PM";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -48,7 +48,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── TOP INFO BAR ─────────────────────────── */}
+      {/* ── TOP INFO BAR ── */}
       <div
         className="hidden md:block text-xs py-2"
         style={{ background: "#1a4731", color: "rgba(255,255,255,0.7)" }}
@@ -65,7 +65,9 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <span style={{ color: "#74c69d" }}>⏰ {openingHours}</span>
+            <span className="flex items-center gap-1" style={{ color: "#74c69d" }}>
+              <Clock size={11} /> {openingHours}
+            </span>
             {isVerified && (
               <span className="flex items-center gap-1 font-semibold" style={{ color: "#74c69d" }}>
                 <Shield size={11} /> ULS Verified
@@ -75,7 +77,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      {/* ── STICKY HEADER ───────────────────────── */}
+      {/* ── STICKY HEADER ── */}
       <header
         className="sticky top-0 z-50 transition-all duration-300"
         style={{
@@ -91,10 +93,10 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             {/* Logo */}
             <Link href="/microsite" className="flex items-center gap-3 flex-shrink-0">
               <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-lg"
                 style={{ background: `linear-gradient(135deg, #1a4731, ${primaryColor})` }}
               >
-                🏟️
+                <Building2 size={20} />
               </div>
               <div>
                 <div className="font-black text-[#111] text-base leading-tight">{stadiumName}</div>
@@ -155,7 +157,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      {/* ── MOBILE NAV ──────────────────────────── */}
+      {/* ── MOBILE NAV ── */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -201,10 +203,10 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
         )}
       </AnimatePresence>
 
-      {/* ── PAGE CONTENT ─────────────────────────── */}
+      {/* ── PAGE CONTENT ── */}
       <main>{children}</main>
 
-      {/* ── MICROSITE FOOTER ─────────────────────── */}
+      {/* ── MICROSITE FOOTER ── */}
       <footer style={{ background: "#0d2b1d" }}>
         {/* Top CTA Strip */}
         <div
@@ -231,10 +233,10 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             <div className="lg:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
                   style={{ background: "rgba(255,255,255,0.1)" }}
                 >
-                  🏟️
+                  <Building2 size={20} />
                 </div>
                 <div>
                   <div className="text-white font-black text-base leading-tight">{stadiumName}</div>
@@ -246,7 +248,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
                 </div>
               </div>
               <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
-                Ethiopia&apos;s premier smart sports facility in the heart of {stadiumCity}.
+                Premier sports facility located in {stadiumCity}, Ethiopia.
               </p>
             </div>
 
@@ -272,10 +274,10 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
                 Opening Hours
               </h4>
               <ul className="space-y-2 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-                <li>Monday – Friday</li>
-                <li className="font-semibold text-white">6:00 AM – 10:00 PM</li>
-                <li className="mt-2">Saturday – Sunday</li>
-                <li className="font-semibold text-white">6:00 AM – 10:00 PM</li>
+                <li>Monday - Friday</li>
+                <li className="font-semibold text-white">6:00 AM - 10:00 PM</li>
+                <li className="mt-2">Saturday - Sunday</li>
+                <li className="font-semibold text-white">6:00 AM - 10:00 PM</li>
               </ul>
             </div>
 
@@ -310,7 +312,7 @@ export default function MicrositeLayout({ children }: { children: React.ReactNod
             style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
           >
             <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
-              © 2026 {stadiumName}. All rights reserved.
+              &copy; 2026 {stadiumName}. All rights reserved.
             </p>
             <p className="text-xs flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>
               Powered by{" "}

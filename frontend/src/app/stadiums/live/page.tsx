@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, Share2, Heart, Bell, Users, Clock,
-  Trophy, Target, Zap, Download, Bookmark, Video, Shield
+  Trophy, Target, Zap, Download, Bookmark, Video, Shield, Building2
 } from "lucide-react";
 import LivePlayer from "@/components/live/LivePlayer";
 import MatchScoreboard from "@/components/live/MatchScoreboard";
@@ -134,8 +134,8 @@ export default function LiveMatchPage() {
                 <h1 className="text-xl font-black text-[#111]">
                   {DEMO_MATCH.homeTeam} vs {DEMO_MATCH.awayTeam}
                 </h1>
-                <p className="text-xs text-[#7a7a7a] mt-0.5">
-                  🏟️ {DEMO_MATCH.stadium} • {DEMO_MATCH.field}
+                <p className="text-white/60 text-xs mt-0.5 flex items-center gap-1.5">
+                  <Building2 size={13} style={{ color: "#74c69d" }} /> {DEMO_MATCH.stadium} - {DEMO_MATCH.field}
                 </p>
               </div>
 

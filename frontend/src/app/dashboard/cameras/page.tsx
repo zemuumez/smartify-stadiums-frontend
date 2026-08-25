@@ -195,7 +195,7 @@ export default function CamerasPage() {
                         </span>
                         {cam.certification_passed && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                            ✅ Certified
+                            <CheckCircle2 size={10} /> Certified
                           </span>
                         )}
                       </div>

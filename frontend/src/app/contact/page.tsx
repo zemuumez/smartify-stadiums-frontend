@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MapPin, Mail, Phone, MessageSquare, ArrowRight, Send } from "lucide-react";
+import { MapPin, Mail, Phone, MessageSquare, ArrowRight, Send, CheckCircle2, Building2 } from "lucide-react";
 import { FadeUp, SlideIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
 const subjects = [
@@ -61,7 +61,7 @@ export default function ContactPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-12"
                   >
-                    <div className="text-5xl mb-4">✅</div>
+                    <CheckCircle2 size={48} className="text-[#2d6a4f] mx-auto mb-4" />
                     <h3 className="text-xl font-black text-[#111] mb-2">Message Sent!</h3>
                     <p className="text-[#7a7a7a] text-sm">We&apos;ll get back to you within 24 hours.</p>
                     <button
@@ -210,7 +210,7 @@ export default function ContactPage() {
               >
                 <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-10" style={{ background: "#74c69d" }} />
                 <div className="relative z-10">
-                  <div className="text-3xl mb-4">🏟️</div>
+                  <Building2 size={32} className="text-white mb-4" />
                   <h3 className="font-black text-white text-lg mb-2">Stadium Owner?</h3>
                   <p className="text-white/65 text-sm leading-relaxed mb-5">
                     Register your stadium on ET Smart Fields and reach thousands of players in your city.

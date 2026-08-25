@@ -57,7 +57,7 @@ export function MicrositeHero({ stadium }: MicrositeHeroProps) {
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-bold" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}>
-              📍 {stadium.city}
+              <MapPin size={12} style={{ color: "#74c69d" }} /> {stadium.city}
             </span>
           </div>
 

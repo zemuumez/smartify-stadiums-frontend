@@ -126,9 +126,7 @@ export default function MicrositeServices() {
                   "Direct link to player accounts for match footage and stats",
                 ].map((point) => (
                   <div key={point} className="flex items-center gap-3 text-sm font-semibold text-[#111]">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs" style={{ background: "#2d6a4f" }}>
-                      ✓
-                    </div>
+                    <CheckCircle2 size={18} style={{ color: "#2d6a4f" }} className="flex-shrink-0" />
                     {point}
                   </div>
                 ))}
@@ -145,7 +143,7 @@ export default function MicrositeServices() {
 
             <FadeUp delay={0.2}>
               <div className="photo-card p-8 rounded-3xl" style={{ background: "linear-gradient(135deg, #1a4731 0%, #2d6a4f 100%)", color: "white" }}>
-                <div className="text-3xl mb-4">🏆</div>
+                <Trophy size={32} className="text-white mb-4" />
                 <h3 className="text-2xl font-black mb-3">Host a Tournament</h3>
                 <p className="text-white/70 text-sm leading-relaxed mb-6">
                   Planning a corporate cup, youth league, or community championship? We provide multi-field bookings, camera packages, referee coordination, and catering support.
