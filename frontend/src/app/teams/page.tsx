@@ -158,7 +158,7 @@ export default function TeamsPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
 
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-36 pb-16">
+        <div className="relative z-10 spotnow-container pt-36 pb-16">
           <div className="max-w-2xl">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-4">
               <span className="trust-badge">
@@ -189,7 +189,7 @@ export default function TeamsPage() {
 
       {/* ── ACTION BAR ── */}
       <section className="relative z-20 -mt-8 pb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp>
             <div className="search-bar-float flex flex-col md:flex-row items-stretch md:items-center justify-between p-3 gap-4">
               {/* Search */}
@@ -232,7 +232,7 @@ export default function TeamsPage() {
       </section>
 
       {/* ── MAIN CONTENT ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="spotnow-container py-10">
         {/* ── LEAGUE TABLE ── */}
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">

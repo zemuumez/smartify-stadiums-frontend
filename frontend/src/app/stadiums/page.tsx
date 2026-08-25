@@ -96,7 +96,7 @@ export default function StadiumsPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
 
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-36 pb-20">
+        <div className="relative z-10 spotnow-container pt-36 pb-20">
           <div className="max-w-2xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -135,7 +135,7 @@ export default function StadiumsPage() {
 
       {/* ── FLOATING SEARCH & FILTER BAR ── */}
       <section className="relative z-20 -mt-8 pb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp>
             <div className="search-bar-float flex flex-col lg:flex-row items-stretch lg:items-center p-2">
               {/* Search text input */}
@@ -202,7 +202,7 @@ export default function StadiumsPage() {
 
       {/* ── SPORT PILLS & QUICK FILTERS ── */}
       <section className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             {/* Sport Pills */}
             <div className="flex flex-wrap gap-2.5">
@@ -246,7 +246,7 @@ export default function StadiumsPage() {
 
       {/* ── VENUE LISTINGS GRID ── */}
       <section className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <div className="flex items-center justify-between mb-8">
             <div>
               <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">
@@ -401,7 +401,7 @@ export default function StadiumsPage() {
 
       {/* ── GUARANTEE / QUALITY SECTION ── */}
       <section className="py-20 bg-white border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <div className="grid lg:grid-cols-3 gap-8">
             {[
               {

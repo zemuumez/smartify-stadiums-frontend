@@ -38,8 +38,8 @@ export function Header() {
             : "bg-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-[72px]">
+        <div className="spotnow-container">
+          <div className="flex items-center justify-between h-16 lg:h-[76px]">
 
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">

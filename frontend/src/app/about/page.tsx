@@ -65,7 +65,7 @@ export default function AboutPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-28">
+        <div className="relative z-10 spotnow-container pt-40 pb-28">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -90,7 +90,7 @@ export default function AboutPage() {
 
       {/* ── MISSION + STATS ── */}
       <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <SlideIn direction="left">
               <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Our Mission</div>
@@ -128,7 +128,7 @@ export default function AboutPage() {
 
       {/* ── WHAT WE DO ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp className="text-center mb-16">
             <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Platform</div>
             <h2 className="heading-xl mb-4">What ET Smart Fields Does</h2>
@@ -172,7 +172,7 @@ export default function AboutPage() {
 
       {/* ── VALUES ── */}
       <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp className="text-center mb-16">
             <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Values</div>
             <h2 className="heading-xl">What Drives Us</h2>
@@ -196,7 +196,7 @@ export default function AboutPage() {
 
       {/* ── 8 KEY DIFFERENTIATORS ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp className="mb-16">
             <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Why ET Smart Fields</div>
             <h2 className="heading-xl max-w-lg">What Makes Us Different</h2>
@@ -222,7 +222,7 @@ export default function AboutPage() {
 
       {/* ── TEAM ── */}
       <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="spotnow-container">
           <FadeUp className="text-center mb-16">
             <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">The Team</div>
             <h2 className="heading-xl">The People Behind ET Smart Fields</h2>
