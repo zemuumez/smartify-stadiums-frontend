@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, MapPin, Calendar, Video, User, LogOut, ArrowUpRight } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
@@ -10,10 +11,14 @@ import { useAuthStore } from "@/lib/auth-store";
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthStore();
 
+  const isDarkHeroPage = pathname === "/" || pathname === "/stadiums";
+  const isSolid = scrolled || !isDarkHeroPage;
+
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 40);
+    const handleScroll = () => setScrolled(window.scrollY > 30);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -32,8 +37,8 @@ export function Header() {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isSolid
             ? "bg-white/95 backdrop-blur-xl border-b border-black/[0.06] shadow-sm"
             : "bg-transparent"
         }`}
@@ -56,14 +61,14 @@ export function Header() {
               <div className="hidden sm:flex items-baseline gap-0.5">
                 <span
                   className={`text-[17px] font-black tracking-tight transition-colors ${
-                    scrolled ? "text-[#111]" : "text-white"
+                    isSolid ? "text-[#111]" : "text-white"
                   }`}
                 >
                   ET
                 </span>
                 <span
                   className={`text-[17px] font-black tracking-tight transition-colors ${
-                    scrolled ? "text-[#2d6a4f]" : "text-[#74c69d]"
+                    isSolid ? "text-[#2d6a4f]" : "text-[#74c69d]"
                   }`}
                 >
                   Smart Fields
@@ -78,7 +83,7 @@ export function Header() {
                   key={link.href}
                   href={link.href}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    scrolled
+                    isSolid
                       ? "text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4]"
                       : "text-white/90 hover:text-white hover:bg-white/10"
                   }`}
@@ -95,7 +100,7 @@ export function Header() {
                   <Link
                     href="/dashboard"
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      scrolled
+                      isSolid
                         ? "text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4]"
                         : "text-white/90 hover:text-white hover:bg-white/10"
                     }`}
@@ -106,7 +111,7 @@ export function Header() {
                   <button
                     onClick={() => logout()}
                     className={`p-2 rounded-lg transition-all ${
-                      scrolled
+                      isSolid
                         ? "text-slate-400 hover:text-red-500 hover:bg-red-50"
                         : "text-white/60 hover:text-white hover:bg-white/10"
                     }`}
@@ -120,7 +125,7 @@ export function Header() {
                   <Link
                     href="/auth/login"
                     className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      scrolled
+                      isSolid
                         ? "text-[#3d3d3d] hover:text-[#2d6a4f]"
                         : "text-white/90 hover:text-white"
                     }`}
@@ -129,7 +134,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-lg shadow-[#2d6a4f]/30 hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-md hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
                   >
                     Contact Us
                     <span className="w-5 h-5 bg-white/15 rounded-full flex items-center justify-center">
@@ -145,7 +150,7 @@ export function Header() {
               <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={`p-2.5 rounded-xl transition-all ${
-                  scrolled
+                  isSolid
                     ? "text-[#111] hover:bg-[#f0faf4]"
                     : "text-white hover:bg-white/15"
                 }`}

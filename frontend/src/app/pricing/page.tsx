@@ -2,35 +2,37 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Check, Zap, Crown, Building2, ArrowRight, ArrowUpRight, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, Zap, Crown, Building2, ArrowRight, ArrowUpRight, ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
 import { FadeUp, StaggerChildren, StaggerItem, ScaleIn } from "@/components/ui/AnimatedSection";
 
 const plans = [
   {
     name: "Starter",
     etb: "2,500",
+    annualEtb: "2,000",
     icon: <Zap size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "Perfect for a single field getting online.",
+    desc: "Perfect for a single field getting started online.",
     popular: false,
     fields: "1–2 Fields",
     cameras: "1 Camera",
     storage: "500 GB",
     features: [
-      "Online booking system",
-      "Real-time availability",
-      "Stadium microsite (CMS)",
-      "Telebirr & Chapa payments",
-      "Basic analytics dashboard",
-      "Player rating & reviews",
+      "Online booking calendar",
+      "Real-time slot availability",
+      "Official stadium microsite",
+      "Telebirr & CBE Birr payments",
+      "Basic revenue analytics",
+      "Player ratings & reviews",
       "Email support",
     ],
   },
   {
     name: "Professional",
     etb: "7,500",
+    annualEtb: "6,000",
     icon: <Crown size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "For growing stadiums with multiple fields and cameras.",
+    desc: "For growing stadiums with multiple fields and AI cameras.",
     popular: true,
     fields: "Up to 10 Fields",
     cameras: "5 Cameras",
@@ -41,314 +43,233 @@ const plans = [
       "AI highlight generation",
       "Full match video replays",
       "Advanced analytics (revenue, trends)",
-      "Custom microsite themes",
+      "Custom microsite branding",
       "Event & tournament management",
-      "Priority support",
+      "Priority phone support",
       "API access",
     ],
   },
   {
     name: "Enterprise",
     etb: "20,000",
+    annualEtb: "16,000",
     icon: <Building2 size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "For large complexes, multi-venue operations, and partners.",
+    desc: "For large sports complexes and multi-venue operators.",
     popular: false,
     fields: "Unlimited Fields",
     cameras: "Unlimited Cameras",
     storage: "10 TB",
     features: [
       "Everything in Professional",
-      "Real-time streaming",
-      "White-label microsite options",
+      "Real-time live streaming",
+      "White-label custom domain options",
       "Dedicated account manager",
-      "Custom integrations",
       "On-site installation & training",
-      "SLA guarantee (99.9% uptime)",
+      "99.9% uptime SLA guarantee",
       "Platform admin API",
-      "24/7 support",
+      "24/7 dedicated support",
     ],
   },
 ];
 
 const faqs = [
   { q: "Is there a free trial?", a: "Yes — every plan comes with a 14-day free trial. No credit card required to get started." },
-  { q: "What is the 5% platform fee?", a: "On every booking made through your stadium, ET Smart Fields deducts a 5% platform fee. This is how we keep subscription prices affordable while investing in new features." },
-  { q: "Can I change my plan later?", a: "Absolutely. Upgrade or downgrade anytime. Changes take effect immediately with prorated billing." },
-  { q: "What payment methods do you accept for subscriptions?", a: "We accept Telebirr, CBE Birr, credit/debit cards, and bank transfers for annual plans." },
-  { q: "Is the camera system included in the price?", a: "Camera hardware is provided by our partner at additional cost. AI integration software is included in Professional and Enterprise plans." },
-  { q: "Can I cancel anytime?", a: "Yes. Cancel your subscription at any time — access continues until the end of your current billing period." },
+  { q: "What is the 5% platform fee?", a: "On bookings processed via Telebirr or CBE Birr, a small 5% platform fee applies to cover instant payment gateway sync and SMS notifications." },
+  { q: "Can I change or upgrade my plan later?", a: "Absolutely. You can upgrade, downgrade, or pause your subscription anytime directly from your Owner Dashboard." },
+  { q: "What payment methods are supported for subscriptions?", a: "We support Telebirr, CBE Birr, Chapa, credit/debit cards, and direct bank transfers for annual plans." },
+  { q: "Is AI camera hardware included?", a: "AI integration software and automated recording pipelines are included in Professional and Enterprise plans. Hardware installation is provided by certified partners." },
+  { q: "Can I cancel anytime?", a: "Yes. You can cancel your subscription at any time with no lock-in contracts." },
 ];
 
 export default function PricingPage() {
+  const [annual, setAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
+    <div className="min-h-screen pt-28 pb-24" style={{ backgroundColor: "#f4f3ef" }}>
 
-      {/* ── HERO ───────────────────────────────────── */}
-      <section className="pt-40 pb-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Pricing</div>
+      {/* ── HEADER / INTRO ─────────────────────────── */}
+      <section className="py-12">
+        <div className="spotnow-container text-center max-w-3xl mx-auto">
+          <FadeUp>
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider text-[#2d6a4f] bg-[#f0faf4] border border-[#2d6a4f]/15 mb-4">
+              <ShieldCheck size={13} /> Transparent Pricing
+            </div>
+
             <h1
-              className="text-[#111] font-black leading-tight mb-5"
-              style={{ fontSize: "clamp(2.4rem, 6vw, 4rem)", letterSpacing: "-0.025em" }}
+              className="text-[#111] font-black leading-tight mb-4 tracking-tight"
+              style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}
             >
-              Simple, Transparent Pricing
+              Simple, Predictable Plans
             </h1>
-            <p className="text-[#7a7a7a] text-xl max-w-xl mx-auto leading-relaxed">
-              Choose the plan that fits your stadium. All plans include ULS verification, a public microsite, and basic analytics.
+
+            <p className="text-[#6a6a6a] text-base sm:text-lg leading-relaxed mb-8 max-w-xl mx-auto">
+              Choose the plan that fits your stadium. All plans include ULS quality verification, a public microsite, and real-time booking syncing.
             </p>
-          </motion.div>
+
+            {/* Monthly / Annual Toggle */}
+            <div className="inline-flex items-center gap-3 p-1.5 rounded-full bg-white border border-black/[0.08] shadow-sm">
+              <button
+                onClick={() => setAnnual(false)}
+                className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${
+                  !annual ? "bg-[#2d6a4f] text-white shadow-sm" : "text-[#5a5a5a] hover:text-[#111]"
+                }`}
+              >
+                Monthly Billing
+              </button>
+              <button
+                onClick={() => setAnnual(true)}
+                className={`px-5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  annual ? "bg-[#2d6a4f] text-white shadow-sm" : "text-[#5a5a5a] hover:text-[#111]"
+                }`}
+              >
+                Annual Billing
+                <span className="px-2 py-0.5 rounded-full bg-[#f0faf4] text-[#2d6a4f] text-[10px] font-black">
+                  Save 20%
+                </span>
+              </button>
+            </div>
+          </FadeUp>
         </div>
       </section>
 
-      {/* ── PLAN CARDS ─────────────────────────────── */}
-      <section className="pb-24" style={{ backgroundColor: "#f4f3ef" }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto -mt-4">
+      {/* ── PRICING CARDS ──────────────────────────── */}
+      <section className="py-6">
+        <div className="spotnow-container">
+          <div className="grid md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
             {plans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                className={`photo-card p-8 relative ${plan.popular ? "border-2 border-[#2d6a4f]" : ""}`}
-                style={plan.popular ? { boxShadow: "0 12px 36px rgba(45,106,79,0.12)" } : {}}
-              >
-                {plan.popular && (
-                  <div
-                    className="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1.5 text-white text-xs font-black rounded-full whitespace-nowrap"
-                    style={{ background: "#2d6a4f" }}
-                  >
-                    Most Popular
-                  </div>
-                )}
-
-                {/* Icon + Plan name */}
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f0faf4" }}>
-                    {plan.icon}
-                  </div>
-                  <h3 className="font-black text-[#111] text-xl">{plan.name}</h3>
-                </div>
-                <p className="text-sm text-[#7a7a7a] mb-6">{plan.desc}</p>
-
-                {/* Price */}
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-[#111]">{plan.etb}</span>
-                    <span className="text-[#7a7a7a] text-sm">ETB / month</span>
-                  </div>
-                </div>
-
-                {/* Specs */}
+              <ScaleIn key={plan.name} delay={i * 0.1}>
                 <div
-                  className="grid grid-cols-3 gap-2 rounded-2xl p-3 mb-6"
-                  style={{ background: "#f0faf4" }}
-                >
-                  {[
-                    { label: "Fields", value: plan.fields },
-                    { label: "Cameras", value: plan.cameras },
-                    { label: "Storage", value: plan.storage },
-                  ].map((spec) => (
-                    <div key={spec.label} className="text-center">
-                      <div className="text-[10px] text-[#7a7a7a] font-semibold uppercase tracking-wide">{spec.label}</div>
-                      <div className="text-xs font-black text-[#111] mt-0.5">{spec.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Features */}
-                <ul className="space-y-2.5 mb-8">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm text-[#3d3d3d]">
-                      <Check size={15} className="mt-0.5 flex-shrink-0" style={{ color: "#2d6a4f" }} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA */}
-                <Link
-                  href="/auth/register"
-                  className={`flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-2xl text-sm font-bold transition-all hover:-translate-y-0.5 ${
-                    plan.popular
-                      ? "text-white"
-                      : "border text-[#2d6a4f] hover:opacity-90"
+                  className={`photo-card p-8 h-full flex flex-col justify-between relative ${
+                    plan.popular ? "border-2 border-[#2d6a4f] shadow-2xl" : "shadow-lg"
                   }`}
-                  style={
-                    plan.popular
-                      ? { background: "#2d6a4f", boxShadow: "0 4px 16px rgba(45,106,79,0.3)" }
-                      : { borderColor: "#2d6a4f", backgroundColor: "transparent" }
-                  }
                 >
-                  Get Started <ArrowRight size={14} />
-                </Link>
-              </motion.div>
+                  {plan.popular && (
+                    <div
+                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 text-white text-[11px] font-black uppercase tracking-wider rounded-full shadow-md"
+                      style={{ background: "#2d6a4f" }}
+                    >
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#f0faf4]">
+                        {plan.icon}
+                      </div>
+                      <h3 className="text-xl font-black text-[#111]">{plan.name}</h3>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-[#7a7a7a] leading-relaxed mb-6">
+                      {plan.desc}
+                    </p>
+
+                    {/* Pricing */}
+                    <div className="mb-6 pb-6 border-b border-black/[0.06]">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-black text-[#111]">
+                          {annual ? plan.annualEtb : plan.etb}
+                        </span>
+                        <span className="text-xs font-semibold text-[#7a7a7a]">ETB / month</span>
+                      </div>
+                      <div className="text-[11px] text-[#8a8a8a] mt-1">
+                        {annual ? "Billed annually" : "Billed monthly, cancel anytime"}
+                      </div>
+                    </div>
+
+                    {/* Specs Box */}
+                    <div className="grid grid-cols-3 gap-2 rounded-2xl p-3.5 mb-6 bg-[#f0faf4] text-center">
+                      <div>
+                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Fields</div>
+                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.fields}</div>
+                      </div>
+                      <div className="border-x border-[#2d6a4f]/15">
+                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Cameras</div>
+                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.cameras}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Storage</div>
+                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.storage}</div>
+                      </div>
+                    </div>
+
+                    {/* Features List */}
+                    <div className="space-y-3 mb-8">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#111]">Included Features:</div>
+                      {plan.features.map((feat) => (
+                        <div key={feat} className="flex items-start gap-2.5 text-xs text-[#3d3d3d] font-medium leading-relaxed">
+                          <Check size={14} className="text-[#2d6a4f] flex-shrink-0 mt-0.5" strokeWidth={3} />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CTA */}
+                  <Link
+                    href="/auth/register/owner"
+                    className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-xs font-bold transition-all shadow-md ${
+                      plan.popular
+                        ? "bg-[#2d6a4f] text-white hover:bg-[#1a4731]"
+                        : "bg-white border border-black/15 text-[#111] hover:bg-[#f0faf4] hover:border-[#2d6a4f]"
+                    }`}
+                  >
+                    Start 14-Day Free Trial
+                    <ArrowUpRight size={13} />
+                  </Link>
+                </div>
+              </ScaleIn>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── PLATFORM FEE CALLOUT ─────────────────── */}
-      <section className="py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeUp>
-            <div
-              className="rounded-3xl p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6"
-              style={{ background: "linear-gradient(135deg, #f0faf4 0%, #e8f5ee 100%)", border: "1.5px solid #b7e4c7" }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "white", color: "#2d6a4f" }}
-              >
-                <Zap size={24} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-black text-[#111] text-xl mb-2">5% Platform Fee on Bookings</h3>
-                <p className="text-[#7a7a7a] text-sm leading-relaxed">
-                  In addition to your monthly plan, ET Smart Fields charges a 5% fee on every booking payment processed through the platform. This covers payment processing, real-time sync infrastructure, and customer support for your players.
-                  <strong className="text-[#2d6a4f]"> Your net revenue appears in real-time on your analytics dashboard.</strong>
-                </p>
-              </div>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
-
-      {/* ── FEATURE COMPARISON TABLE ─────────────── */}
-      <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ── FAQ SECTION ────────────────────────────── */}
+      <section className="py-20">
+        <div className="spotnow-container max-w-3xl mx-auto">
           <FadeUp className="text-center mb-12">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Compare</div>
-            <h2 className="heading-xl">Full Feature Comparison</h2>
-          </FadeUp>
-
-          <FadeUp delay={0.1}>
-            <div className="photo-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-                      <th className="text-left p-5 text-sm font-bold text-[#7a7a7a]">Feature</th>
-                      {plans.map((p) => (
-                        <th key={p.name} className="p-5 text-center text-sm font-black text-[#111]">
-                          {p.name}
-                          {p.popular && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full text-white" style={{ background: "#2d6a4f" }}>Popular</span>}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { feature: "Fields", values: ["1–2", "Up to 10", "Unlimited"] },
-                      { feature: "AI Cameras", values: ["1", "5", "Unlimited"] },
-                      { feature: "Video Storage", values: ["500 GB", "2 TB", "10 TB"] },
-                      { feature: "Online Booking", values: [true, true, true] },
-                      { feature: "Stadium Microsite", values: [true, true, true] },
-                      { feature: "AI Camera Integration", values: [false, true, true] },
-                      { feature: "AI Highlight Generation", values: [false, true, true] },
-                      { feature: "Match Replays", values: [false, true, true] },
-                      { feature: "Advanced Analytics", values: [false, true, true] },
-                      { feature: "Event Management", values: [false, true, true] },
-                      { feature: "Live Streaming", values: [false, false, true] },
-                      { feature: "White-Label Options", values: [false, false, true] },
-                      { feature: "API Access", values: [false, true, true] },
-                      { feature: "Dedicated Account Manager", values: [false, false, true] },
-                      { feature: "Support", values: ["Email", "Priority", "24/7"] },
-                    ].map((row, i) => (
-                      <tr
-                        key={row.feature}
-                        style={{
-                          borderBottom: "1px solid rgba(0,0,0,0.05)",
-                          background: i % 2 === 0 ? "white" : "#fbfbf9",
-                        }}
-                      >
-                        <td className="p-5 text-sm text-[#3d3d3d] font-medium">{row.feature}</td>
-                        {row.values.map((v, vi) => (
-                          <td key={vi} className="p-5 text-center text-sm">
-                            {typeof v === "boolean" ? (
-                              v ? (
-                                <Check size={16} className="mx-auto" style={{ color: "#2d6a4f" }} />
-                              ) : (
-                                <span className="text-[#ccc] text-lg leading-none">—</span>
-                              )
-                            ) : (
-                              <span className="font-semibold text-[#111]">{v}</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
-
-      {/* ── FAQ ─────────────────────────────────────── */}
-      <section className="py-24 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <FadeUp className="text-center mb-16">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">FAQ</div>
-            <h2 className="heading-xl">Common Questions</h2>
+            <h2 className="text-2xl sm:text-3xl font-black text-[#111] mb-2 tracking-tight">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-xs sm:text-sm text-[#7a7a7a]">
+              Have questions about stadium onboarding and platform fees? We&apos;ve got answers.
+            </p>
           </FadeUp>
 
           <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-                className="photo-card overflow-hidden"
-              >
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between gap-4 p-6 text-left"
+            {faqs.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={faq.q}
+                  className="photo-card p-5 cursor-pointer transition-all hover:border-black/20"
+                  onClick={() => setOpenFaq(isOpen ? null : idx)}
                 >
-                  <span className="font-bold text-[#111] text-sm">{faq.q}</span>
-                  <ChevronDown
-                    size={18}
-                    className="flex-shrink-0 transition-transform duration-200 text-[#aaa]"
-                    style={{ transform: openFaq === i ? "rotate(180deg)" : "rotate(0deg)" }}
-                  />
-                </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-6 text-sm text-[#7a7a7a] leading-relaxed -mt-2">
-                    {faq.a}
+                  <div className="flex items-center justify-between gap-4">
+                    <h3 className="text-sm font-bold text-[#111]">{faq.q}</h3>
+                    <ChevronDown
+                      size={16}
+                      className={`text-[#7a7a7a] transition-transform duration-300 ${isOpen ? "rotate-180 text-[#2d6a4f]" : ""}`}
+                    />
                   </div>
-                )}
-              </motion.div>
-            ))}
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.p
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="text-xs text-[#6a6a6a] leading-relaxed mt-3 pt-3 border-t border-black/[0.06]"
+                      >
+                        {faq.a}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </section>
-
-      {/* ── CTA ─────────────────────────────────────── */}
-      <section
-        className="py-20 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}
-      >
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
-          <FadeUp>
-            <h2 className="text-white font-black text-4xl mb-4">Still Have Questions?</h2>
-            <p className="text-white/65 text-lg mb-10 max-w-md mx-auto">
-              Talk to our team. We&apos;ll help you find the right plan and guide you through onboarding.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/contact" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
-                Talk to Sales <ArrowUpRight size={16} />
-              </Link>
-              <Link href="/auth/register" className="btn-ghost-white" style={{ paddingTop: "1rem", paddingBottom: "1rem" }}>
-                Start Free Trial
-              </Link>
-            </div>
-          </FadeUp>
         </div>
       </section>
 
