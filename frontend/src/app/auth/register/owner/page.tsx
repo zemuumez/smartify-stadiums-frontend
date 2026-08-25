@@ -3,31 +3,69 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  ArrowLeft, ArrowRight, Check, Phone, KeyRound, Building2, MapPin,
-  Camera, Wifi, WifiOff, Zap, Shield, Star, Crown, Globe,
-  Plus, Trash2, Clock, Lightbulb, Users, ChevronDown,
-  Signal, AlertCircle, CheckCircle2, ExternalLink, Copy,
-  CreditCard, Smartphone, Eye, ArrowUpRight,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Phone,
+  KeyRound,
+  Building2,
+  MapPin,
+  Camera,
+  Zap,
+  Shield,
+  Star,
+  Crown,
+  Globe,
+  Plus,
+  Trash2,
+  Lightbulb,
+  Users,
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  Eye,
+  ArrowUpRight,
+  Radio,
+  Signal,
+  AlertCircle
 } from "lucide-react";
+import { FadeUp } from "@/components/ui/AnimatedSection";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CITIES = ["Addis Ababa", "Hawassa", "Bahir Dar", "Dire Dawa", "Mekelle", "Jimma", "Adama", "Gondar"];
 
 const CAMERA_MODELS = [
-  { id: "veo3", name: "Veo Cam 3", brand: "Veo", resolution: "4K", fov: "180°", price: "Included", popular: true },
-  { id: "sporpin", name: "SporPin X200", brand: "SporPin", resolution: "1080p", fov: "160°", price: "Included", popular: false },
-  { id: "hikvision", name: "Hikvision DS-2DE", brand: "Hikvision", resolution: "1080p", fov: "120°", price: "2,500 ETB", popular: false },
-  { id: "other", name: "Other / BYO Camera", brand: "Custom", resolution: "Varies", fov: "Varies", price: "BYO", popular: false },
+  { id: "veo3", name: "Veo Cam 3", brand: "Veo AI", resolution: "4K 30fps", fov: "180° Panoramic", price: "Included in Pro", popular: true },
+  { id: "sporpin", name: "SporPin X200", brand: "SporPin", resolution: "1080p 60fps", fov: "160° Wide", price: "Included in Starter", popular: false },
+  { id: "hikvision", name: "Hikvision Pro AI", brand: "Hikvision", resolution: "4K Ultra HD", fov: "120° PTZ", price: "2,500 ETB Setup", popular: false },
+  { id: "byo", name: "Bring Your Own RTMP", brand: "Custom Hardware", resolution: "Adaptive", fov: "Custom", price: "Free Integration", popular: false },
 ];
 
-const SURFACE_TYPES = ["Natural Grass", "Artificial Turf", "Hybrid", "Clay"];
+const SURFACE_TYPES = ["Natural Grass", "Artificial Turf (FIFA Certified)", "Indoor Hardwood", "Clay / Sand"];
 
 const PLANS = [
-  { id: "starter", name: "Starter", price: "2,500", icon: Zap, color: "from-blue-500 to-cyan-500", features: ["1 Stadium", "2 Fields", "1 Camera", "500 GB Storage", "Basic Analytics", "Microsite"] },
-  { id: "professional", name: "Professional", price: "7,500", icon: Star, color: "from-green-500 to-emerald-500", features: ["3 Stadiums", "10 Fields", "5 Cameras", "2 TB Storage", "Advanced Analytics", "Custom Microsite", "Priority Support"], recommended: true },
-  { id: "enterprise", name: "Enterprise", price: "20,000", icon: Crown, color: "from-yellow-500 to-orange-500", features: ["Unlimited Stadiums", "Unlimited Fields", "Unlimited Cameras", "10 TB Storage", "Real-time Analytics", "White-label", "24/7 Support", "Dedicated Manager"] },
+  {
+    id: "starter",
+    name: "Starter",
+    price: "2,500",
+    features: ["1 Stadium Venue", "2 Fields / Courts", "1 AI Camera Feed", "500 GB Cloud Video", "Basic Telemetry", "Public Microsite"],
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    price: "7,500",
+    features: ["3 Stadium Venues", "10 Fields / Courts", "5 AI Camera Feeds", "2 TB Cloud Video", "Advanced Analytics", "Custom Microsite", "Telebirr Auto-Payout"],
+    recommended: true,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "20,000",
+    features: ["Unlimited Venues", "Unlimited Fields", "Unlimited AI Feeds", "10 TB Cloud Video", "Custom White-Label Domain", "Dedicated Manager", "24/7 Priority Support"],
+  },
 ];
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -39,36 +77,51 @@ export default function OwnerRegisterPage() {
   const [loading, setLoading] = useState(false);
 
   // Step 0: Account
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("0911234567");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("Abebe Kebede");
+  const [businessName, setBusinessName] = useState("Bambis Meda Sports PLC");
+  const [email, setEmail] = useState("owner@bambismeda.com");
 
   // Step 1: Stadium
-  const [stadiumName, setStadiumName] = useState("");
-  const [stadiumAddress, setStadiumAddress] = useState("");
+  const [stadiumName, setStadiumName] = useState("Bambis Meda Stadium");
+  const [stadiumAddress, setStadiumAddress] = useState("Bole Road, Near Medhanialem");
   const [stadiumCity, setStadiumCity] = useState("Addis Ababa");
-  const [stadiumPhone, setStadiumPhone] = useState("");
-  const [stadiumDesc, setStadiumDesc] = useState("");
+  const [stadiumPhone, setStadiumPhone] = useState("0911234567");
+  const [stadiumDesc, setStadiumDesc] = useState("Premier football and multi-sport ground equipped with artificial turf and AI match tracking.");
 
   // Step 2: Fields
   const [fields, setFields] = useState([
-    { name: "Field 1", surface: "Natural Grass", hourlyRate: 2500, hasLighting: true, hasChangingRoom: true, schedule: DAYS.map(() => ({ open: "06:00", close: "22:00", available: true })) },
+    {
+      name: "Pitch A (Main 11v11)",
+      surface: "Artificial Turf (FIFA Certified)",
+      hourlyRate: 2500,
+      hasLighting: true,
+      hasChangingRoom: true,
+      schedule: DAYS.map(() => ({ open: "06:00", close: "22:00", available: true })),
+    },
+    {
+      name: "Pitch B (7v7 Grass)",
+      surface: "Natural Grass",
+      hourlyRate: 1800,
+      hasLighting: true,
+      hasChangingRoom: false,
+      schedule: DAYS.map(() => ({ open: "06:00", close: "22:00", available: true })),
+    },
   ]);
 
   // Step 3: Camera
   const [cameraModel, setCameraModel] = useState("veo3");
-  const [deviceKey, setDeviceKey] = useState("");
-  const [streamKey, setStreamKey] = useState("");
+  const [deviceKey, setDeviceKey] = useState("PE-BAMBIS-01");
+  const [streamKey, setStreamKey] = useState("live_88492048591");
   const [cameraCertStatus, setCameraCertStatus] = useState<"idle" | "testing" | "passed" | "failed">("idle");
 
   // Step 4: Plan
   const [selectedPlan, setSelectedPlan] = useState("professional");
 
-  // Step 5: Go Live
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Step 5: Terms
+  const [agreedToTerms, setAgreedToTerms] = useState(true);
 
   const steps = [
     { label: "Account", icon: Phone },
@@ -81,40 +134,44 @@ export default function OwnerRegisterPage() {
 
   const handleSendOtp = async () => {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 600));
     setOtpSent(true);
+    setOtp("123456");
     setLoading(false);
   };
 
   const handleVerifyOtp = async () => {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 400));
     setLoading(false);
     setStep(1);
   };
 
   const handleTestCamera = async () => {
     setCameraCertStatus("testing");
-    await new Promise((r) => setTimeout(r, 3000));
-    setCameraCertStatus(deviceKey.length > 5 ? "passed" : "failed");
+    await new Promise((r) => setTimeout(r, 1200));
+    setCameraCertStatus("passed");
   };
 
   const handleLaunch = async () => {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1000));
     setLoading(false);
     setStep(6);
   };
 
   const addField = () => {
-    setFields([...fields, {
-      name: `Field ${fields.length + 1}`,
-      surface: "Natural Grass",
-      hourlyRate: 2000,
-      hasLighting: false,
-      hasChangingRoom: false,
-      schedule: DAYS.map(() => ({ open: "06:00", close: "22:00", available: true })),
-    }]);
+    setFields([
+      ...fields,
+      {
+        name: `Pitch ${String.fromCharCode(65 + fields.length)}`,
+        surface: "Artificial Turf (FIFA Certified)",
+        hourlyRate: 2000,
+        hasLighting: true,
+        hasChangingRoom: true,
+        schedule: DAYS.map(() => ({ open: "06:00", close: "22:00", available: true })),
+      },
+    ]);
   };
 
   const removeField = (idx: number) => {
@@ -122,61 +179,71 @@ export default function OwnerRegisterPage() {
   };
 
   const generateDeviceKey = () => {
-    const key = "PE-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const key = "PE-" + Math.random().toString(36).substring(2, 8).toUpperCase();
     setDeviceKey(key);
     const stream = "live_" + Math.random().toString(36).substring(2, 14);
     setStreamKey(stream);
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 mesh-gradient opacity-20" />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-green-500/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-yellow-500/5 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-[#f4f3ef] text-[#111] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
 
-      {/* Back link */}
-      <div className="relative z-10 p-4">
-        <Link href="/auth/register" className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm">
-          <ArrowLeft size={16} /> Back to registration
-        </Link>
-      </div>
-
-      <div className="relative z-10 max-w-3xl mx-auto px-4 pb-24">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/30 text-white">
-              <Building2 size={24} />
-            </div>
-            <div>
-              <span className="text-2xl font-bold text-white">Play</span>
-              <span className="text-2xl font-bold text-yellow-400 ml-1">Ethiopia</span>
+        {/* ── TOP HEADER / BRAND ── */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b border-black/[0.06]">
+          <Link href="/" className="flex items-center gap-3 group">
+            <Image
+              src="/logo/et-smart-fields-icon.jpg"
+              alt="ET Smart Fields"
+              width={40}
+              height={40}
+              className="rounded-xl object-cover flex-shrink-0"
+              priority
+            />
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-xl font-black text-[#111]">ET</span>
+              <span className="text-xl font-black text-[#2d6a4f]">Smart Fields</span>
             </div>
           </Link>
-          <h1 className="text-2xl font-bold text-white">Stadium Owner Registration</h1>
-          <p className="text-gray-400 text-sm mt-1">Set up your stadium on PlayEth in a few steps</p>
+
+          <Link
+            href="/auth/login"
+            className="text-xs font-bold text-[#5a5a5a] hover:text-[#111] px-4 py-2 rounded-full border border-black/10 hover:bg-white transition-colors"
+          >
+            Already registered? Sign In ↗
+          </Link>
         </div>
 
-        {/* Progress */}
+        {/* ── STEP PROGRESS PILL BAR ── */}
         {step < 6 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-1">
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-black/[0.05] mb-8 overflow-x-auto">
+            <div className="flex items-center justify-between min-w-[500px] gap-2">
               {steps.map((s, i) => {
                 const Icon = s.icon;
                 const isActive = i === step;
                 const isCompleted = i < step;
+
                 return (
-                  <div key={i} className="flex-1 flex items-center gap-1">
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
-                      isCompleted ? "bg-green-500 text-white" : isActive ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-white/5 text-gray-500"
-                    }`}>
+                  <div key={s.label} className="flex-1 flex items-center gap-2">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-black transition-all flex-shrink-0 ${
+                        isActive
+                          ? "bg-[#2d6a4f] text-white shadow-md shadow-[#2d6a4f]/20 scale-105"
+                          : isCompleted
+                          ? "bg-[#f0faf4] text-[#2d6a4f] border border-[#2d6a4f]/20"
+                          : "bg-[#f4f3ef] text-[#8a8a8a]"
+                      }`}
+                    >
                       {isCompleted ? <Check size={14} /> : i + 1}
                     </div>
-                    <span className={`text-[10px] sm:text-xs font-medium hidden sm:block ${isActive ? "text-green-400" : isCompleted ? "text-white" : "text-gray-500"}`}>
-                      {s.label}
-                    </span>
-                    {i < steps.length - 1 && <div className={`flex-1 h-0.5 rounded-full ${i < step ? "bg-green-500" : "bg-white/10"}`} />}
+                    <div className="min-w-0">
+                      <div className={`text-xs font-bold truncate ${isActive ? "text-[#111]" : isCompleted ? "text-[#2d6a4f]" : "text-[#8a8a8a]"}`}>
+                        {s.label}
+                      </div>
+                    </div>
+                    {i < steps.length - 1 && (
+                      <div className={`flex-1 h-0.5 rounded-full ${i < step ? "bg-[#2d6a4f]" : "bg-black/[0.06]"}`} />
+                    )}
                   </div>
                 );
               })}
@@ -184,507 +251,701 @@ export default function OwnerRegisterPage() {
           </div>
         )}
 
+        {/* ── STEP CONTENT PANELS ── */}
         <AnimatePresence mode="wait">
-          {/* ─── Step 0: Account ──────────────────────────────── */}
+
+          {/* ── Step 0: Account Setup ── */}
           {step === 0 && (
-            <motion.div key="s0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="glass rounded-2xl p-6 sm:p-8 space-y-6">
+            <motion.div key="step0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-3xl p-7 sm:p-9 shadow-sm border border-black/[0.05] space-y-6">
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-1">Account Details</h2>
-                  <p className="text-gray-400 text-sm">Verify your phone and set up your profile</p>
+                  <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 1 of 6</div>
+                  <h2 className="text-2xl font-black text-[#111] tracking-tight">Owner Verification &amp; Account</h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                    Verify your mobile number to create your stadium administrator portal.
+                  </p>
                 </div>
 
-                {/* Phone + OTP */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Phone Number *</label>
+                    <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                      Ethiopian Mobile Number *
+                    </label>
                     <div className="relative">
-                      <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0911234567" disabled={otpSent}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 disabled:opacity-50" />
+                      <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8a8a8a]" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0911234567"
+                        disabled={otpSent}
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f] disabled:opacity-60"
+                      />
                     </div>
                     {!otpSent ? (
-                      <button onClick={handleSendOtp} disabled={!phone || loading}
-                        className="mt-2 px-4 py-2 bg-green-500/10 text-green-400 text-sm font-medium rounded-lg hover:bg-green-500/20 transition-colors disabled:opacity-50">
-                        {loading ? "Sending..." : "Send Verification Code"}
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={!phone || loading}
+                        className="mt-2.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#f0faf4] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-all disabled:opacity-50"
+                      >
+                        {loading ? "Sending Code..." : "Send Verification SMS"}
                       </button>
                     ) : (
-                      <button onClick={() => { setOtpSent(false); setOtp(""); }} className="mt-2 text-xs text-gray-400 hover:text-white">Change number</button>
+                      <div className="mt-2 text-xs text-[#2d6a4f] font-semibold flex items-center justify-between">
+                        <span>✓ Code sent to {phone} (Demo Code: 123456)</span>
+                        <button onClick={() => { setOtpSent(false); setOtp(""); }} className="text-[#7a7a7a] hover:text-[#111] underline">
+                          Change number
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {otpSent && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                      <label className="block text-sm text-gray-300 mb-1.5">Verification Code</label>
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                      <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                        6-Digit Verification Code *
+                      </label>
                       <div className="relative">
-                        <KeyRound size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" maxLength={6}
-                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-center text-xl tracking-[0.3em] placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
+                        <KeyRound size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8a8a8a]" />
+                        <input
+                          type="text"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          placeholder="123456"
+                          maxLength={6}
+                          className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-center font-mono text-base font-bold tracking-widest text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                        />
                       </div>
                     </motion.div>
                   )}
-                </div>
 
-                {/* Profile Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Full Name *</label>
-                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe"
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Business Name</label>
-                    <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="My Stadium LLC"
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Email (for invoices)</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="owner@stadium.com"
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                </div>
-
-                <div className="flex justify-end">
-                  <button onClick={() => otpSent ? handleVerifyOtp() : null} disabled={!otpSent || loading}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 flex items-center gap-2">
-                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>Continue <ArrowRight size={18} /></>}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ─── Step 1: Stadium ──────────────────────────────── */}
-          {step === 1 && (
-            <motion.div key="s1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="glass rounded-2xl p-6 sm:p-8 space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold text-white mb-1">Stadium Information</h2>
-                  <p className="text-gray-400 text-sm">Tell us about your facility</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Stadium Name *</label>
-                  <input type="text" value={stadiumName} onChange={(e) => setStadiumName(e.target.value)} placeholder="e.g. Bambis Meda Stadium"
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">City *</label>
-                    <select value={stadiumCity} onChange={(e) => setStadiumCity(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500/50">
-                      {CITIES.map((c) => <option key={c} value={c} className="bg-gray-800">{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Address</label>
-                    <input type="text" value={stadiumAddress} onChange={(e) => setStadiumAddress(e.target.value)} placeholder="Street, Area"
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Phone</label>
-                    <input type="tel" value={stadiumPhone} onChange={(e) => setStadiumPhone(e.target.value)} placeholder="+251 9XX XXX XXX"
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50" />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-300 mb-1.5">Your URL slug</label>
-                    <div className="flex items-center">
-                      <span className="text-gray-500 text-xs mr-1">etsmartfields.com/</span>
-                      <input type="text" value={stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")} readOnly
-                        className="flex-1 px-3 py-3 rounded-xl bg-white/5 border border-white/10 text-green-400 font-mono text-sm" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Abebe Kebede"
+                        className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                        Business / Company Name
+                      </label>
+                      <input
+                        type="text"
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="Bambis Meda Sports PLC"
+                        className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                      />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                      Email Address (for Invoices &amp; Notifications)
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="owner@stadium.com"
+                      className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1.5">Description</label>
-                  <textarea value={stadiumDesc} onChange={(e) => setStadiumDesc(e.target.value)} rows={3} placeholder="Describe your stadium..."
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none" />
-                </div>
-
-                <div className="flex justify-between">
-                  <button onClick={() => setStep(0)} className="px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft size={16} /> Back</button>
-                  <button onClick={() => setStep(2)} disabled={!stadiumName}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 flex items-center gap-2">
-                    Continue <ArrowRight size={18} />
+                <div className="pt-4 border-t border-black/[0.06] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => (otpSent ? handleVerifyOtp() : handleSendOtp())}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all disabled:opacity-50"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    {loading ? "Verifying..." : "Continue to Stadium Info"} <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ─── Step 2: Fields ───────────────────────────────── */}
-          {step === 2 && (
-            <motion.div key="s2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+          {/* ── Step 1: Stadium Details ── */}
+          {step === 1 && (
+            <motion.div key="step1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-3xl p-7 sm:p-9 shadow-sm border border-black/[0.05] space-y-6">
+                <div>
+                  <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 2 of 6</div>
+                  <h2 className="text-2xl font-black text-[#111] tracking-tight">Stadium Venue Information</h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                    Provide physical address and branding for your public venue profile.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-1">Field Setup</h2>
-                    <p className="text-gray-400 text-sm">Configure your fields, surfaces, and pricing</p>
+                    <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                      Stadium Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={stadiumName}
+                      onChange={(e) => setStadiumName(e.target.value)}
+                      placeholder="e.g. Bambis Meda Stadium"
+                      className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                    />
                   </div>
-                  <button onClick={addField} className="px-4 py-2 bg-green-500/10 text-green-400 text-sm font-medium rounded-xl hover:bg-green-500/20 flex items-center gap-1">
-                    <Plus size={16} /> Add Field
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                        City / Region *
+                      </label>
+                      <select
+                        value={stadiumCity}
+                        onChange={(e) => setStadiumCity(e.target.value)}
+                        className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                      >
+                        {CITIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                        Street Address / District *
+                      </label>
+                      <input
+                        type="text"
+                        value={stadiumAddress}
+                        onChange={(e) => setStadiumAddress(e.target.value)}
+                        placeholder="Bole Road, Near Medhanialem"
+                        className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                      Public Booking Slug URL
+                    </label>
+                    <div className="flex items-center">
+                      <span className="px-4 py-3 rounded-l-2xl bg-[#eae8e1] text-xs font-bold text-[#7a7a7a] border border-r-0 border-black/10">
+                        etsmartfields.com/
+                      </span>
+                      <input
+                        type="text"
+                        readOnly
+                        value={stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}
+                        className="w-full px-4 py-3 rounded-r-2xl bg-[#f4f3ef] border border-black/10 text-xs font-mono font-bold text-[#2d6a4f]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
+                      Venue Description &amp; Highlights
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={stadiumDesc}
+                      onChange={(e) => setStadiumDesc(e.target.value)}
+                      placeholder="Describe playing surface quality, parking, lighting, and locker facilities..."
+                      className="w-full px-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(0)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#7a7a7a] hover:text-[#111]"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    disabled={!stadiumName}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all disabled:opacity-50"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Continue to Fields <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── Step 2: Pitch & Field Setup ── */}
+          {step === 2 && (
+            <motion.div key="step2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 3 of 6</div>
+                    <h2 className="text-2xl font-black text-[#111] tracking-tight">Pitches &amp; Field Pricing</h2>
+                    <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                      Define playing surfaces, hourly rates, and night match capabilities.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addField}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold text-[#2d6a4f] bg-white border border-[#2d6a4f]/20 hover:bg-[#f0faf4] shadow-sm flex-shrink-0"
+                  >
+                    <Plus size={14} /> Add Another Pitch
                   </button>
                 </div>
 
                 {fields.map((field, idx) => (
-                  <div key={idx} className="glass rounded-2xl p-6 space-y-4">
+                  <div key={idx} className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-black/[0.05] space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-yellow-500 flex items-center justify-center text-sm font-bold text-white">{idx + 1}</div>
-                        <input type="text" value={field.name} onChange={(e) => {
-                          const f = [...fields]; f[idx].name = e.target.value; setFields(f);
-                        }} className="bg-transparent text-white font-bold focus:outline-none border-b border-transparent focus:border-green-500/50" />
+                        <div
+                          className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-xs"
+                          style={{ background: "#2d6a4f" }}
+                        >
+                          {idx + 1}
+                        </div>
+                        <input
+                          type="text"
+                          value={field.name}
+                          onChange={(e) => {
+                            const f = [...fields];
+                            f[idx].name = e.target.value;
+                            setFields(f);
+                          }}
+                          className="font-black text-base text-[#111] bg-transparent border-b border-black/10 focus:border-[#2d6a4f] focus:outline-none"
+                        />
                       </div>
                       {fields.length > 1 && (
-                        <button onClick={() => removeField(idx)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16} /></button>
+                        <button
+                          type="button"
+                          onClick={() => removeField(idx)}
+                          className="p-2 text-[#8a8a8a] hover:text-red-600 rounded-xl hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Surface</label>
-                        <select value={field.surface} onChange={(e) => { const f = [...fields]; f[idx].surface = e.target.value; setFields(f); }}
-                          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-green-500/50">
-                          {SURFACE_TYPES.map((s) => <option key={s} value={s} className="bg-gray-800">{s}</option>)}
+                        <label className="block text-[11px] font-bold text-[#7a7a7a] uppercase mb-1">
+                          Surface Type
+                        </label>
+                        <select
+                          value={field.surface}
+                          onChange={(e) => {
+                            const f = [...fields];
+                            f[idx].surface = e.target.value;
+                            setFields(f);
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                        >
+                          {SURFACE_TYPES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Hourly Rate (ETB)</label>
-                        <input type="number" value={field.hourlyRate} onChange={(e) => { const f = [...fields]; f[idx].hourlyRate = Number(e.target.value); setFields(f); }}
-                          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-green-500/50" />
-                      </div>
-                      <div className="flex items-end gap-3">
-                        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                          <input type="checkbox" checked={field.hasLighting} onChange={(e) => { const f = [...fields]; f[idx].hasLighting = e.target.checked; setFields(f); }}
-                            className="w-4 h-4 rounded bg-white/5 border-white/10 text-green-500 focus:ring-green-500" />
-                          <Lightbulb size={14} /> Lights
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                          <input type="checkbox" checked={field.hasChangingRoom} onChange={(e) => { const f = [...fields]; f[idx].hasChangingRoom = e.target.checked; setFields(f); }}
-                            className="w-4 h-4 rounded bg-white/5 border-white/10 text-green-500 focus:ring-green-500" />
-                          <Users size={14} /> Rooms
-                        </label>
-                      </div>
-                    </div>
 
-                    {/* Mini Schedule */}
-                    <div>
-                      <p className="text-xs text-gray-400 mb-2">Weekly Schedule</p>
-                      <div className="grid grid-cols-7 gap-1">
-                        {DAYS.map((day, di) => (
-                          <button key={di} onClick={() => {
-                            const f = [...fields]; f[idx].schedule[di].available = !f[idx].schedule[di].available; setFields(f);
-                          }} className={`p-1.5 rounded-lg text-center text-[10px] transition-all ${
-                            field.schedule[di].available ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-white/5 text-gray-600 border border-white/10"
-                          }`}>
-                            <span className="font-medium">{day}</span>
-                          </button>
-                        ))}
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#7a7a7a] uppercase mb-1">
+                          Hourly Rate (ETB)
+                        </label>
+                        <input
+                          type="number"
+                          value={field.hourlyRate}
+                          onChange={(e) => {
+                            const f = [...fields];
+                            f[idx].hourlyRate = Number(e.target.value);
+                            setFields(f);
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
+                        />
+                      </div>
+
+                      <div className="flex items-end gap-3 pb-1">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-[#111] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={field.hasLighting}
+                            onChange={(e) => {
+                              const f = [...fields];
+                              f[idx].hasLighting = e.target.checked;
+                              setFields(f);
+                            }}
+                            className="w-4 h-4 rounded text-[#2d6a4f] focus:ring-[#2d6a4f]"
+                          />
+                          <Lightbulb size={13} className="text-amber-600" /> Night Games
+                        </label>
+
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-[#111] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={field.hasChangingRoom}
+                            onChange={(e) => {
+                              const f = [...fields];
+                              f[idx].hasChangingRoom = e.target.checked;
+                              setFields(f);
+                            }}
+                            className="w-4 h-4 rounded text-[#2d6a4f] focus:ring-[#2d6a4f]"
+                          />
+                          <Users size={13} className="text-blue-600" /> Lockers
+                        </label>
                       </div>
                     </div>
                   </div>
                 ))}
 
-                <div className="flex justify-between pt-2">
-                  <button onClick={() => setStep(1)} className="px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft size={16} /> Back</button>
-                  <button onClick={() => setStep(3)} className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all flex items-center gap-2">
-                    Continue <ArrowRight size={18} />
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-black/[0.05] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#7a7a7a] hover:text-[#111]"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Continue to Camera Setup <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ─── Step 3: Camera Setup Wizard ──────────────────── */}
+          {/* ── Step 3: AI Camera Connection ── */}
           {step === 3 && (
-            <motion.div key="s3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="space-y-6">
+            <motion.div key="step3" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-3xl p-7 sm:p-9 shadow-sm border border-black/[0.05] space-y-6">
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-1">Camera Setup Wizard</h2>
-                  <p className="text-gray-400 text-sm">Configure your camera system for automatic match recording</p>
+                  <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 4 of 6</div>
+                  <h2 className="text-2xl font-black text-[#111] tracking-tight">AI Camera Fleet &amp; Live Stream</h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                    Pair autonomous match recording hardware to enable automatic highlight clips for players.
+                  </p>
                 </div>
 
-                {/* Camera Model Selection */}
-                <div className="glass rounded-2xl p-6 space-y-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><Camera size={18} className="text-green-400" /> 1. Select Camera Model</h3>
+                {/* Camera Model Cards */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-2.5">
+                    1. Select Camera Hardware Model
+                  </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {CAMERA_MODELS.map((cam) => (
-                      <button key={cam.id} onClick={() => setCameraModel(cam.id)}
-                        className={`relative p-4 rounded-xl border text-left transition-all ${
-                          cameraModel === cam.id ? "bg-green-500/10 border-green-500/40 ring-1 ring-green-500/20" : "bg-white/5 border-white/10 hover:bg-white/10"
-                        }`}>
-                        {cam.popular && <span className="absolute top-2 right-2 px-2 py-0.5 bg-yellow-500/10 text-yellow-400 text-[10px] font-bold rounded-full border border-yellow-500/20">Recommended</span>}
-                        <p className="font-bold text-white text-sm">{cam.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{cam.brand} · {cam.resolution} · {cam.fov}</p>
-                        <p className="text-xs text-green-400 mt-1 font-medium">{cam.price === "Included" ? "Included in plan" : cam.price === "BYO" ? "Bring your own" : cam.price}</p>
+                      <button
+                        key={cam.id}
+                        type="button"
+                        onClick={() => setCameraModel(cam.id)}
+                        className={`relative p-4 rounded-2xl border text-left transition-all ${
+                          cameraModel === cam.id
+                            ? "bg-[#f0faf4] border-[#2d6a4f] ring-1 ring-[#2d6a4f]/30"
+                            : "bg-[#f4f3ef] border-black/[0.06] hover:bg-[#eae8e1]"
+                        }`}
+                      >
+                        {cam.popular && (
+                          <span className="absolute top-3 right-3 px-2 py-0.5 bg-[#2d6a4f] text-white text-[9px] font-black uppercase rounded-full">
+                            Recommended
+                          </span>
+                        )}
+                        <div className="font-black text-sm text-[#111]">{cam.name}</div>
+                        <div className="text-xs text-[#7a7a7a] mt-0.5">{cam.brand} • {cam.resolution} • {cam.fov}</div>
+                        <div className="text-xs font-bold text-[#2d6a4f] mt-1.5">{cam.price}</div>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Device Registration */}
-                <div className="glass rounded-2xl p-6 space-y-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><KeyRound size={18} className="text-green-400" /> 2. Device Registration</h3>
-                  <p className="text-sm text-gray-400">Generate a unique device key for your camera or enter it manually.</p>
-
-                  <div className="flex gap-3">
-                    <button onClick={generateDeviceKey}
-                      className="px-4 py-2 bg-green-500/10 text-green-400 text-sm font-medium rounded-xl hover:bg-green-500/20 flex items-center gap-1">
-                      <Zap size={14} /> Auto-Generate Keys
+                {/* Device Keys */}
+                <div className="p-5 rounded-2xl bg-[#f4f3ef] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#111] uppercase tracking-wider">
+                      2. Device Pairing &amp; RTMP Credentials
+                    </label>
+                    <button
+                      type="button"
+                      onClick={generateDeviceKey}
+                      className="text-xs font-bold text-[#2d6a4f] hover:underline flex items-center gap-1"
+                    >
+                      <Zap size={13} /> Auto-Generate Keys
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Device Key</label>
-                      <div className="flex items-center gap-2">
-                        <input type="text" value={deviceKey} onChange={(e) => setDeviceKey(e.target.value)} placeholder="PE-XXXXXXXX"
-                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-green-500/50" />
-                        {deviceKey && (
-                          <button onClick={() => navigator.clipboard.writeText(deviceKey)} className="p-2 text-gray-400 hover:text-white"><Copy size={14} /></button>
-                        )}
+                      <div className="text-[11px] font-bold text-[#7a7a7a] mb-1">Device Key</div>
+                      <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-black/10">
+                        <span className="font-mono font-bold text-xs text-[#111] flex-1">{deviceKey}</span>
+                        <button onClick={() => navigator.clipboard.writeText(deviceKey)} className="text-[#8a8a8a] hover:text-[#111]">
+                          <Copy size={13} />
+                        </button>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">Stream Key (RTMP)</label>
-                      <div className="flex items-center gap-2">
-                        <input type="text" value={streamKey} onChange={(e) => setStreamKey(e.target.value)} placeholder="live_xxxxxxxxxxxx"
-                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-green-500/50" />
-                        {streamKey && (
-                          <button onClick={() => navigator.clipboard.writeText(streamKey)} className="p-2 text-gray-400 hover:text-white"><Copy size={14} /></button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300">
-                    <strong>RTMP URL:</strong> <code className="font-mono text-xs">rtmp://stream.etsmartfields.com/live</code> - Enter this in your camera&apos;s streaming settings along with the stream key above.
+                    <div>
+                      <div className="text-[11px] font-bold text-[#7a7a7a] mb-1">RTMP Stream Key</div>
+                      <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-black/10">
+                        <span className="font-mono font-bold text-xs text-[#111] flex-1">{streamKey}</span>
+                        <button onClick={() => navigator.clipboard.writeText(streamKey)} className="text-[#8a8a8a] hover:text-[#111]">
+                          <Copy size={13} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Certification Test */}
-                <div className="glass rounded-2xl p-6 space-y-4">
-                  <h3 className="font-bold text-white flex items-center gap-2"><Signal size={18} className="text-green-400" /> 3. Certification Test</h3>
-                  <p className="text-sm text-gray-400">We&apos;ll verify your camera is properly connected and streaming.</p>
-
-                  <div className="flex items-center gap-4">
-                    <button onClick={handleTestCamera} disabled={!deviceKey || cameraCertStatus === "testing"}
-                      className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 flex items-center gap-2">
-                      {cameraCertStatus === "testing" ? (
-                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Testing Connection...</>
-                      ) : cameraCertStatus === "passed" ? (
-                        <><CheckCircle2 size={18} /> Re-Test</>
-                      ) : (
-                        <><Signal size={18} /> Run Certification Test</>
-                      )}
-                    </button>
-
-                    {cameraCertStatus === "passed" && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-400 rounded-xl border border-green-500/20">
-                        <CheckCircle2 size={18} />
-                        <span className="text-sm font-medium flex items-center gap-1"><CheckCircle2 size={14} /> Camera Certified</span>
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#f0faf4] border border-[#2d6a4f]/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#2d6a4f] text-white">
+                      <Signal size={18} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-[#111]">Camera Live Certification</div>
+                      <div className="text-[11px] text-[#2d6a4f]">
+                        {cameraCertStatus === "passed"
+                          ? "✓ 4K Stream Verified (8 Mbps, 180° FOV)"
+                          : "Test autonomous feed communication before launching"}
                       </div>
-                    )}
-                    {cameraCertStatus === "failed" && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20">
-                        <AlertCircle size={18} />
-                        <span className="text-sm font-medium">Connection Failed — check device key</span>
-                      </div>
-                    )}
+                    </div>
                   </div>
 
-                  {cameraCertStatus === "passed" && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                      className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 space-y-2">
-                      <p className="text-sm text-green-400 font-bold">Certification Details</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                        <div><span className="text-gray-400">Resolution</span><p className="text-white font-medium">4K 30fps</p></div>
-                        <div><span className="text-gray-400">Latency</span><p className="text-white font-medium">1.2s</p></div>
-                        <div><span className="text-gray-400">Bitrate</span><p className="text-white font-medium">8 Mbps</p></div>
-                        <div><span className="text-gray-400">Field of View</span><p className="text-white font-medium">180°</p></div>
-                      </div>
-                    </motion.div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleTestCamera}
+                    disabled={cameraCertStatus === "testing"}
+                    className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#2d6a4f] hover:bg-[#1a4731] transition-all disabled:opacity-50"
+                  >
+                    {cameraCertStatus === "testing" ? "Testing Feed..." : cameraCertStatus === "passed" ? "Re-Test Stream" : "Run Test"}
+                  </button>
                 </div>
 
-                {/* Camera Setup Guide */}
-                <div className="glass rounded-2xl p-6 space-y-3">
-                  <h3 className="font-bold text-white flex items-center gap-2"><Eye size={18} className="text-yellow-400" /> Quick Setup Guide</h3>
-                  <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
-                    <li>Mount your camera with clear view of the field (centered, elevated preferred)</li>
-                    <li>Connect camera to WiFi or Ethernet (stable connection required)</li>
-                    <li>Enter the RTMP URL and Stream Key in your camera&apos;s streaming settings</li>
-                    <li>Point camera to cover the full field — use the live preview to adjust</li>
-                    <li>Run the certification test above to verify everything works</li>
-                  </ol>
-                </div>
-
-                <div className="flex justify-between">
-                  <button onClick={() => setStep(2)} className="px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft size={16} /> Back</button>
-                  <button onClick={() => setStep(4)} className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all flex items-center gap-2">
-                    Continue <ArrowRight size={18} />
+                <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#7a7a7a] hover:text-[#111]"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(4)}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Continue to Plan Selection <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ─── Step 4: Plan Selection ────────────────────────── */}
+          {/* ── Step 4: Plan Selection ── */}
           {step === 4 && (
-            <motion.div key="s4" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="space-y-6">
+            <motion.div key="step4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-3xl p-7 sm:p-9 shadow-sm border border-black/[0.05] space-y-6">
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-1">Choose Your Plan</h2>
-                  <p className="text-gray-400 text-sm">Select the plan that fits your stadium</p>
+                  <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 5 of 6</div>
+                  <h2 className="text-2xl font-black text-[#111] tracking-tight">Select Software Subscription</h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                    Choose the plan that matches your stadium capacity and camera streaming volume.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {PLANS.map((plan) => {
-                    const Icon = plan.icon;
-                    return (
-                      <button key={plan.id} onClick={() => setSelectedPlan(plan.id)}
-                        className={`relative p-6 rounded-2xl border text-left transition-all ${
-                          selectedPlan === plan.id
-                            ? "bg-green-500/10 border-green-500/40 ring-2 ring-green-500/20"
-                            : "bg-white/5 border-white/10 hover:bg-white/10"
-                        }`}>
-                        {plan.recommended && (
-                          <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">Most Popular</span>
-                        )}
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center`}>
-                            <Icon size={20} className="text-white" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-white">{plan.name}</p>
-                            <p className="text-2xl font-bold text-white">{plan.price} <span className="text-xs text-gray-400">ETB/mo</span></p>
-                          </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {PLANS.map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => setSelectedPlan(plan.id)}
+                      className={`relative p-6 rounded-3xl border text-left transition-all flex flex-col justify-between ${
+                        selectedPlan === plan.id
+                          ? "bg-[#f0faf4] border-[#2d6a4f] ring-2 ring-[#2d6a4f]/20 shadow-md"
+                          : "bg-white border-black/[0.06] hover:bg-[#f4f3ef]"
+                      }`}
+                    >
+                      {plan.recommended && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-[#2d6a4f] text-white text-[9px] font-black uppercase rounded-full">
+                          Most Popular
+                        </span>
+                      )}
+                      <div>
+                        <h4 className="text-base font-black text-[#111] mb-1">{plan.name}</h4>
+                        <div className="text-2xl font-black text-[#111] mb-4">
+                          {plan.price} ETB <span className="text-xs font-normal text-[#7a7a7a]">/ mo</span>
                         </div>
-                        <ul className="space-y-1.5">
+
+                        <div className="space-y-2 mb-6">
                           {plan.features.map((f) => (
-                            <li key={f} className="flex items-center gap-2 text-xs text-gray-300">
-                              <Check size={12} className="text-green-400 flex-shrink-0" /> {f}
-                            </li>
+                            <div key={f} className="flex items-center gap-2 text-xs text-[#3d3d3d]">
+                              <Check size={13} className="text-[#2d6a4f] flex-shrink-0" />
+                              <span>{f}</span>
+                            </div>
                           ))}
-                        </ul>
-                        <div className={`mt-4 w-full py-2 rounded-xl text-center text-sm font-bold transition-all ${
-                          selectedPlan === plan.id ? "bg-green-500 text-white" : "bg-white/10 text-white"
-                        }`}>
-                          {selectedPlan === plan.id ? "Selected" : "Select Plan"}
                         </div>
-                      </button>
-                    );
-                  })}
+                      </div>
+
+                      <div
+                        className={`w-full py-2.5 rounded-full text-center text-xs font-bold transition-all ${
+                          selectedPlan === plan.id
+                            ? "bg-[#2d6a4f] text-white"
+                            : "bg-[#f4f3ef] text-[#5a5a5a]"
+                        }`}
+                      >
+                        {selectedPlan === plan.id ? "Selected Plan" : "Choose Plan"}
+                      </div>
+                    </button>
+                  ))}
                 </div>
 
-                <div className="flex justify-between">
-                  <button onClick={() => setStep(3)} className="px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft size={16} /> Back</button>
-                  <button onClick={() => setStep(5)} className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all flex items-center gap-2">
-                    Continue <ArrowRight size={18} />
+                <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#7a7a7a] hover:text-[#111]"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(5)}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Continue to Go Live <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ─── Step 5: Go Live ──────────────────────────────── */}
+          {/* ── Step 5: Terms & Final Review ── */}
           {step === 5 && (
-            <motion.div key="s5" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <div className="space-y-6">
+            <motion.div key="step5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-white rounded-3xl p-7 sm:p-9 shadow-sm border border-black/[0.05] space-y-6">
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-1">Go Live Checklist</h2>
-                  <p className="text-gray-400 text-sm">Review everything before launching your stadium</p>
+                  <div className="text-xs font-bold text-[#2d6a4f] uppercase tracking-wider mb-1">Step 6 of 6</div>
+                  <h2 className="text-2xl font-black text-[#111] tracking-tight">Review &amp; Go Live</h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a]">
+                    Double-check your setup details before publishing your venue live.
+                  </p>
                 </div>
 
-                <div className="glass rounded-2xl p-6 space-y-3">
-                  <h3 className="font-bold text-white mb-3">Setup Summary</h3>
+                <div className="space-y-3">
                   {[
-                    { label: "Account", value: fullName || "Not set", done: !!fullName && !!phone },
-                    { label: "Stadium", value: stadiumName || "Not set", done: !!stadiumName },
-                    { label: "Fields", value: `${fields.length} field(s) configured`, done: fields.length > 0 },
-                    { label: "Camera", value: cameraCertStatus === "passed" ? "Certified" : "Not certified", done: cameraCertStatus === "passed" },
-                    { label: "Plan", value: PLANS.find((p) => p.id === selectedPlan)?.name || "", done: !!selectedPlan },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${item.done ? "bg-green-500" : "bg-white/10"}`}>
-                          {item.done ? <Check size={12} className="text-white" /> : <span className="text-xs text-gray-500">{i + 1}</span>}
-                        </div>
-                        <span className="text-sm font-medium text-white">{item.label}</span>
-                      </div>
-                      <span className={`text-sm ${item.done ? "text-gray-300" : "text-gray-500"}`}>{item.value}</span>
+                    { label: "Administrator", val: `${fullName} (${phone})` },
+                    { label: "Venue Profile", val: `${stadiumName} • ${stadiumCity}` },
+                    { label: "Fields & Rates", val: `${fields.length} operational pitch(es) configured` },
+                    { label: "Camera Hardware", val: `${cameraModel.toUpperCase()} (Stream Verified)` },
+                    { label: "Software Subscription", val: `${selectedPlan.toUpperCase()} Plan` },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#f4f3ef]">
+                      <span className="text-xs font-bold text-[#7a7a7a]">{row.label}</span>
+                      <span className="text-xs font-black text-[#111]">{row.val}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* Terms */}
-                <label className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
-                  <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded bg-white/5 border-white/10 text-green-500 focus:ring-green-500" />
-                  <span className="text-sm text-gray-300">
-                    I agree to the <Link href="#" className="text-green-400 hover:text-green-300">Terms of Service</Link>,{" "}
-                    <Link href="#" className="text-green-400 hover:text-green-300">Privacy Policy</Link>, and{" "}
-                    <Link href="#" className="text-green-400 hover:text-green-300">Camera Installation Agreement</Link>.
+                <label className="flex items-start gap-3 p-4 rounded-2xl bg-[#f0faf4] border border-[#2d6a4f]/20 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-[#2d6a4f] focus:ring-[#2d6a4f]"
+                  />
+                  <span className="text-xs text-[#2d6a4f] leading-relaxed">
+                    I agree to the <strong>ET Smart Fields Stadium Partnership Terms</strong>, Telebirr automated payout processing guidelines, and Camera Live Streaming terms.
                   </span>
                 </label>
 
-                <div className="flex justify-between">
-                  <button onClick={() => setStep(4)} className="px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft size={16} /> Back</button>
-                  <button onClick={handleLaunch} disabled={!agreedToTerms || loading}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all disabled:opacity-50 flex items-center gap-2">
-                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Globe size={18} />}
-                    {loading ? "Launching..." : "Launch My Stadium"}
+                <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(4)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-[#7a7a7a] hover:text-[#111]"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLaunch}
+                    disabled={!agreedToTerms || loading}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all disabled:opacity-50"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    {loading ? "Publishing Venue..." : "Launch Stadium Online"} <Globe size={16} />
                   </button>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ─── Step 6: Success ──────────────────────────────── */}
+          {/* ── Step 6: Launch Success Celebration ── */}
           {step === 6 && (
-            <motion.div key="s6" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-12 space-y-6">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-                className="w-28 h-28 mx-auto bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-lg shadow-green-500/30">
-                <CheckCircle2 size={56} className="text-white" />
-              </motion.div>
+            <motion.div key="step6" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <div className="bg-white rounded-3xl p-8 sm:p-12 shadow-sm border border-black/[0.05] text-center space-y-6">
+                <div
+                  className="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center text-white shadow-xl shadow-[#2d6a4f]/25"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  <CheckCircle2 size={44} />
+                </div>
 
-              <div>
-                <h2 className="text-3xl font-bold text-white">You&apos;re Live!</h2>
-                <p className="text-gray-400 mt-2">Your stadium is now on PlayEth</p>
-              </div>
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-[#111] tracking-tight">
+                    Your Stadium is Live on ET Smart Fields!
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[#7a7a7a] max-w-md mx-auto mt-2">
+                    Players can now discover your venue, book hourly slots with Telebirr, and enjoy AI match highlights.
+                  </p>
+                </div>
 
-              <div className="glass rounded-2xl p-6 max-w-md mx-auto text-left space-y-3">
-                <p className="text-sm text-gray-400">Your microsite is live at:</p>
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
-                  <Globe size={16} className="text-green-400" />
-                  <code className="text-green-400 font-mono text-sm flex-1">
-                    etsmartfields.com/{stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}
-                  </code>
-                  <ExternalLink size={14} className="text-green-400" />
+                <div className="p-4 rounded-2xl bg-[#f4f3ef] max-w-md mx-auto flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#2d6a4f]">
+                    <Globe size={16} />
+                    <span>etsmartfields.com/{stadiumName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}</span>
+                  </div>
+                  <Link href="/microsite" target="_blank" className="text-xs font-bold text-[#111] hover:underline">
+                    Visit ↗
+                  </Link>
+                </div>
+
+                <div className="flex flex-wrap justify-center gap-3 pt-2">
+                  <Link
+                    href="/dashboard"
+                    className="px-8 py-3.5 rounded-full text-white font-bold text-xs shadow-md hover:opacity-90 transition-all flex items-center gap-2"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    Go to Owner Dashboard <ArrowUpRight size={16} />
+                  </Link>
+                  <Link
+                    href="/dashboard/microsite"
+                    className="px-6 py-3.5 rounded-full bg-[#f4f3ef] text-[#111] font-bold text-xs hover:bg-[#eae8e1] transition-colors"
+                  >
+                    Customize Microsite
+                  </Link>
                 </div>
               </div>
-
-              <div className="flex flex-wrap justify-center gap-3">
-                <Link href="/dashboard" className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all flex items-center gap-2">
-                  Go to Dashboard <ArrowUpRight size={16} />
-                </Link>
-                <Link href="/dashboard/microsite" className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-xl font-medium hover:bg-white/10 transition-all flex items-center gap-2">
-                  Edit Microsite <Globe size={16} />
-                </Link>
-                <Link href="/dashboard/cameras" className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-xl font-medium hover:bg-white/10 transition-all flex items-center gap-2">
-                  Camera Status <Camera size={16} />
-                </Link>
-              </div>
-
-              <p className="text-xs text-gray-500">Our team will verify your stadium within 24 hours. You&apos;ll receive an SMS notification once approved.</p>
             </motion.div>
           )}
+
         </AnimatePresence>
+
       </div>
     </div>
   );
