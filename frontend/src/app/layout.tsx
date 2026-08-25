@@ -6,9 +6,9 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 
 export const metadata: Metadata = {
-  title: "ET Smart Fields - Smart Football Infrastructure",
-  description: "Book football fields, watch match replays, and connect with smart stadiums across Ethiopia",
-  keywords: ["football", "ethiopia", "booking", "stadium", "sports", "replay", "smart fields"],
+  title: "ET Smart Fields - Book Sports Fields in Ethiopia",
+  description: "Find, reserve and pay for football, basketball, volleyball, badminton, tennis and futsal fields across Ethiopia in under 2 minutes.",
+  keywords: ["football", "basketball", "volleyball", "badminton", "tennis", "futsal", "ethiopia", "booking", "stadium", "sports"],
   icons: {
     icon: [
       { url: "/logo/et-smart-fields-icon.jpg", sizes: "192x192", type: "image/jpeg" },
@@ -84,7 +84,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-white overscroll-none transition-colors duration-300">
+      <body className="antialiased overscroll-none" style={{ backgroundColor: '#f4f3ef', color: '#111111' }}>
         <ThemeProvider>
           <AuthProvider>
             <Header />

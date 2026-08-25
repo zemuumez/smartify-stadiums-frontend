@@ -26,8 +26,17 @@ export function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/10 safe-bottom transition-colors">
-        <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div
+        className="safe-bottom"
+        style={{
+          background: "rgba(255,255,255,0.97)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderTop: "1px solid rgba(0,0,0,0.07)",
+          boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div className="flex items-center justify-around h-[60px] max-w-lg mx-auto px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -36,20 +45,39 @@ export function MobileNav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative flex flex-col items-center gap-0.5 py-1 px-3 min-w-[48px]"
+                className="relative flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-[52px] rounded-xl transition-all"
               >
+                {/* Active indicator dot */}
                 {active && (
                   <motion.div
                     layoutId="mobile-nav-active"
-                    className="absolute -top-1 w-8 h-1 bg-green-600 dark:bg-green-400 rounded-full"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="absolute -top-0.5 w-6 h-1 rounded-full"
+                    style={{ background: "#2d6a4f" }}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
+
+                {/* Active background */}
+                {active && (
+                  <motion.div
+                    layoutId="mobile-nav-bg"
+                    className="absolute inset-0 rounded-xl"
+                    style={{ background: "rgba(45, 106, 79, 0.08)" }}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+
                 <Icon
                   size={20}
-                  className={`transition-colors ${active ? "text-green-600 dark:text-green-400" : "text-slate-400 dark:text-slate-500"}`}
+                  className={`relative z-10 transition-colors duration-200 ${
+                    active ? "text-[#2d6a4f]" : "text-[#aaaaaa]"
+                  }`}
                 />
-                <span className={`text-[10px] font-medium transition-colors ${active ? "text-green-600 dark:text-green-400" : "text-slate-400 dark:text-slate-500"}`}>
+                <span
+                  className={`relative z-10 text-[10px] font-semibold transition-colors duration-200 ${
+                    active ? "text-[#2d6a4f]" : "text-[#aaaaaa]"
+                  }`}
+                >
                   {item.label}
                 </span>
               </Link>

@@ -4,172 +4,162 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MapPin, Calendar, Video, User, LogOut, Sun, Moon } from "lucide-react";
+import { Menu, X, MapPin, Calendar, Video, User, LogOut, ArrowUpRight } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { useTheme } from "@/lib/theme-provider";
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    const handleScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const navLinks = [
-    { href: "/stadiums", label: "Find Stadiums", icon: <MapPin size={16} /> },
-    { href: "/bookings", label: "My Bookings", icon: <Calendar size={16} /> },
-    { href: "/stadiums/live", label: "Live Matches", icon: <Video size={16} /> },
-    { href: "/about", label: "About", icon: null },
-    { href: "/pricing", label: "Pricing", icon: null },
+    { href: "/", label: "Home" },
+    { href: "/stadiums", label: "Venues" },
+    { href: "/stadiums/live", label: "Live" },
+    { href: "/about", label: "About" },
+    { href: "/pricing", label: "Pricing" },
   ];
 
   return (
     <>
       <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           scrolled
-            ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 shadow-sm shadow-slate-900/5"
+            ? "bg-white/95 backdrop-blur-xl border-b border-black/[0.06] shadow-sm"
             : "bg-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-20">
+          <div className="flex items-center justify-between h-16 lg:h-[72px]">
+
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.2 }}
-                className="relative h-10 w-auto"
-              >
+            <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+              <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
                 <Image
                   src="/logo/et-smart-fields-icon.jpg"
                   alt="ET Smart Fields"
-                  width={40}
-                  height={40}
-                  className="h-10 w-auto rounded-lg"
+                  width={36}
+                  height={36}
+                  className="rounded-xl object-cover"
                   priority
                 />
               </motion.div>
-              <div className="hidden sm:flex items-baseline">
-                <span className="text-lg font-bold text-slate-900 dark:text-white">ET</span>
-                <span className="text-lg font-bold text-green-600 dark:text-green-400 ml-0.5">Smart Fields</span>
+              <div className="hidden sm:flex items-baseline gap-0.5">
+                <span
+                  className={`text-[17px] font-black tracking-tight transition-colors ${
+                    scrolled ? "text-[#111]" : "text-white"
+                  }`}
+                >
+                  ET
+                </span>
+                <span
+                  className={`text-[17px] font-black tracking-tight transition-colors ${
+                    scrolled ? "text-[#2d6a4f]" : "text-[#74c69d]"
+                  }`}
+                >
+                  Smart Fields
+                </span>
               </div>
             </Link>
 
             {/* Desktop Nav */}
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-0.5">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 transition-all duration-200"
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    scrolled
+                      ? "text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4]"
+                      : "text-white/90 hover:text-white hover:bg-white/10"
+                  }`}
                 >
-                  {link.icon}
                   {link.label}
                 </Link>
               ))}
             </nav>
 
-            {/* Auth Buttons & Theme Toggle */}
+            {/* Right — Auth + CTA */}
             <div className="hidden lg:flex items-center gap-3">
-              {/* Theme Toggle */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleTheme}
-                className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
-                aria-label="Toggle theme"
-              >
-                <AnimatePresence mode="wait">
-                  {theme === "light" ? (
-                    <motion.div
-                      key="sun"
-                      initial={{ rotate: -90, opacity: 0 }}
-                      animate={{ rotate: 0, opacity: 1 }}
-                      exit={{ rotate: 90, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <Sun size={18} />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="moon"
-                      initial={{ rotate: 90, opacity: 0 }}
-                      animate={{ rotate: 0, opacity: 1 }}
-                      exit={{ rotate: -90, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <Moon size={18} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-
               {isAuthenticated ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <Link
                     href="/dashboard"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 transition-all"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      scrolled
+                        ? "text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4]"
+                        : "text-white/90 hover:text-white hover:bg-white/10"
+                    }`}
                   >
-                    <User size={16} />
-                    {user?.full_name || "Dashboard"}
+                    <User size={15} />
+                    {user?.full_name?.split(" ")[0] || "Dashboard"}
                   </Link>
                   <button
                     onClick={() => logout()}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                    className={`p-2 rounded-lg transition-all ${
+                      scrolled
+                        ? "text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        : "text-white/60 hover:text-white hover:bg-white/10"
+                    }`}
+                    aria-label="Logout"
                   >
-                    <LogOut size={16} />
+                    <LogOut size={15} />
                   </button>
                 </div>
               ) : (
                 <>
                   <Link
                     href="/auth/login"
-                    className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 transition-all"
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      scrolled
+                        ? "text-[#3d3d3d] hover:text-[#2d6a4f]"
+                        : "text-white/90 hover:text-white"
+                    }`}
                   >
                     Log In
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all hover:-translate-y-0.5"
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-lg shadow-[#2d6a4f]/30 hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
                   >
-                    Get Started
+                    Contact Us
+                    <span className="w-5 h-5 bg-white/15 rounded-full flex items-center justify-center">
+                      <ArrowUpRight size={11} />
+                    </span>
                   </Link>
                 </>
               )}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile — hamburger */}
             <div className="flex items-center gap-2 lg:hidden">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
-                aria-label="Toggle theme"
-              >
-                {theme === "light" ? <Sun size={18} /> : <Moon size={18} />}
-              </motion.button>
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                className={`p-2.5 rounded-xl transition-all ${
+                  scrolled
+                    ? "text-[#111] hover:bg-[#f0faf4]"
+                    : "text-white hover:bg-white/15"
+                }`}
+                aria-label="Toggle menu"
               >
-                {isOpen ? <X size={24} /> : <Menu size={24} />}
+                {isOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
             </div>
+
           </div>
         </div>
       </motion.header>
 
-      {/* Mobile Menu */}
+      {/* Mobile Drawer */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -178,55 +168,93 @@ export function Header() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-40 lg:hidden"
           >
-            <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              onClick={() => setIsOpen(false)}
+            />
+
+            {/* Drawer */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute right-0 top-0 h-full w-72 bg-white dark:bg-gray-900 shadow-2xl"
+              transition={{ type: "spring", damping: 28, stiffness: 220 }}
+              className="absolute right-0 top-0 h-full w-[300px] bg-white shadow-2xl flex flex-col"
             >
-              <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-100 dark:border-white/10">
+              {/* Drawer header */}
+              <div className="flex items-center gap-3 px-5 h-16 border-b border-black/[0.06]">
                 <Image
                   src="/logo/et-smart-fields-icon.jpg"
                   alt="ET Smart Fields"
                   width={32}
                   height={32}
-                  className="h-8 w-auto rounded-lg"
+                  className="rounded-lg object-cover"
                 />
-                <span className="text-lg font-bold text-slate-900 dark:text-white">Menu</span>
-                <button onClick={() => setIsOpen(false)} className="ml-auto p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white">
-                  <X size={20} />
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-base font-black text-[#111]">ET</span>
+                  <span className="text-base font-black text-[#2d6a4f]">Smart Fields</span>
+                </div>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="ml-auto p-2 text-[#7a7a7a] hover:text-[#111] rounded-lg hover:bg-[#f0faf4]"
+                >
+                  <X size={18} />
                 </button>
               </div>
-              <nav className="py-4 px-3 space-y-1">
+
+              {/* Nav links */}
+              <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-green-50 dark:hover:bg-green-500/10 hover:text-green-600 dark:hover:text-green-400 transition-all"
+                    className="flex items-center px-4 py-3 rounded-xl text-[0.9375rem] font-semibold text-[#3d3d3d] hover:bg-[#f0faf4] hover:text-[#2d6a4f] transition-all"
                   >
-                    {link.icon}
                     {link.label}
                   </Link>
                 ))}
               </nav>
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-100 dark:border-white/10 space-y-2">
-                <Link
-                  href="/auth/login"
-                  onClick={() => setIsOpen(false)}
-                  className="block w-full text-center px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
-                >
-                  Log In
-                </Link>
-                <Link
-                  href="/auth/register"
-                  onClick={() => setIsOpen(false)}
-                  className="block w-full text-center px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-green-600 to-green-500 shadow-lg shadow-green-500/25"
-                >
-                  Get Started
-                </Link>
+
+              {/* Drawer footer CTA */}
+              <div className="p-4 border-t border-black/[0.06] space-y-2.5">
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25"
+                    >
+                      <User size={15} />
+                      My Dashboard
+                    </Link>
+                    <button
+                      onClick={() => { logout(); setIsOpen(false); }}
+                      className="w-full text-center px-4 py-2.5 rounded-full text-sm font-semibold text-red-500 border border-red-100 hover:bg-red-50 transition-all"
+                    >
+                      Log Out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/auth/login"
+                      onClick={() => setIsOpen(false)}
+                      className="block w-full text-center px-4 py-3 rounded-full text-sm font-semibold text-[#3d3d3d] border border-black/[0.1] hover:bg-[#f0faf4] transition-all"
+                    >
+                      Log In
+                    </Link>
+                    <Link
+                      href="/auth/register"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25 hover:bg-[#1a4731] transition-all"
+                    >
+                      Contact Us
+                      <ArrowUpRight size={14} />
+                    </Link>
+                  </>
+                )}
               </div>
             </motion.div>
           </motion.div>

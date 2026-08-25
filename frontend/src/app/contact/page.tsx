@@ -1,98 +1,234 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Mail, Phone, MapPin, Send, MessageSquare, Clock } from "lucide-react";
+import { MapPin, Mail, Phone, MessageSquare, ArrowRight, Send } from "lucide-react";
+import { FadeUp, SlideIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
+
+const subjects = [
+  "General Enquiry",
+  "Stadium Registration",
+  "Partnership & Investment",
+  "Technical Support",
+  "Camera Installation",
+  "Media & Press",
+];
 
 export default function ContactPage() {
-  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", contact: "", subject: subjects[0], message: "" });
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSent(true);
+  };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero */}
-      <section className="pt-32 pb-24 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-        <div className="absolute inset-0 mesh-gradient opacity-20" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-            <span className="text-green-400 font-semibold tracking-wider uppercase text-sm">Contact Us</span>
-            <h1 className="text-5xl sm:text-6xl font-black text-white mt-4 mb-6">
-              Get in <span className="gradient-text">Touch</span>
+    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
+
+      {/* ── HERO ───────────────────────────────────── */}
+      <section className="pt-40 pb-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Contact</div>
+            <h1
+              className="text-[#111] font-black leading-tight mb-5"
+              style={{ fontSize: "clamp(2.4rem, 6vw, 3.8rem)", letterSpacing: "-0.025em" }}
+            >
+              Get in Touch
             </h1>
-            <p className="text-xl text-slate-300 max-w-2xl">
-              Have questions? We&apos;d love to hear from you. Send us a message and we&apos;ll respond as soon as possible.
+            <p className="text-[#7a7a7a] text-xl max-w-lg leading-relaxed">
+              Whether you&apos;re a player, stadium owner, or potential partner — we&apos;re here to help.
             </p>
           </motion.div>
         </div>
       </section>
 
-      <section className="py-24 bg-white">
+      {/* ── MAIN GRID ─────────────────────────────── */}
+      <section className="py-16" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-3 gap-12">
-            {/* Contact Info */}
-            <div className="space-y-8">
-              {[
-                { icon: <Mail className="text-green-600" size={24} />, title: "Email", value: "hello@etsmartfields.com", desc: "We respond within 24 hours" },
-                { icon: <Phone className="text-green-600" size={24} />, title: "Phone", value: "+251 911 123 456", desc: "Mon-Fri, 9AM-6PM EAT" },
-                { icon: <MapPin className="text-green-600" size={24} />, title: "Office", value: "Bole, Addis Ababa", desc: "Ethiopia" },
-              ].map((item) => (
-                <div key={item.title} className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-                    {item.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900">{item.title}</h3>
-                    <p className="text-slate-700">{item.value}</p>
-                    <p className="text-sm text-slate-400">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="grid lg:grid-cols-2 gap-12">
 
-            {/* Contact Form */}
-            <div className="lg:col-span-2">
-              {submitted ? (
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-12 rounded-3xl bg-green-50 border border-green-200 text-center">
-                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                    <Send className="text-green-600" size={24} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Message Sent!</h3>
-                  <p className="text-slate-500">We&apos;ll get back to you within 24 hours.</p>
-                </motion.div>
-              ) : (
-                <form onSubmit={() => setSubmitted(true)} className="p-8 rounded-3xl bg-slate-50 border border-slate-100 space-y-6">
-                  <div className="grid sm:grid-cols-2 gap-6">
+            {/* Left — Form */}
+            <SlideIn direction="left">
+              <div className="photo-card p-8">
+                <h2 className="text-xl font-black text-[#111] mb-6">Send Us a Message</h2>
+
+                {sent ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-12"
+                  >
+                    <div className="text-5xl mb-4">✅</div>
+                    <h3 className="text-xl font-black text-[#111] mb-2">Message Sent!</h3>
+                    <p className="text-[#7a7a7a] text-sm">We&apos;ll get back to you within 24 hours.</p>
+                    <button
+                      onClick={() => setSent(false)}
+                      className="mt-6 text-sm font-bold underline"
+                      style={{ color: "#2d6a4f" }}
+                    >
+                      Send another message
+                    </button>
+                  </motion.div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Name</label>
-                      <input type="text" required className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all" placeholder="Your name" />
+                      <label className="block text-xs font-bold text-[#3d3d3d] mb-2 uppercase tracking-wide">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="e.g. Abebe Kebede"
+                        className="w-full px-4 py-3.5 rounded-2xl border text-sm focus:outline-none transition-all"
+                        style={{
+                          borderColor: "rgba(0,0,0,0.1)",
+                          background: "#fafafa",
+                          fontSize: "0.875rem",
+                        }}
+                        onFocus={(e) => (e.target.style.borderColor = "#2d6a4f")}
+                        onBlur={(e) => (e.target.style.borderColor = "rgba(0,0,0,0.1)")}
+                      />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                      <input type="email" required className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all" placeholder="you@email.com" />
+                      <label className="block text-xs font-bold text-[#3d3d3d] mb-2 uppercase tracking-wide">
+                        Phone or Email
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={form.contact}
+                        onChange={(e) => setForm({ ...form, contact: e.target.value })}
+                        placeholder="+251 9XX XXX XXX or you@email.com"
+                        className="w-full px-4 py-3.5 rounded-2xl border text-sm focus:outline-none transition-all"
+                        style={{ borderColor: "rgba(0,0,0,0.1)", background: "#fafafa" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#2d6a4f")}
+                        onBlur={(e) => (e.target.style.borderColor = "rgba(0,0,0,0.1)")}
+                      />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Subject</label>
-                    <select className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all">
-                      <option>General Inquiry</option>
-                      <option>Stadium Registration</option>
-                      <option>Technical Support</option>
-                      <option>Partnership</option>
-                      <option>Billing</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Message</label>
-                    <textarea rows={5} required className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all resize-none" placeholder="How can we help?" />
-                  </div>
-                  <button type="submit" className="w-full px-8 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl text-lg font-bold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 transition-all">
-                    Send Message
-                  </button>
-                </form>
-              )}
-            </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#3d3d3d] mb-2 uppercase tracking-wide">
+                        Subject
+                      </label>
+                      <select
+                        value={form.subject}
+                        onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                        className="w-full px-4 py-3.5 rounded-2xl border text-sm focus:outline-none appearance-none"
+                        style={{ borderColor: "rgba(0,0,0,0.1)", background: "#fafafa" }}
+                      >
+                        {subjects.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#3d3d3d] mb-2 uppercase tracking-wide">
+                        Message
+                      </label>
+                      <textarea
+                        required
+                        rows={5}
+                        value={form.message}
+                        onChange={(e) => setForm({ ...form, message: e.target.value })}
+                        placeholder="Tell us what you need..."
+                        className="w-full px-4 py-3.5 rounded-2xl border text-sm focus:outline-none resize-none"
+                        style={{ borderColor: "rgba(0,0,0,0.1)", background: "#fafafa" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#2d6a4f")}
+                        onBlur={(e) => (e.target.style.borderColor = "rgba(0,0,0,0.1)")}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl text-white font-bold text-sm transition-all hover:opacity-90 hover:-translate-y-0.5"
+                      style={{ background: "#2d6a4f", boxShadow: "0 4px 16px rgba(45,106,79,0.3)" }}
+                    >
+                      <Send size={16} />
+                      Send Message
+                    </button>
+                  </form>
+                )}
+              </div>
+            </SlideIn>
+
+            {/* Right — Info Cards */}
+            <SlideIn direction="right" className="space-y-5">
+              {/* Contact Info */}
+              <div className="photo-card p-7">
+                <h3 className="font-black text-[#111] mb-5">Contact Information</h3>
+                <div className="space-y-4">
+                  {[
+                    { icon: <MapPin size={18} />, label: "Office", value: "Bole Sub-City, Addis Ababa, Ethiopia" },
+                    { icon: <Phone size={18} />, label: "Phone", value: "+251 911 123 456" },
+                    { icon: <Mail size={18} />, label: "Email", value: "hello@etsmartfields.com" },
+                    { icon: <MessageSquare size={18} />, label: "WhatsApp", value: "+251 911 123 456" },
+                  ].map((c) => (
+                    <div key={c.label} className="flex items-start gap-4">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: "#f0faf4", color: "#2d6a4f" }}
+                      >
+                        {c.icon}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#aaa] uppercase tracking-wide">{c.label}</div>
+                        <div className="text-sm font-semibold text-[#111] mt-0.5">{c.value}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hours */}
+              <div className="photo-card p-7">
+                <h3 className="font-black text-[#111] mb-4">Office Hours</h3>
+                <div className="space-y-2 text-sm">
+                  {[
+                    { day: "Monday – Friday", hours: "8:00 AM – 6:00 PM" },
+                    { day: "Saturday", hours: "9:00 AM – 3:00 PM" },
+                    { day: "Sunday", hours: "Closed" },
+                  ].map((h) => (
+                    <div key={h.day} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                      <span className="text-[#7a7a7a]">{h.day}</span>
+                      <span className="font-semibold text-[#111]">{h.hours}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stadium Owner CTA */}
+              <div
+                className="rounded-3xl p-7 relative overflow-hidden"
+                style={{ background: "linear-gradient(135deg, #1a4731 0%, #2d6a4f 100%)" }}
+              >
+                <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-10" style={{ background: "#74c69d" }} />
+                <div className="relative z-10">
+                  <div className="text-3xl mb-4">🏟️</div>
+                  <h3 className="font-black text-white text-lg mb-2">Stadium Owner?</h3>
+                  <p className="text-white/65 text-sm leading-relaxed mb-5">
+                    Register your stadium on ET Smart Fields and reach thousands of players in your city.
+                  </p>
+                  <Link
+                    href="/auth/register"
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:opacity-90"
+                    style={{ background: "white", color: "#2d6a4f" }}
+                  >
+                    Get Started Free <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            </SlideIn>
           </div>
         </div>
       </section>
+
     </div>
   );
 }

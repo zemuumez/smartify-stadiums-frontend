@@ -1,56 +1,201 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
 import Link from "next/link";
-import { Zap, Lightbulb, Shirt, ArrowRight } from "lucide-react";
-import { useStadium, useFields } from "@/lib/sanity/hooks";
+import { motion } from "framer-motion";
+import { Calendar, CheckCircle2, ArrowRight, Zap } from "lucide-react";
+import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 
-const DEMO_STADIUM_ID = "demo-stadium-1";
+const SPORTS = ["All", "Football", "Futsal", "Basketball", "Volleyball"];
 
-const SURFACE_LABELS: Record<string, string> = {
-  "artificial-turf": "Artificial Turf",
-  "natural-grass": "Natural Grass",
-  "hard-court": "Hard Court",
-  hybrid: "Hybrid",
+const fields = [
+  {
+    id: 1, name: "Field 1 — Artificial Turf", sport: "Football",
+    surface: "Artificial Turf (FIFA Quality)", size: "7v7", price: "1,200",
+    lighting: true, camera: true, changing: true, wifi: true,
+    schedule: "Mon–Sun: 6:00 AM – 10:00 PM",
+    desc: "Our flagship 7-a-side pitch with FIFA-quality synthetic turf, LED floodlights, and a live AI camera.",
+    amenities: ["AI Camera Recording", "LED Floodlights", "Changing Rooms", "Ball Provided", "Free WiFi"],
+  },
+  {
+    id: 2, name: "Field 2 — 5-a-Side Turf", sport: "Football",
+    surface: "Artificial Turf (3G)", size: "5v5", price: "900",
+    lighting: true, camera: true, changing: true, wifi: true,
+    schedule: "Mon–Sun: 6:00 AM – 10:00 PM",
+    desc: "Compact and fast. Our 5-a-side pitch is perfect for small squads and futsal-style play.",
+    amenities: ["AI Camera Recording", "LED Floodlights", "Shared Changing Rooms", "Free WiFi"],
+  },
+  {
+    id: 3, name: "Futsal Hall — Indoor", sport: "Futsal",
+    surface: "Hardwood / Polyurethane", size: "5v5", price: "800",
+    lighting: true, camera: true, changing: true, wifi: true,
+    schedule: "Mon–Sun: 7:00 AM – 11:00 PM",
+    desc: "A professional indoor futsal hall with wooden flooring, regulation markings, and full AI camera coverage.",
+    amenities: ["AI Camera Recording", "Indoor Climate Control", "Changing Rooms", "Scoreboards", "Free WiFi"],
+  },
+  {
+    id: 4, name: "Basketball Court", sport: "Basketball",
+    surface: "Hardwood (NBA-spec)", size: "5v5", price: "600",
+    lighting: true, camera: false, changing: false, wifi: true,
+    schedule: "Mon–Sun: 7:00 AM – 9:00 PM",
+    desc: "Full-size outdoor basketball court with NBA-specification hardwood surface and adjustable hoops.",
+    amenities: ["LED Floodlights", "Adjustable Hoops", "Free WiFi"],
+  },
+  {
+    id: 5, name: "Volleyball Court", sport: "Volleyball",
+    surface: "Synthetic Sand / Hardwood", size: "6v6", price: "500",
+    lighting: false, camera: false, changing: false, wifi: false,
+    schedule: "Mon–Fri: 8:00 AM – 6:00 PM",
+    desc: "Outdoor volleyball court — available for casual play and competitive matches. Equipment provided.",
+    amenities: ["Net & Equipment Provided", "Outdoor Court"],
+  },
+];
+
+const sportColor: Record<string, string> = {
+  Football:   "#2d6a4f",
+  Futsal:     "#1e4d7b",
+  Basketball: "#b45309",
+  Volleyball: "#7c3aed",
 };
 
 export default function MicrositeFields() {
-  const { stadium } = useStadium("bambis-meda");
-  const { fields } = useFields(stadium?._id || DEMO_STADIUM_ID);
+  const [activeFilter, setActiveFilter] = useState("All");
+
+  const filtered = activeFilter === "All"
+    ? fields
+    : fields.filter((f) => f.sport === activeFilter);
 
   return (
-    <div className="py-24 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="text-green-600 font-semibold tracking-wider uppercase text-sm">Our Fields</span>
-          <h1 className="text-4xl font-black text-slate-900 mt-2">Choose Your Field</h1>
-          <p className="text-slate-500 mt-2">{fields.length} fields available for booking. Prices per hour.</p>
+    <div style={{ backgroundColor: "#f4f3ef" }}>
+
+      {/* ── PAGE HEADER ─────────────────── */}
+      <section className="pt-16 pb-12 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Our Fields</div>
+            <h1 className="heading-xl mb-4">Book Your Field</h1>
+            <p className="text-[#7a7a7a] text-lg max-w-xl">
+              {fields.length} fields available at Bambis Meda Stadium. Real-time availability. Instant booking via Telebirr or Chapa.
+            </p>
+          </motion.div>
         </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          {fields.map((field, i) => (
-            <motion.div key={field._id} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }} className="rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center text-6xl">🟢</div>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-slate-900">{field.name}</h3>
-                  <span className="text-2xl font-black text-green-600">₮{field.pricePerHour}<span className="text-sm font-normal text-slate-500">/hr</span></span>
+      </section>
+
+      {/* ── SPORT FILTER ───────────────── */}
+      <section className="py-8" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeUp>
+            <div className="flex flex-wrap gap-2">
+              {SPORTS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setActiveFilter(s)}
+                  className={`sport-pill ${activeFilter === s ? "active" : "inactive"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── FIELD LISTINGS ─────────────── */}
+      <section className="pb-24" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <StaggerChildren className="space-y-5">
+            {filtered.map((field) => (
+              <StaggerItem key={field.id}>
+                <div className="photo-card p-7 flex flex-col lg:flex-row gap-6">
+
+                  {/* Left — Field Info */}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span
+                        className="text-xs font-black px-3 py-1.5 rounded-full text-white"
+                        style={{ background: sportColor[field.sport] || "#2d6a4f" }}
+                      >
+                        {field.sport}
+                      </span>
+                      <span className="text-xs text-[#7a7a7a] font-semibold">{field.size} · {field.surface}</span>
+                    </div>
+
+                    <h2 className="font-black text-[#111] text-xl mb-2">{field.name}</h2>
+                    <p className="text-sm text-[#7a7a7a] leading-relaxed mb-5 max-w-xl">{field.desc}</p>
+
+                    {/* Amenities */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {field.amenities.map((a) => (
+                        <span
+                          key={a}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                          style={{ background: "#f0faf4", color: "#2d6a4f" }}
+                        >
+                          <CheckCircle2 size={11} /> {a}
+                        </span>
+                      ))}
+                    </div>
+
+                    <p className="text-xs text-[#aaa]">
+                      🕐 {field.schedule}
+                    </p>
+                  </div>
+
+                  {/* Right — Pricing + CTA */}
+                  <div className="flex-shrink-0 flex flex-col items-start lg:items-end justify-between gap-4">
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-[#111]">{field.price} ETB</div>
+                      <div className="text-xs text-[#7a7a7a]">per hour</div>
+                    </div>
+
+                    {/* Amenity icons */}
+                    <div className="flex gap-3 text-xl">
+                      {field.lighting  && <span title="LED Lighting">💡</span>}
+                      {field.camera    && <span title="AI Camera">📹</span>}
+                      {field.changing  && <span title="Changing Room">🚿</span>}
+                      {field.wifi      && <span title="Free WiFi">📶</span>}
+                    </div>
+
+                    <Link
+                      href="/bookings/new"
+                      className="flex items-center gap-2 px-7 py-3.5 rounded-full text-white font-bold text-sm transition-all hover:opacity-90 hover:-translate-y-0.5 whitespace-nowrap"
+                      style={{ background: "#2d6a4f", boxShadow: "0 4px 14px rgba(45,106,79,0.3)" }}
+                    >
+                      <Calendar size={15} /> Book This Field
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mb-4 text-sm text-slate-500">
-                  <span>{SURFACE_LABELS[field.surface] || field.surface}</span><span>•</span><span>{field.size}</span>
-                </div>
-                <div className="flex gap-2 mb-4">
-                  {field.hasLighting && <span className="flex items-center gap-1 text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg"><Lightbulb size={12} /> Lighting</span>}
-                  {field.hasChangingRoom && <span className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-lg"><Shirt size={12} /> Changing Room</span>}
-                  <span className="flex items-center gap-1 text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg"><Zap size={12} /> {SURFACE_LABELS[field.surface] || field.surface}</span>
-                </div>
-                <Link href="/bookings/new" className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">
-                  Book Now <ArrowRight size={16} />
-                </Link>
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
+        </div>
+      </section>
+
+      {/* ── BOOKING INFO ─────────────────── */}
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <FadeUp className="text-center mb-10">
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">How Booking Works</div>
+            <h2 className="heading-xl">Easy as 1-2-3</h2>
+          </FadeUp>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              { step: "01", emoji: "📅", title: "Pick a Field & Time", desc: "Browse fields above and select a date and time slot that suits you." },
+              { step: "02", emoji: "💳", title: "Pay Online",          desc: "Complete payment via Telebirr, CBE Birr, or credit card. Instant confirmation." },
+              { step: "03", emoji: "⚽", title: "Show Up & Play",      desc: "Arrive at the stadium. We&apos;ll have your field ready with equipment." },
+            ].map((s) => (
+              <div key={s.step} className="photo-card p-6 text-center relative">
+                <div className="absolute top-4 right-4 font-black text-6xl text-[#f0faf4] select-none">{s.step}</div>
+                <div className="text-3xl mb-3">{s.emoji}</div>
+                <h3 className="font-black text-[#111] mb-2">{s.title}</h3>
+                <p className="text-sm text-[#7a7a7a]">{s.desc}</p>
               </div>
-            </motion.div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
+
     </div>
   );
 }

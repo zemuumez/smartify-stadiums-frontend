@@ -6,14 +6,11 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Star, Video, Shield, Clock, Users, Calendar,
-  ArrowLeft, ChevronRight, Play, Download, Share2, Heart
+  ArrowLeft, Play, Download, Share2, Phone, Mail, CheckCircle2, Award
 } from "lucide-react";
-import { GlassCard, GlowCard } from "@/components/ui/GlassCard";
-import { FadeUp, SlideIn } from "@/components/ui/AnimatedSection";
-import { MagneticButton } from "@/components/ui/MagneticButton";
 import { MicrositeHero } from "@/components/microsite/MicrositeHero";
-import { MicrositeLayout } from "@/components/microsite/MicrositeLayout";
 import { FieldCard } from "@/components/microsite/FieldCard";
+import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 import api from "@/lib/api";
 
 interface Stadium {
@@ -30,7 +27,6 @@ interface Stadium {
   phone?: string;
   email?: string;
   operating_hours?: string;
-  logo?: string;
   cover_image?: string;
   fields_count: number;
 }
@@ -74,13 +70,11 @@ export default function StadiumDetailPage() {
   const fetchStadiumData = async () => {
     try {
       setLoading(true);
-      // Try fetching from API
       const response = await api.get(`/stadiums/${slug}`);
       setStadium(response.data?.stadium || demoStadium);
       setFields(response.data?.fields || demoFields);
       setReplays(response.data?.replays || demoReplays);
     } catch {
-      // Use demo data
       setStadium(demoStadium);
       setFields(demoFields);
       setReplays(demoReplays);
@@ -91,20 +85,20 @@ export default function StadiumDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="w-10 h-10 border-4 border-[#2d6a4f]/20 border-t-[#2d6a4f] rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!stadium) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-6xl mb-4 block">🏟️</span>
-          <h2 className="text-2xl font-bold text-white mb-2">Stadium Not Found</h2>
-          <Link href="/stadiums" className="text-green-400 hover:text-green-300">
-            ← Back to Stadiums
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f4f3ef" }}>
+        <div className="text-center photo-card p-10 max-w-md">
+          <span className="text-5xl mb-4 block">🏟️</span>
+          <h2 className="text-xl font-black text-[#111] mb-2">Stadium Not Found</h2>
+          <Link href="/stadiums" className="text-sm font-bold" style={{ color: "#2d6a4f" }}>
+            ← Back to All Stadiums
           </Link>
         </div>
       </div>
@@ -112,27 +106,28 @@ export default function StadiumDetailPage() {
   }
 
   return (
-    <MicrositeLayout stadium={stadium}>
+    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
       {/* Hero */}
       <MicrositeHero stadium={stadium} />
 
       {/* Tabs */}
-      <section className="sticky top-16 z-40 bg-gray-950/80 backdrop-blur-2xl border-b border-white/5">
+      <section className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto py-2">
             {[
-              { key: "fields", label: "Fields & Booking", icon: <Calendar size={16} /> },
-              { key: "matches", label: "Match Replays", icon: <Video size={16} /> },
-              { key: "about", label: "About", icon: <MapPin size={16} /> },
+              { key: "fields", label: "Fields & Booking", icon: <Calendar size={15} /> },
+              { key: "matches", label: "Match Replays & AI Camera", icon: <Video size={15} /> },
+              { key: "about", label: "About & Amenities", icon: <MapPin size={15} /> },
             ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as any)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-all ${
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold whitespace-nowrap transition-all"
+                style={
                   activeTab === tab.key
-                    ? "text-green-400 border-b-2 border-green-400"
-                    : "text-gray-400 hover:text-white"
-                }`}
+                    ? { background: "#2d6a4f", color: "white" }
+                    : { background: "transparent", color: "#6a6a6a" }
+                }
               >
                 {tab.icon}
                 {tab.label}
@@ -143,17 +138,30 @@ export default function StadiumDetailPage() {
       </section>
 
       {/* Content */}
-      <section className="py-12">
+      <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <AnimatePresence mode="wait">
             {activeTab === "fields" && (
               <motion.div
                 key="fields"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                exit={{ opacity: 0, y: -16 }}
               >
-                <h2 className="text-2xl font-bold text-white mb-6">Available Fields</h2>
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">Available Fields</div>
+                    <h2 className="heading-xl">Select a Pitch to Book</h2>
+                  </div>
+                  <Link
+                    href={`/microsite/fields`}
+                    className="text-xs font-bold"
+                    style={{ color: "#2d6a4f" }}
+                  >
+                    View Official Field Directory →
+                  </Link>
+                </div>
+
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {fields.map((field) => (
                     <FieldCard key={field.id} field={field} />
@@ -165,61 +173,57 @@ export default function StadiumDetailPage() {
             {activeTab === "matches" && (
               <motion.div
                 key="matches"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                exit={{ opacity: 0, y: -16 }}
               >
-                <h2 className="text-2xl font-bold text-white mb-6">Match Replays</h2>
+                <div className="mb-8">
+                  <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">AI Camera Archive</div>
+                  <h2 className="heading-xl">Recent Replays &amp; Highlights</h2>
+                </div>
+
                 {stadium.has_camera ? (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {replays.map((replay) => (
-                      <GlowCard key={replay.id}>
-                        {/* Thumbnail */}
-                        <div className="relative h-48 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl mb-4 flex items-center justify-center group cursor-pointer">
-                          {replay.thumbnail ? (
-                            <img src={replay.thumbnail} alt={replay.title} className="w-full h-full object-cover rounded-xl" />
-                          ) : (
-                            <span className="text-5xl">⚽</span>
-                          )}
-                          <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                              <Play className="text-white ml-1" size={24} />
-                            </div>
+                      <div key={replay.id} className="photo-card overflow-hidden group">
+                        {/* Video Thumbnail */}
+                        <div className="relative aspect-video flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0d2b1d 0%, #1a4731 100%)" }}>
+                          <div className="w-14 h-14 rounded-full flex items-center justify-center border-2 border-white/40 transition-transform group-hover:scale-110" style={{ background: "rgba(45,106,79,0.85)" }}>
+                            <Play className="text-white ml-1" size={22} fill="currentColor" />
                           </div>
-                          <div className="absolute top-3 right-3 bg-black/60 px-2 py-1 rounded text-xs text-white">
+                          <div className="absolute top-3 right-3 bg-black/60 px-2.5 py-1 rounded-md text-[11px] font-bold text-white">
                             {replay.duration}
                           </div>
                         </div>
 
                         {/* Info */}
-                        <h3 className="font-bold text-white mb-1">{replay.title}</h3>
-                        <p className="text-sm text-gray-400 mb-3">{replay.date}</p>
+                        <div className="p-6">
+                          <h3 className="font-black text-[#111] text-base mb-1">{replay.title}</h3>
+                          <p className="text-xs text-[#7a7a7a] mb-4">{replay.date}</p>
 
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-sm text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <Play size={12} />
-                              {replay.views} views
+                          <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+                            <span className="text-xs text-[#7a7a7a] flex items-center gap-1 font-medium">
+                              <Play size={11} style={{ color: "#2d6a4f" }} /> {replay.views} views
                             </span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
-                              <Download size={14} className="text-gray-400" />
-                            </button>
-                            <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
-                              <Share2 size={14} className="text-gray-400" />
-                            </button>
+                            <div className="flex gap-2">
+                              <button className="p-2 rounded-xl text-xs font-semibold" style={{ background: "#f0faf4", color: "#2d6a4f" }}>
+                                <Download size={13} />
+                              </button>
+                              <button className="p-2 rounded-xl text-xs font-semibold" style={{ background: "#f0faf4", color: "#2d6a4f" }}>
+                                <Share2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </GlowCard>
+                      </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-16 glass rounded-2xl">
-                    <Video className="mx-auto text-gray-600 mb-4" size={48} />
-                    <h3 className="text-xl font-bold text-white mb-2">No Camera System</h3>
-                    <p className="text-gray-400">
-                      This stadium doesn&apos;t have a camera system yet. Match replays will be available soon.
+                  <div className="text-center py-20 photo-card p-8">
+                    <Video className="mx-auto text-[#aaa] mb-4" size={40} />
+                    <h3 className="text-lg font-black text-[#111] mb-2">No Camera System Installed</h3>
+                    <p className="text-[#7a7a7a] text-sm max-w-sm mx-auto">
+                      This stadium does not have an active AI Camera system yet. Match replays will be available once certified.
                     </p>
                   </div>
                 )}
@@ -229,62 +233,80 @@ export default function StadiumDetailPage() {
             {activeTab === "about" && (
               <motion.div
                 key="about"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="max-w-3xl"
+                exit={{ opacity: 0, y: -16 }}
+                className="max-w-4xl"
               >
-                <h2 className="text-2xl font-bold text-white mb-6">About {stadium.name}</h2>
-
-                <GlassCard className="p-6 mb-6">
-                  <p className="text-gray-300 leading-relaxed">
-                    {stadium.description || `${stadium.name} is a premium football facility located in ${stadium.city}, Ethiopia. Featuring modern amenities and professional-grade fields, it's the perfect place for your next match.`}
-                  </p>
-                </GlassCard>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <GlassCard className="p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <MapPin className="text-green-400" size={20} />
-                      <span className="font-bold text-white">Location</span>
-                    </div>
-                    <p className="text-gray-400">{stadium.address}, {stadium.city}</p>
-                  </GlassCard>
-
-                  <GlassCard className="p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Clock className="text-green-400" size={20} />
-                      <span className="font-bold text-white">Hours</span>
-                    </div>
-                    <p className="text-gray-400">{stadium.operating_hours || "6:00 AM - 10:00 PM"}</p>
-                  </GlassCard>
-
-                  <GlassCard className="p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Users className="text-green-400" size={20} />
-                      <span className="font-bold text-white">Capacity</span>
-                    </div>
-                    <p className="text-gray-400">{fields.length} Fields Available</p>
-                  </GlassCard>
-
-                  <GlassCard className="p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Star className="text-yellow-400" size={20} />
-                      <span className="font-bold text-white">Rating</span>
-                    </div>
-                    <p className="text-gray-400">{stadium.rating.toFixed(1)} / 5.0 ({stadium.total_reviews} reviews)</p>
-                  </GlassCard>
+                <div className="mb-8">
+                  <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">Stadium Info</div>
+                  <h2 className="heading-xl">About {stadium.name}</h2>
                 </div>
+
+                <div className="photo-card p-8 mb-6">
+                  <p className="text-[#3d3d3d] text-base leading-relaxed">
+                    {stadium.description || `${stadium.name} is a premier sports facility located in ${stadium.city}, Ethiopia. Featuring modern amenities, professional-grade artificial turf pitches, and AI-powered camera systems for automated match recording.`}
+                  </p>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4 mb-8">
+                  <div className="photo-card p-6 flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f0faf4" }}>
+                      <MapPin size={18} style={{ color: "#2d6a4f" }} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#8a8a8a] uppercase">Address</div>
+                      <div className="text-sm font-semibold text-[#111] mt-0.5">{stadium.address}, {stadium.city}</div>
+                    </div>
+                  </div>
+
+                  <div className="photo-card p-6 flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f0faf4" }}>
+                      <Clock size={18} style={{ color: "#2d6a4f" }} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#8a8a8a] uppercase">Operating Hours</div>
+                      <div className="text-sm font-semibold text-[#111] mt-0.5">{stadium.operating_hours || "6:00 AM – 10:00 PM"}</div>
+                    </div>
+                  </div>
+
+                  <div className="photo-card p-6 flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f0faf4" }}>
+                      <Phone size={18} style={{ color: "#2d6a4f" }} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#8a8a8a] uppercase">Phone</div>
+                      <div className="text-sm font-semibold text-[#111] mt-0.5">{stadium.phone || "+251 911 234 567"}</div>
+                    </div>
+                  </div>
+
+                  <div className="photo-card p-6 flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#f0faf4" }}>
+                      <Star size={18} style={{ color: "#2d6a4f" }} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#8a8a8a] uppercase">Rating</div>
+                      <div className="text-sm font-semibold text-[#111] mt-0.5">{stadium.rating.toFixed(1)} / 5.0 ({stadium.total_reviews} reviews)</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/microsite"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-white text-xs font-bold"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  Visit Full Official Stadium Microsite →
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </section>
-    </MicrositeLayout>
+    </div>
   );
 }
 
-// Demo data
 const demoStadium: Stadium = {
   id: "1",
   name: "Bambis Meda Stadium",
@@ -292,14 +314,15 @@ const demoStadium: Stadium = {
   address: "Bole Road, Bole",
   fields_count: 3,
   city: "Addis Ababa",
-  rating: 4.8,
-  total_reviews: 124,
+  rating: 4.9,
+  total_reviews: 212,
   is_verified: true,
   has_camera: true,
-  description: "Bambis Meda Stadium is one of Addis Ababa's premier football facilities. Located in the heart of Bole, it features three professional-grade fields with modern amenities, night lighting, and AI-powered camera systems for automatic match recording.",
-  phone: "+251 911 234 567",
+  cover_image: "/venue-card-1.jpg",
+  description: "Bambis Meda Stadium is one of Addis Ababa's premier sports facilities. Located in the heart of Bole, it features three professional-grade fields with modern amenities, night lighting, and AI-powered camera systems for automatic match recording.",
+  phone: "+251 911 445 678",
   email: "info@bambismeda.com",
-  operating_hours: "6:00 AM - 10:00 PM",
+  operating_hours: "6:00 AM – 10:00 PM",
 };
 
 const demoFields: Field[] = [
@@ -308,7 +331,7 @@ const demoFields: Field[] = [
     field_number: 1,
     surface_type: "artificial_turf",
     has_lighting: true,
-    price_per_hour: 800,
+    price_per_hour: 1200,
     capacity: 22,
     schedule: [
       { day_of_week: 1, open_time: "06:00", close_time: "22:00" },
@@ -323,10 +346,10 @@ const demoFields: Field[] = [
   {
     id: "f2",
     field_number: 2,
-    surface_type: "natural_grass",
+    surface_type: "futsal_hardwood",
     has_lighting: true,
-    price_per_hour: 600,
-    capacity: 22,
+    price_per_hour: 800,
+    capacity: 10,
     schedule: [
       { day_of_week: 1, open_time: "06:00", close_time: "22:00" },
       { day_of_week: 2, open_time: "06:00", close_time: "22:00" },
@@ -340,10 +363,10 @@ const demoFields: Field[] = [
   {
     id: "f3",
     field_number: 3,
-    surface_type: "artificial_turf",
+    surface_type: "basketball_court",
     has_lighting: false,
-    price_per_hour: 400,
-    capacity: 14,
+    price_per_hour: 600,
+    capacity: 10,
     schedule: [
       { day_of_week: 1, open_time: "06:00", close_time: "18:00" },
       { day_of_week: 2, open_time: "06:00", close_time: "18:00" },
@@ -359,23 +382,23 @@ const demoFields: Field[] = [
 const demoReplays: MatchReplay[] = [
   {
     id: "r1",
-    title: "Addis Stars vs Lion City FC",
-    date: "August 15, 2026",
+    title: "Bole Lions FC vs Kirkos United",
+    date: "Aug 24, 2026",
     duration: "90:00",
-    views: 1243,
+    views: 342,
   },
   {
     id: "r2",
-    title: "Weekend Tournament Final",
-    date: "August 10, 2026",
+    title: "Weekend 3v3 Tournament Final",
+    date: "Aug 22, 2026",
     duration: "45:00",
-    views: 856,
+    views: 520,
   },
   {
     id: "r3",
-    title: "Training Session Highlights",
-    date: "August 5, 2026",
+    title: "Friday Night Futsal Cup Highlights",
+    date: "Aug 20, 2026",
     duration: "15:00",
-    views: 2341,
+    views: 890,
   },
 ];
