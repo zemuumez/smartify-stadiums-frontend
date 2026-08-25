@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, MapPin, Calendar, Video, User, LogOut, ArrowUpRight } from "lucide-react";
+import { Menu, X, ArrowUpRight, PhoneCall } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 
 export function Header() {
@@ -14,8 +14,12 @@ export function Header() {
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthStore();
 
-  // Hide on dashboard and admin routes (they have their own navigation)
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
+  // Hide on dashboard, admin, and stadium official microsite routes (they have their own navigation)
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/microsite")
+  ) {
     return null;
   }
 
@@ -98,56 +102,27 @@ export function Header() {
               ))}
             </nav>
 
-            {/* Right — Auth + CTA */}
+            {/* Right — Partner CTA (No public admin login button) */}
             <div className="hidden lg:flex items-center gap-3">
-              {isAuthenticated ? (
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/dashboard"
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      isSolid
-                        ? "text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4]"
-                        : "text-white/90 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <User size={15} />
-                    {user?.full_name?.split(" ")[0] || "Dashboard"}
-                  </Link>
-                  <button
-                    onClick={() => logout()}
-                    className={`p-2 rounded-lg transition-all ${
-                      isSolid
-                        ? "text-slate-400 hover:text-red-500 hover:bg-red-50"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
-                    }`}
-                    aria-label="Logout"
-                  >
-                    <LogOut size={15} />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <Link
-                    href="/auth/login"
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      isSolid
-                        ? "text-[#3d3d3d] hover:text-[#2d6a4f]"
-                        : "text-white/90 hover:text-white"
-                    }`}
-                  >
-                    Log In
-                  </Link>
-                  <Link
-                    href="/auth/register"
-                    className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-md hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
-                  >
-                    Contact Us
-                    <span className="w-5 h-5 bg-white/15 rounded-full flex items-center justify-center">
-                      <ArrowUpRight size={11} />
-                    </span>
-                  </Link>
-                </>
-              )}
+              <Link
+                href="/about"
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  isSolid
+                    ? "text-[#3d3d3d] hover:text-[#2d6a4f]"
+                    : "text-white/90 hover:text-white"
+                }`}
+              >
+                Partner With Us
+              </Link>
+              <Link
+                href="/pricing"
+                className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-md hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
+              >
+                Get Started
+                <span className="w-5 h-5 bg-white/15 rounded-full flex items-center justify-center">
+                  <ArrowUpRight size={11} />
+                </span>
+              </Link>
             </div>
 
             {/* Mobile — hamburger */}
@@ -178,19 +153,16 @@ export function Header() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-40 lg:hidden"
           >
-            {/* Backdrop */}
             <div
-              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
-
-            {/* Drawer */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 220 }}
-              className="absolute right-0 top-0 h-full w-[300px] bg-white shadow-2xl flex flex-col"
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="absolute right-0 top-0 bottom-0 w-[280px] bg-white flex flex-col shadow-2xl z-50"
             >
               {/* Drawer header */}
               <div className="flex items-center gap-3 px-5 h-16 border-b border-black/[0.06]">
@@ -213,14 +185,14 @@ export function Header() {
                 </button>
               </div>
 
-              {/* Nav links */}
+              {/* Drawer links */}
               <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center px-4 py-3 rounded-xl text-[0.9375rem] font-semibold text-[#3d3d3d] hover:bg-[#f0faf4] hover:text-[#2d6a4f] transition-all"
+                    className="flex items-center px-4 py-3 rounded-2xl text-sm font-semibold text-[#3d3d3d] hover:text-[#2d6a4f] hover:bg-[#f0faf4] transition-all"
                   >
                     {link.label}
                   </Link>
@@ -229,42 +201,14 @@ export function Header() {
 
               {/* Drawer footer CTA */}
               <div className="p-4 border-t border-black/[0.06] space-y-2.5">
-                {isAuthenticated ? (
-                  <>
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25"
-                    >
-                      <User size={15} />
-                      My Dashboard
-                    </Link>
-                    <button
-                      onClick={() => { logout(); setIsOpen(false); }}
-                      className="w-full text-center px-4 py-2.5 rounded-full text-sm font-semibold text-red-500 border border-red-100 hover:bg-red-50 transition-all"
-                    >
-                      Log Out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href="/auth/login"
-                      onClick={() => setIsOpen(false)}
-                      className="block w-full text-center px-4 py-3 rounded-full text-sm font-semibold text-[#3d3d3d] border border-black/[0.1] hover:bg-[#f0faf4] transition-all"
-                    >
-                      Log In
-                    </Link>
-                    <Link
-                      href="/auth/register"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25 hover:bg-[#1a4731] transition-all"
-                    >
-                      Contact Us
-                      <ArrowUpRight size={14} />
-                    </Link>
-                  </>
-                )}
+                <Link
+                  href="/pricing"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25 hover:bg-[#1a4731] transition-all"
+                >
+                  Get Started
+                  <ArrowUpRight size={14} />
+                </Link>
               </div>
             </motion.div>
           </motion.div>

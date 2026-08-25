@@ -546,7 +546,7 @@ export default function StadiumsPage() {
                         className="text-xs font-bold transition-colors hover:underline flex items-center gap-1"
                         style={{ color: "#2d6a4f" }}
                       >
-                        Official Microsite <ArrowRight size={12} />
+                        Visit Official Site <ArrowRight size={12} />
                       </Link>
 
                       <Link

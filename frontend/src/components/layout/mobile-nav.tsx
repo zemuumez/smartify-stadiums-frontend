@@ -16,8 +16,14 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname();
 
-  // Don't show on dashboard or admin (has their own sidebar)
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) return null;
+  // Don't show on dashboard, admin, or official stadium microsites
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/microsite")
+  ) {
+    return null;
+  }
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
