@@ -45,15 +45,39 @@ export default function StadiumsPage() {
   }, []);
 
   const loadStadiums = async () => {
+    let initialList = demoStadiumsList;
     try {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("registered_stadium");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const customStadium: Stadium = {
+            id: "custom-1",
+            owner_id: "u1",
+            name: parsed.name || "Bambis Meda Stadium",
+            slug: (parsed.name || "bambis-meda").toLowerCase().replace(/\s+/g, "-"),
+            description: parsed.description || "Premier sports arena in Ethiopia",
+            address: parsed.address || "Bole Road",
+            city: parsed.city || "Addis Ababa",
+            status: "active",
+            badge: "verified",
+            has_camera: true,
+            has_online_booking: true,
+            has_referee_booking: true,
+            field_count: parsed.fields?.length || 2,
+            created_at: parsed.registeredAt || new Date().toISOString(),
+          };
+          initialList = [customStadium, ...demoStadiumsList.filter(s => s.name !== customStadium.name)];
+        }
+      }
       const res = await api.get("/stadiums");
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         setStadiums(res.data);
       } else {
-        setStadiums(demoStadiumsList);
+        setStadiums(initialList);
       }
     } catch {
-      setStadiums(demoStadiumsList);
+      setStadiums(initialList);
     }
   };
 
@@ -66,25 +90,32 @@ export default function StadiumsPage() {
       loadStadiums();
     } catch {
       // Demo fallback: add locally
-      setStadiums((prev) => [
-        ...prev,
-        {
-          id: String(prev.length + 1),
-          owner_id: "u1",
+      const createdItem: Stadium = {
+        id: String(Date.now()),
+        owner_id: "u1",
+        name: newStadium.name,
+        slug: newStadium.name.toLowerCase().replace(/\s+/g, "-"),
+        description: newStadium.description || "Modern sports facility in Ethiopia",
+        address: newStadium.address,
+        city: newStadium.city,
+        status: "active",
+        badge: "verified",
+        has_camera: true,
+        has_online_booking: true,
+        has_referee_booking: true,
+        field_count: 2,
+        created_at: new Date().toISOString(),
+      };
+      setStadiums((prev) => [createdItem, ...prev]);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("registered_stadium", JSON.stringify({
           name: newStadium.name,
-          slug: newStadium.name.toLowerCase().replace(/\s+/g, "-"),
-          description: newStadium.description || "Modern sports facility in Ethiopia",
           address: newStadium.address,
           city: newStadium.city,
-          status: "active",
-          badge: "verified",
-          has_camera: true,
-          has_online_booking: true,
-          has_referee_booking: true,
-          field_count: 2,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+          description: newStadium.description,
+          fields: [{}, {}],
+        }));
+      }
       setShowCreateModal(false);
       setNewStadium({ name: "", address: "", city: "Addis Ababa", phone: "", description: "" });
     } finally {
