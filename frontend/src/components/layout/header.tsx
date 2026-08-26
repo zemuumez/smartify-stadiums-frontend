@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowUpRight, PhoneCall } from "lucide-react";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 
 export function Header() {
@@ -14,7 +14,13 @@ export function Header() {
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthStore();
 
-  // Hide on dashboard, admin, and stadium official microsite routes (they have their own navigation)
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 30);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Hide on dashboard, admin, and stadium official microsite routes (they have their own standalone navigation)
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
@@ -25,12 +31,6 @@ export function Header() {
 
   const isDarkHeroPage = pathname === "/" || pathname === "/stadiums";
   const isSolid = scrolled || !isDarkHeroPage;
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const navLinks = [
     { href: "/", label: "Home" },

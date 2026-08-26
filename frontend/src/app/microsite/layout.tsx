@@ -13,13 +13,16 @@ import {
   Phone,
   Clock,
   Building2,
-  PhoneCall,
   KeyRound,
   CheckCircle2,
-  DollarSign,
   Smartphone,
   ArrowRight,
-  User
+  User,
+  Video,
+  Download,
+  LogOut,
+  Play,
+  Trophy
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -54,7 +57,11 @@ export default function StandaloneMicrositeLayout({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authRole, setAuthRole] = useState<"player" | "owner">("player");
   const [phone, setPhone] = useState("0911234567");
+  const [otp, setOtp] = useState("123456");
   const [authLoading, setAuthLoading] = useState(false);
+
+  // Player Dashboard Modal State
+  const [showPlayerHub, setShowPlayerHub] = useState(false);
 
   // Booking Modal State
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -63,7 +70,7 @@ export default function StandaloneMicrositeLayout({
   const [bookingTime, setBookingTime] = useState("18:00 - 19:00");
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
-  const { setDemoUser } = useAuthStore();
+  const { user, isAuthenticated, setDemoUser, logout } = useAuthStore();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -78,6 +85,7 @@ export default function StandaloneMicrositeLayout({
       setDemoUser("player");
       setAuthLoading(false);
       setShowAuthModal(false);
+      setShowPlayerHub(true);
     }, 400);
   };
 
@@ -151,19 +159,39 @@ export default function StandaloneMicrositeLayout({
 
             {/* Desktop Right CTAs */}
             <div className="hidden sm:flex items-center gap-2.5 flex-shrink-0">
-              <a
-                href={`tel:${STADIUM_DATA.phone}`}
-                className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-[#2d6a4f] px-3.5 py-2 rounded-full bg-[#f0faf4] border border-[#2d6a4f]/20 hover:bg-[#2d6a4f] hover:text-white transition-all"
-              >
-                <Phone size={13} /> {STADIUM_DATA.phone}
-              </a>
-
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="px-4 py-2.5 rounded-full text-xs font-bold border border-black/15 text-[#111] hover:bg-[#f4f3ef] transition-colors"
-              >
-                Sign In
-              </button>
+              {isAuthenticated && user?.role === "player" ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowPlayerHub(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-[#f0faf4] text-[#2d6a4f] border border-[#2d6a4f]/20 hover:bg-[#2d6a4f] hover:text-white transition-all"
+                  >
+                    <User size={13} /> {user.full_name || "Abebe (Player)"}
+                  </button>
+                  <button
+                    onClick={() => logout()}
+                    className="p-2 rounded-full text-[#7a7a7a] hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </div>
+              ) : isAuthenticated && user?.role === "owner" ? (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-[#f0faf4] text-[#2d6a4f] border border-[#2d6a4f]/20 hover:bg-[#2d6a4f] hover:text-white transition-all"
+                  >
+                    <Building2 size={13} /> Owner Dashboard ↗
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-4 py-2.5 rounded-full text-xs font-bold border border-black/15 text-[#111] hover:bg-[#f4f3ef] transition-colors"
+                >
+                  Sign In
+                </button>
+              )}
 
               <button
                 onClick={() => setShowBookingModal(true)}
@@ -282,7 +310,7 @@ export default function StandaloneMicrositeLayout({
         </div>
       </footer>
 
-      {/* ── GLOBAL MODAL: PLAYER & STAFF LOGIN ── */}
+      {/* ── MODAL 1: PLAYER & STADIUM STAFF SIGN IN ── */}
       <AnimatePresence>
         {showAuthModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -353,14 +381,15 @@ export default function StandaloneMicrositeLayout({
 
                 <div>
                   <label className="block text-xs font-bold text-[#111] uppercase tracking-wider mb-1.5">
-                    {authRole === "player" ? "SMS Code / Password" : "Staff Passkey / PIN"}
+                    {authRole === "player" ? "SMS Verification Code" : "Staff PIN / Code"}
                   </label>
                   <div className="relative">
                     <KeyRound size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8a8a8a]" />
                     <input
                       type="password"
                       placeholder="123456"
-                      defaultValue="123456"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
                       className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#f4f3ef] border border-black/10 text-xs font-semibold text-[#111] focus:outline-none focus:border-[#2d6a4f]"
                     />
                   </div>
@@ -384,7 +413,114 @@ export default function StandaloneMicrositeLayout({
         )}
       </AnimatePresence>
 
-      {/* ── GLOBAL MODAL: PITCH RESERVATION ── */}
+      {/* ── MODAL 2: PLAYER PROFILE & MATCH HIGHLIGHTS HUB ── */}
+      <AnimatePresence>
+        {showPlayerHub && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPlayerHub(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative z-10 w-full max-w-lg bg-white rounded-3xl p-7 sm:p-8 shadow-2xl border border-black/[0.06] max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-black/[0.06]">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-xs"
+                    style={{ background: "#2d6a4f" }}
+                  >
+                    A
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-[#111]">Abebe Kebede (Team Captain)</h3>
+                    <p className="text-xs text-[#2d6a4f] font-semibold">Bole Lions FC • Verified Player</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPlayerHub(false)}
+                  className="p-2 rounded-xl text-[#7a7a7a] hover:text-[#111] hover:bg-[#f4f3ef]"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Upcoming Reservation */}
+              <div className="space-y-4 mb-6">
+                <h4 className="text-xs font-bold text-[#111] uppercase tracking-wider">Your Active Booking</h4>
+                <div className="p-4 rounded-2xl bg-[#f0faf4] border border-[#2d6a4f]/20 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-black text-[#111]">Pitch 1 — FIFA Artificial Turf</div>
+                    <div className="text-[11px] text-[#2d6a4f]">Friday, Aug 28 • 18:00 - 19:00 (Floodlit)</div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase text-[#2d6a4f] bg-white shadow-sm">
+                    Confirmed
+                  </span>
+                </div>
+              </div>
+
+              {/* Your 4K Video Replays */}
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[#111] uppercase tracking-wider">Your 4K Match Videos</h4>
+                  <span className="text-[10px] font-bold text-[#2d6a4f]">Auto-Recorded by Veo Cam 3</span>
+                </div>
+
+                {[
+                  { title: "Bole Lions vs Arada FC (Full Match)", date: "Aug 22, 2026", dur: "62 mins", score: "4 - 2 Win" },
+                  { title: "Bole Lions vs Unity Stars (Cup Semi)", date: "Aug 15, 2026", dur: "58 mins", score: "3 - 1 Win" },
+                ].map((clip, i) => (
+                  <div key={i} className="p-3.5 rounded-2xl bg-[#f4f3ef] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#2d6a4f] text-white">
+                        <Play size={16} className="ml-0.5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#111]">{clip.title}</div>
+                        <div className="text-[10px] text-[#7a7a7a]">{clip.date} • {clip.dur} • <span className="text-[#2d6a4f] font-bold">{clip.score}</span></div>
+                      </div>
+                    </div>
+                    <button className="p-2 text-[#2d6a4f] hover:bg-white rounded-xl transition-colors" title="Download 4K Clip">
+                      <Download size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    logout();
+                    setShowPlayerHub(false);
+                  }}
+                  className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
+                >
+                  <LogOut size={13} /> Sign Out of Player Portal
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowPlayerHub(false);
+                    setShowBookingModal(true);
+                  }}
+                  className="px-5 py-2.5 rounded-full text-white text-xs font-bold shadow-sm"
+                  style={{ background: "#2d6a4f" }}
+                >
+                  Book Another Match
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL 3: PITCH RESERVATION ── */}
       <AnimatePresence>
         {showBookingModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
