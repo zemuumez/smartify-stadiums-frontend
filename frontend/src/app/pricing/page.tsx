@@ -3,81 +3,93 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Zap, Crown, Building2, ArrowRight, ArrowUpRight, ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
-import { FadeUp, StaggerChildren, StaggerItem, ScaleIn } from "@/components/ui/AnimatedSection";
+import {
+  Check,
+  ChevronDown,
+  Sparkles,
+  Zap,
+  Building2,
+  Shield,
+  ShieldCheck,
+  PhoneCall,
+  ArrowUpRight,
+  Star,
+  Camera,
+  Layers,
+  HelpCircle
+} from "lucide-react";
+import { FadeUp, ScaleIn } from "@/components/ui/AnimatedSection";
 
 const plans = [
   {
     name: "Starter",
+    tagline: "Single Pitch Entry",
+    desc: "Perfect for a single community pitch getting started with digital bookings and verified listings.",
     etb: "2,500",
     annualEtb: "2,000",
-    icon: <Zap size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "Perfect for a single field getting started online.",
     popular: false,
-    fields: "1–2 Fields",
-    cameras: "1 Camera",
-    storage: "500 GB",
+    fields: "1 Field",
+    cameras: "1 Camera Compatible",
+    storage: "100 GB Cloud",
     features: [
-      "Online booking calendar",
-      "Real-time slot availability",
-      "Official stadium microsite",
-      "Telebirr & CBE Birr payments",
-      "Basic revenue analytics",
-      "Player ratings & reviews",
-      "Email support",
+      "Dedicated official stadium site",
+      "Telebirr & CBE automated payments",
+      "Real-time calendar & conflict engine",
+      "SMS booking confirmations to players",
+      "ULS quality compliance verification",
+      "Standard platform support",
     ],
   },
   {
     name: "Professional",
+    tagline: "High-Traffic Venues",
+    desc: "Designed for growing sports centers with multiple pitches, night floodlights, and 4K AI cameras.",
     etb: "7,500",
     annualEtb: "6,000",
-    icon: <Crown size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "For growing stadiums with multiple fields and AI cameras.",
     popular: true,
-    fields: "Up to 10 Fields",
-    cameras: "5 Cameras",
-    storage: "2 TB",
+    badge: "Most Popular Choice",
+    fields: "Up to 5 Fields",
+    cameras: "Up to 4 AI Veo Cameras",
+    storage: "1 TB Match Storage",
     features: [
-      "Everything in Starter",
-      "AI camera integration",
-      "AI highlight generation",
-      "Full match video replays",
-      "Advanced analytics (revenue, trends)",
-      "Custom microsite branding",
-      "Event & tournament management",
-      "Priority phone support",
-      "API access",
+      "Everything in Starter included",
+      "Automated 4K Veo AI match recording",
+      "Player highlight reel & goal clipping",
+      "Weekly revenue analytics & payouts",
+      "Multi-field schedule coordination",
+      "Custom tournament bracket manager",
+      "Priority WhatsApp & phone hotline",
     ],
   },
   {
     name: "Enterprise",
+    tagline: "Sports Complexes & Academies",
+    desc: "Comprehensive solution for large sports complexes, municipal grounds, and academy chains.",
     etb: "20,000",
     annualEtb: "16,000",
-    icon: <Building2 size={22} style={{ color: "#2d6a4f" }} />,
-    desc: "For large sports complexes and multi-venue operators.",
     popular: false,
     fields: "Unlimited Fields",
     cameras: "Unlimited Cameras",
-    storage: "10 TB",
+    storage: "10 TB Archive",
     features: [
-      "Everything in Professional",
-      "Real-time live streaming",
-      "White-label custom domain options",
-      "Dedicated account manager",
-      "On-site installation & training",
+      "Everything in Professional included",
+      "Autonomous 24/7 live match broadcast",
+      "Custom domain & full white-labeling",
+      "Dedicated stadium account manager",
+      "On-site camera installation & audit",
       "99.9% uptime SLA guarantee",
-      "Platform admin API",
-      "24/7 dedicated support",
+      "Direct API integrations & reporting",
+      "24/7 dedicated enterprise response",
     ],
   },
 ];
 
 const faqs = [
-  { q: "Is there a free trial?", a: "Yes — every plan comes with a 14-day free trial. No credit card required to get started." },
-  { q: "What is the 5% platform fee?", a: "On bookings processed via Telebirr or CBE Birr, a small 5% platform fee applies to cover instant payment gateway sync and SMS notifications." },
-  { q: "Can I change or upgrade my plan later?", a: "Absolutely. You can upgrade, downgrade, or pause your subscription anytime directly from your Owner Dashboard." },
-  { q: "What payment methods are supported for subscriptions?", a: "We support Telebirr, CBE Birr, Chapa, credit/debit cards, and direct bank transfers for annual plans." },
-  { q: "Is AI camera hardware included?", a: "AI integration software and automated recording pipelines are included in Professional and Enterprise plans. Hardware installation is provided by certified partners." },
+  { q: "Is there a free trial?", a: "Yes — every stadium plan comes with a 14-day free trial. You can test the microsite, calendar sync, and booking system with zero risk." },
+  { q: "What is the 5% platform commission?", a: "On bookings processed via Telebirr or CBE Birr, a small 5% platform fee applies to cover instant gateway synchronization, automated SMS dispatch, and server operations." },
+  { q: "Can I change or upgrade my plan later?", a: "Absolutely. You can upgrade, downgrade, or switch between monthly and annual billing at any time directly from your Stadium Owner Dashboard." },
+  { q: "What payment methods are supported for subscriptions?", a: "We support Telebirr, CBE Birr, Chapa, Mastercard/Visa, and direct bank invoices for annual plans." },
+  { q: "Is AI camera hardware included?", a: "AI recording software and cloud processing pipelines are included in Professional and Enterprise tiers. Hardware mounting and calibration are handled by certified local partners." },
   { q: "Can I cancel anytime?", a: "Yes. You can cancel your subscription at any time with no lock-in contracts." },
 ];
 
@@ -93,7 +105,7 @@ export default function PricingPage() {
         <div className="spotnow-container text-center max-w-3xl mx-auto">
           <FadeUp>
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider text-[#2d6a4f] bg-[#f0faf4] border border-[#2d6a4f]/15 mb-4">
-              <ShieldCheck size={13} /> Transparent Pricing
+              <ShieldCheck size={13} /> Transparent Venue Plans
             </div>
 
             <h1
@@ -103,12 +115,12 @@ export default function PricingPage() {
               Simple, Predictable Plans
             </h1>
 
-            <p className="text-[#6a6a6a] text-base sm:text-lg leading-relaxed mb-8 max-w-xl mx-auto">
-              Choose the plan that fits your stadium. All plans include ULS quality verification, a public microsite, and real-time booking syncing.
+            <p className="text-[#6a6a6a] text-base sm:text-lg leading-relaxed mb-8 max-w-xl mx-auto font-medium">
+              Choose the plan that matches your stadium facility. All plans include ULS quality certification, an official microsite, and automated Telebirr booking sync.
             </p>
 
             {/* Monthly / Annual Toggle */}
-            <div className="inline-flex items-center gap-3 p-1.5 rounded-full bg-white border border-black/[0.08] shadow-sm">
+            <div className="inline-flex items-center gap-2 p-1.5 rounded-full bg-white border border-black/[0.08] shadow-sm">
               <button
                 onClick={() => setAnnual(false)}
                 className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${
@@ -136,84 +148,113 @@ export default function PricingPage() {
       {/* ── PRICING CARDS ──────────────────────────── */}
       <section className="py-6">
         <div className="spotnow-container">
-          <div className="grid md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 items-stretch max-w-6xl mx-auto">
             {plans.map((plan, i) => (
               <ScaleIn key={plan.name} delay={i * 0.1}>
                 <div
-                  className={`photo-card p-8 h-full flex flex-col justify-between relative ${
-                    plan.popular ? "border-2 border-[#2d6a4f] shadow-2xl" : "shadow-lg"
+                  className={`rounded-3xl p-8 h-full flex flex-col justify-between transition-all duration-300 ${
+                    plan.popular
+                      ? "text-white shadow-2xl md:-translate-y-2 border-2 border-[#2d6a4f]"
+                      : "bg-white text-[#111] shadow-lg border border-black/[0.08] hover:shadow-xl"
                   }`}
+                  style={plan.popular ? { background: "#1a4731" } : undefined}
                 >
-                  {plan.popular && (
-                    <div
-                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 text-white text-[11px] font-black uppercase tracking-wider rounded-full shadow-md"
-                      style={{ background: "#2d6a4f" }}
-                    >
-                      Most Popular
-                    </div>
-                  )}
-
                   <div>
-                    {/* Header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#f0faf4]">
-                        {plan.icon}
-                      </div>
-                      <h3 className="text-xl font-black text-[#111]">{plan.name}</h3>
+                    {/* Badge / Tagline */}
+                    <div className="flex items-center justify-between mb-4">
+                      {plan.popular ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#74c69d] text-[#1a4731] shadow-sm">
+                          <Star size={11} className="fill-[#1a4731]" /> Most Popular
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-[#7a7a7a] uppercase tracking-wider">
+                          {plan.tagline}
+                        </span>
+                      )}
                     </div>
 
-                    <p className="text-xs sm:text-sm text-[#7a7a7a] leading-relaxed mb-6">
+                    {/* Plan Name & Tagline */}
+                    <h3 className={`text-2xl font-black mb-2 ${plan.popular ? "text-white" : "text-[#111]"}`}>
+                      {plan.name}
+                    </h3>
+                    <p className={`text-xs leading-relaxed mb-6 ${plan.popular ? "text-white/75" : "text-[#7a7a7a]"}`}>
                       {plan.desc}
                     </p>
 
                     {/* Pricing */}
-                    <div className="mb-6 pb-6 border-b border-black/[0.06]">
+                    <div className={`mb-6 pb-6 border-b ${plan.popular ? "border-white/15" : "border-black/[0.06]"}`}>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-3xl sm:text-4xl font-black text-[#111]">
+                        <span className="text-4xl font-black">
                           {annual ? plan.annualEtb : plan.etb}
                         </span>
-                        <span className="text-xs font-semibold text-[#7a7a7a]">ETB / month</span>
+                        <span className={`text-xs font-semibold ${plan.popular ? "text-white/70" : "text-[#7a7a7a]"}`}>
+                          ETB / month
+                        </span>
                       </div>
-                      <div className="text-[11px] text-[#8a8a8a] mt-1">
-                        {annual ? "Billed annually" : "Billed monthly, cancel anytime"}
+                      <div className={`text-[11px] mt-1 ${plan.popular ? "text-white/60" : "text-[#8a8a8a]"}`}>
+                        {annual ? "Billed annually (Save 20%)" : "Billed monthly, cancel anytime"}
                       </div>
                     </div>
 
                     {/* Specs Box */}
-                    <div className="grid grid-cols-3 gap-2 rounded-2xl p-3.5 mb-6 bg-[#f0faf4] text-center">
+                    <div
+                      className={`grid grid-cols-3 gap-2 rounded-2xl p-3.5 mb-6 text-center ${
+                        plan.popular ? "bg-white/10 text-white" : "bg-[#f4f3ef] text-[#111]"
+                      }`}
+                    >
                       <div>
-                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Fields</div>
-                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.fields}</div>
+                        <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
+                          Fields
+                        </div>
+                        <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
+                          {plan.fields}
+                        </div>
                       </div>
-                      <div className="border-x border-[#2d6a4f]/15">
-                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Cameras</div>
-                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.cameras}</div>
+                      <div className={`border-x ${plan.popular ? "border-white/15" : "border-black/10"}`}>
+                        <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
+                          Cameras
+                        </div>
+                        <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
+                          {plan.cameras}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-[#7a7a7a] font-bold uppercase">Storage</div>
-                        <div className="text-xs font-black text-[#2d6a4f] mt-0.5">{plan.storage}</div>
+                        <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
+                          Storage
+                        </div>
+                        <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
+                          {plan.storage}
+                        </div>
                       </div>
                     </div>
 
                     {/* Features List */}
                     <div className="space-y-3 mb-8">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#111]">Included Features:</div>
+                      <div className={`text-[11px] font-bold uppercase tracking-wider ${plan.popular ? "text-white/80" : "text-[#111]"}`}>
+                        Included Features:
+                      </div>
                       {plan.features.map((feat) => (
-                        <div key={feat} className="flex items-start gap-2.5 text-xs text-[#3d3d3d] font-medium leading-relaxed">
-                          <Check size={14} className="text-[#2d6a4f] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                          <span>{feat}</span>
+                        <div key={feat} className="flex items-start gap-2.5 text-xs font-medium leading-relaxed">
+                          <Check
+                            size={14}
+                            className={`flex-shrink-0 mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}
+                            strokeWidth={3}
+                          />
+                          <span className={plan.popular ? "text-white/90" : "text-[#3d3d3d]"}>
+                            {feat}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* CTA */}
+                  {/* CTA Button */}
                   <Link
                     href="/auth/register/owner"
-                    className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-xs font-bold transition-all shadow-md ${
+                    className={`flex items-center justify-center gap-2 w-full py-4 rounded-full text-xs font-bold transition-all shadow-md ${
                       plan.popular
-                        ? "bg-[#2d6a4f] text-white hover:bg-[#1a4731]"
-                        : "bg-white border border-black/15 text-[#111] hover:bg-[#f0faf4] hover:border-[#2d6a4f]"
+                        ? "bg-white text-[#111] hover:bg-[#f4f3ef] hover:scale-[1.02]"
+                        : "bg-[#2d6a4f] text-white hover:bg-[#1a4731]"
                     }`}
                   >
                     Start 14-Day Free Trial
@@ -244,26 +285,32 @@ export default function PricingPage() {
               return (
                 <div
                   key={faq.q}
-                  className="photo-card p-5 cursor-pointer transition-all hover:border-black/20"
+                  className="bg-white rounded-3xl p-6 cursor-pointer transition-all border border-black/[0.06] shadow-sm hover:shadow-md"
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <h3 className="text-sm font-bold text-[#111]">{faq.q}</h3>
-                    <ChevronDown
-                      size={16}
-                      className={`text-[#7a7a7a] transition-transform duration-300 ${isOpen ? "rotate-180 text-[#2d6a4f]" : ""}`}
-                    />
+                    <span className="text-sm font-bold text-[#111]">{faq.q}</span>
+                    <motion.div
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="w-7 h-7 rounded-full bg-[#f4f3ef] flex items-center justify-center flex-shrink-0 text-[#2d6a4f]"
+                    >
+                      <ChevronDown size={15} />
+                    </motion.div>
                   </div>
                   <AnimatePresence>
                     {isOpen && (
-                      <motion.p
+                      <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="text-xs text-[#6a6a6a] leading-relaxed mt-3 pt-3 border-t border-black/[0.06]"
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
                       >
-                        {faq.a}
-                      </motion.p>
+                        <p className="text-xs text-[#6a6a6a] leading-relaxed pt-3 mt-3 border-t border-black/[0.06]">
+                          {faq.a}
+                        </p>
+                      </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
