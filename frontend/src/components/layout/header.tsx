@@ -106,7 +106,7 @@ export function Header() {
             {/* Right — Partner CTA (No public admin login button) */}
             <div className="hidden lg:flex items-center gap-3">
               <Link
-                href="/about"
+                href="/contact"
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                   isSolid
                     ? "text-[#3d3d3d] hover:text-[#2d6a4f]"
