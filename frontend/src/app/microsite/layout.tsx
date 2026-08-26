@@ -36,10 +36,8 @@ const STADIUM_DATA = {
 };
 
 const navLinks = [
-  { href: "/microsite", label: "Overview" },
   { href: "/microsite#fields", label: "Pitches & Courts" },
   { href: "/microsite#highlights", label: "Match Replays" },
-  { href: "/microsite#events", label: "Tournaments" },
   { href: "/microsite#location", label: "Location & Contact" },
 ];
 
