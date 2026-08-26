@@ -38,7 +38,6 @@ export function Header() {
     { href: "/stadiums", label: "Venues" },
     { href: "/stadiums/live", label: "Live" },
     { href: "/about", label: "About" },
-    { href: "/pricing", label: "Pricing" },
   ];
 
   return (
