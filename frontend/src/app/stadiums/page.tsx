@@ -634,7 +634,7 @@ export default function StadiumsPage() {
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
-                href="/auth/register"
+                href="/auth/register/owner"
                 className="btn-primary btn-primary-lg"
                 style={{ background: "#2d6a4f" }}
               >

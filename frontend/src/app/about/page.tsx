@@ -104,7 +104,7 @@ export default function AboutPage() {
               <p className="text-[#7a7a7a] leading-relaxed mb-8">
                 Founded in Addis Ababa by Unity Link Solutions, ET Smart Fields is Ethiopia&apos;s first integrated multi-sport infrastructure platform. We provide stadiums with modern booking systems, AI-powered camera technology, and professional microsites, all under one roof.
               </p>
-              <Link href="/auth/register" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
+              <Link href="/auth/register/owner" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
                 Register Your Stadium <ArrowRight size={16} />
               </Link>
             </SlideIn>
@@ -287,7 +287,7 @@ export default function AboutPage() {
               Be part of Ethiopia&apos;s sports infrastructure revolution. Register your stadium or find a field near you today.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/register" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
+              <Link href="/auth/register/owner" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
                 Register Your Stadium <ArrowRight size={16} />
               </Link>
               <Link href="/stadiums" className="btn-ghost-white" style={{ paddingTop: "1rem", paddingBottom: "1rem" }}>

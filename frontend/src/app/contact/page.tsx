@@ -216,7 +216,7 @@ export default function ContactPage() {
                     Register your stadium on ET Smart Fields and reach thousands of players in your city.
                   </p>
                   <Link
-                    href="/auth/register"
+                    href="/auth/register/owner"
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:opacity-90"
                     style={{ background: "white", color: "#2d6a4f" }}
                   >

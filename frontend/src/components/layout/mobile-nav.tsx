@@ -16,11 +16,12 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname();
 
-  // Don't show on dashboard, admin, or official stadium microsites
+  // Don't show on dashboard, admin, official stadium microsites, or registration wizard
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/microsite")
+    pathname.startsWith("/microsite") ||
+    pathname.startsWith("/auth/register")
   ) {
     return null;
   }

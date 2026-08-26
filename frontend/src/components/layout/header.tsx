@@ -20,11 +20,12 @@ export function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Hide on dashboard, admin, and stadium official microsite routes (they have their own standalone navigation)
+  // Hide on dashboard, admin, stadium official microsite, and registration wizard routes (they have their own standalone navigation)
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/microsite")
+    pathname.startsWith("/microsite") ||
+    pathname.startsWith("/auth/register")
   ) {
     return null;
   }
