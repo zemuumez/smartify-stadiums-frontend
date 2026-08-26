@@ -70,9 +70,12 @@ export default function StandaloneMicrositeLayout({
   const [bookingTime, setBookingTime] = useState("18:00 - 19:00");
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
   const { user, isAuthenticated, setDemoUser, logout } = useAuthStore();
 
   useEffect(() => {
+    setMounted(true);
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
@@ -159,7 +162,7 @@ export default function StandaloneMicrositeLayout({
 
             {/* Desktop Right CTAs */}
             <div className="hidden sm:flex items-center gap-2.5 flex-shrink-0">
-              {isAuthenticated && user?.role === "player" ? (
+              {mounted && isAuthenticated && user?.role === "player" ? (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowPlayerHub(true)}
@@ -175,7 +178,7 @@ export default function StandaloneMicrositeLayout({
                     <LogOut size={14} />
                   </button>
                 </div>
-              ) : isAuthenticated && user?.role === "owner" ? (
+              ) : mounted && isAuthenticated && user?.role === "owner" ? (
                 <div className="flex items-center gap-2">
                   <Link
                     href="/dashboard"
