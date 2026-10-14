@@ -14,3 +14,4 @@ The founder approved FRONTEND_MASTER_PLAN.md and requires centralized demo data,
 ## Delivery log
 
 - Step 0: recorded the approved plan and durable delivery rules. Checked the plan and rules for scope consistency; no application behavior changed.
+- Step 1: added typed domain services, cookie/CSRF HTTP transport, explicit demo/API selection, centralized operational fixtures and a persistent demo adapter. Twelve behavioral tests pass. Backend endpoints/session design are proposed contracts; legacy page migration follows. No claim of backend security or full frontend completion.
