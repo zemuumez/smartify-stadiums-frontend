@@ -45,4 +45,5 @@ export const am: Record<MessageKey, string> = {
   active: 'ንቁ', suspended: 'የታገደ', approve: 'ንቁ አድርግ', suspend: 'አግድ', reviewReason: 'የግምገማ ምክንያት',
   audit: 'የእርምጃ ታሪክ', privacyNotice: 'የግል ቀረጻ የተረጋገጠ ፈቃድ ይፈልጋል። ቀረጻና ድጋሚ እይታ በዚህ ሙከራ ገና አልተጀመሩም።',
   support: 'እርዳታ ያግኙ', returnHome: 'ወደ መነሻ ተመለስ', notFound: 'ገጹ አልተገኘም',
+  addField: 'ሜዳ ወይም ኮርት ያክሉ', inactive: 'ንቁ አይደለም', edit: 'አርትዕ', surface: 'የሜዳ ወለል', profileEditingPending: 'የመገለጫ ለውጦች በቀጣይ ስሪት ይገኛሉ።', certified: 'የተረጋገጠ', offline: 'ከመስመር ውጭ', revoked: 'ፈቃዱ ተሰርዟል',
 };

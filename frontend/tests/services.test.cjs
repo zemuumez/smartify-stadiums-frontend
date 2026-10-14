@@ -10,6 +10,37 @@ const setup = () => { const transport = createDemoTransport(); return { transpor
 const input = (overrides = {}) => ({ fieldId: 'field-2', sport: 'basketball', date: '2099-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID(), ...overrides });
 const rejects = (operation, code) => assert.rejects(operation, error => error.code === code);
 
+test('court edits are tenant scoped and cannot invalidate a future reservation', async () => {
+  const s = setup(); s.transport.selectAccount('player-1');
+  await s.bookings.create(input());
+  s.transport.selectAccount('owner-1');
+  const court = (await s.fields.list()).find(f => f.id === 'field-2');
+  await rejects(s.fields.update(court.id, { ...court, active: false }), 'conflict');
+  await rejects(s.fields.update(court.id, { ...court, sports: ['futsal'] }), 'conflict');
+  const updated = await s.fields.update(court.id, { ...court, name: 'Renamed court', id: 'tampered' });
+  assert.equal(updated.id, court.id);
+  assert.equal((await s.venues.fields('venue-1')).find(f => f.id === court.id).name, 'Renamed court');
+  s.transport.selectAccount('owner-2');
+  await rejects(s.fields.update(court.id, court), 'forbidden');
+});
+
+test('venue onboarding stays private until administrator approval and publication', async () => {
+  const s = setup(); s.transport.selectAccount('owner-1');
+  const venue = await s.venues.create({ name: 'New sports center', city: 'Addis Ababa', address: 'Bole', phone: '+251922345678', description: 'Multi-sport venue' });
+  assert.equal(venue.status, 'pending');
+  assert.equal((await s.venues.list()).some(v => v.id === venue.id), false);
+  const draft = await s.content.draft(venue.id);
+  assert.equal(draft.published, false);
+  await rejects(s.content.publish(venue.id), 'conflict');
+  await rejects(s.admin.review(venue.id, 'active', 'Verified'), 'forbidden');
+  s.transport.selectAccount('admin-1');
+  await s.admin.review(venue.id, 'active', 'Reviewed venue submission');
+  assert.ok((await s.admin.audit()).some(a => a.resourceId === venue.id));
+  s.transport.selectAccount('owner-1');
+  await s.content.publish(venue.id);
+  assert.equal((await s.content.get(venue.id)).published, true);
+});
+
 test('live is default, invalid modes fail closed', () => {
   assert.equal(resolveMode(undefined), 'api'); assert.equal(resolveMode('demo'), 'demo');
   assert.throws(() => resolveMode('typo'), { code: 'configuration' });

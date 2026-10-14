@@ -2,6 +2,7 @@ import type { Account, BookingInput, Closure, Microsite, RequestOptions, Role, S
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
 import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fixtures';
+import type { FieldInput } from '../services/fields.service';
 
 export interface DemoStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
 const DATA_KEY = 'etsf-demo-v1';
@@ -132,7 +133,9 @@ export function createDemoTransport(storage?: DemoStorage) {
         if (!input.name.trim() || !input.city.trim()) throw new ServiceError('validation', 422);
         const id = crypto.randomUUID();
         const venue = { ...input, id, ownerId: user.id, slug: `venue-${id}`, sports: [], status: 'pending' as const, verified: false, image: '/venue-card-1.jpg', rating: null, reviewCount: 0, timezone: 'Africa/Addis_Ababa' };
-        state.venues.push(venue); audit('venue.submitted', id); persist(); return venue;
+        state.venues.push(venue);
+        state.drafts.push({ venueId: id, tagline: input.name, description: input.description, primaryColor: '#2d6a4f', published: false, updatedAt: new Date().toISOString() });
+        audit('venue.submitted', id); persist(); return venue;
       }
       if (parts[1] === 'stadiums' && parts[2]) {
         const venue = owned(parts[2]);
@@ -156,6 +159,19 @@ export function createDemoTransport(storage?: DemoStorage) {
         const input = options.body as Omit<Closure, 'id'>; const item = field(input.fieldId); owned(item.venueId); validateInterval(input.date, input.startHour, input.endHour);
         if (!input.reason.trim() || !available(item.id, input.date, input.startHour, input.endHour)) throw new ServiceError('conflict', 409);
         const closure = { ...input, id: crypto.randomUUID() }; state.closures.push(closure); audit('field.closed', item.id); persist(); return closure;
+      }
+      if (path === '/owner/fields' && method === 'GET') return state.fields.filter(f => venueIds.includes(f.venueId));
+      if (parts[1] === 'fields' && (method === 'POST' || method === 'PATCH')) {
+        const input = options.body as FieldInput; const venue = owned(input.venueId);
+        if (!input.name.trim() || !input.sports.length || input.sports.some(s => !sports.includes(s)) || !Number.isSafeInteger(input.hourlyRateMinor) || input.hourlyRateMinor < 0 || !Number.isInteger(input.openHour) || !Number.isInteger(input.closeHour) || input.openHour < 0 || input.closeHour > 24 || input.openHour >= input.closeHour) throw new ServiceError('validation', 422);
+        if (method === 'PATCH') {
+          const existing = field(parts[2]); owned(existing.venueId);
+          if (existing.venueId !== input.venueId) throw new ServiceError('validation', 422);
+          const conflicting = state.bookings.some(b => b.fieldId === existing.id && b.status === 'confirmed' && Date.parse(`${b.date}T${String(b.endHour).padStart(2, '0')}:00:00+03:00`) > Date.now() && (!input.active || b.startHour < input.openHour || b.endHour > input.closeHour || !input.sports.includes(b.sport)));
+          if (conflicting) throw new ServiceError('conflict', 409);
+          Object.assign(existing, input, { id: existing.id }); venue.sports = [...new Set(state.fields.filter(f => f.venueId === venue.id && f.active).flatMap(f => f.sports))]; audit('field.updated', existing.id); persist(); return existing;
+        }
+        const created = { ...input, id: crypto.randomUUID() }; state.fields.push(created); venue.sports = [...new Set(state.fields.filter(f => f.venueId === venue.id && f.active).flatMap(f => f.sports))]; audit('field.created', created.id); persist(); return created;
       }
       if (path === '/owner/cameras' && method === 'GET') return state.cameras.filter(item => venueIds.includes(item.venueId));
       if (path === '/owner/invoices' && method === 'GET') return state.invoices.filter(item => venueIds.includes(item.venueId));

@@ -44,5 +44,6 @@ export const en = {
   active: 'Active', suspended: 'Suspended', approve: 'Activate', suspend: 'Suspend', reviewReason: 'Review reason',
   audit: 'Audit history', privacyNotice: 'Private footage requires verified access. Recording and replay services are not live in this demo.',
   support: 'Contact support', returnHome: 'Return home', notFound: 'Page not found',
+  addField: 'Add a court or field', inactive: 'Inactive', edit: 'Edit', surface: 'Surface', profileEditingPending: 'Profile changes will be available in a later release.', certified: 'Certified', offline: 'Offline', revoked: 'Revoked',
 } as const;
 export type MessageKey = keyof typeof en;
