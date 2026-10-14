@@ -1,5 +1,5 @@
 {
   "compilerOptions": { "target": "ES2022", "module": "commonjs", "moduleResolution": "node", "lib": ["ES2022", "DOM"], "strict": true, "skipLibCheck": true, "esModuleInterop": true, "outDir": ".test-build", "rootDir": "src" },
-  "include": ["src/services/**/*.ts", "src/demo/**/*.ts"],
+  "include": ["src/services/**/*.ts", "src/demo/**/*.ts", "src/i18n/*.ts"],
   "exclude": ["src/demo/legacy/**"]
 }

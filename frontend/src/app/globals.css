@@ -607,3 +607,13 @@ html.theme-transitioning *::after {
 .dark .glow-green {
   box-shadow: 0 0 40px rgba(64, 145, 108, 0.3);
 }
+
+/* Shared integration-ready controls: keyboard focus and 44px touch targets. */
+.panel { border: 1px solid #dce4dd; border-radius: 1.5rem; padding: clamp(1rem, 3vw, 2rem); background: white; }
+.form-label { display: flex; flex-direction: column; gap: .5rem; font-weight: 600; min-width: 0; }
+.form-input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #aebbb2; border-radius: .75rem; padding: .7rem .85rem; background: white; color: #16251c; font-weight: 400; }
+.action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: .75rem; padding: .75rem 1.25rem; background: #215c3f; color: white; font-weight: 700; text-align: center; }
+.action:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid #40916c; outline-offset: 3px; }
+html[lang="am"] body { font-family: 'Noto Sans Ethiopic', 'Nyala', 'Ebrima', sans-serif; line-height: 1.7; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; animation-iteration-count: 1 !important; } }

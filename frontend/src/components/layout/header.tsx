@@ -6,13 +6,13 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowUpRight } from "lucide-react";
-import { useAuthStore } from "@/lib/auth-store";
+import { useLanguage } from "@/i18n/provider";
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 30);
@@ -24,7 +24,7 @@ export function Header() {
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/microsite") ||
+    pathname.startsWith("/microsite") || pathname.startsWith("/s/") ||
     pathname.startsWith("/auth/register")
   ) {
     return null;
@@ -34,10 +34,10 @@ export function Header() {
   const isSolid = scrolled || !isDarkHeroPage;
 
   const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/stadiums", label: "Venues" },
-    { href: "/stadiums/live", label: "Live" },
-    { href: "/about", label: "About" },
+    { href: "/", label: t("home") },
+    { href: "/stadiums", label: t("venues") },
+    { href: "/stadiums/live", label: t("live") },
+    { href: "/about", label: t("about") },
   ];
 
   return (
@@ -112,13 +112,13 @@ export function Header() {
                     : "text-white/90 hover:text-white"
                 }`}
               >
-                Partner With Us
+                {t("partner")}
               </Link>
               <Link
                 href="/pricing"
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-[#2d6a4f] text-white rounded-full text-sm font-bold shadow-md hover:bg-[#1a4731] hover:-translate-y-0.5 transition-all duration-300"
               >
-                Get Started
+                {t("getStarted")}
                 <span className="w-5 h-5 bg-white/15 rounded-full flex items-center justify-center">
                   <ArrowUpRight size={11} />
                 </span>
@@ -134,7 +134,7 @@ export function Header() {
                     ? "text-[#111] hover:bg-[#f0faf4]"
                     : "text-white hover:bg-white/15"
                 }`}
-                aria-label="Toggle menu"
+                aria-label={t("menu")} aria-expanded={isOpen}
               >
                 {isOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
@@ -206,7 +206,7 @@ export function Header() {
                   onClick={() => setIsOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-full text-sm font-bold text-white bg-[#2d6a4f] shadow-lg shadow-[#2d6a4f]/25 hover:bg-[#1a4731] transition-all"
                 >
-                  Get Started
+                  {t("getStarted")}
                   <ArrowUpRight size={14} />
                 </Link>
               </div>

@@ -1,3 +1,4 @@
+import { LanguageProvider, LanguageSwitcher } from '@/i18n/provider';
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
@@ -88,15 +89,15 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased overscroll-none" style={{ backgroundColor: '#f4f3ef', color: '#111111' }}>
-        <ThemeProvider>
+        <LanguageProvider><ThemeProvider>
           <AuthProvider>
             <Header />
-            <main className="min-h-screen pb-20 lg:pb-0">
+            <div className="min-h-screen pb-20 lg:pb-0">
               {children}
-            </main>
+            </div>
             <MobileNav />
           </AuthProvider>
-        </ThemeProvider>
+        </ThemeProvider><LanguageSwitcher /></LanguageProvider>
       </body>
     </html>
   );

@@ -2,7 +2,7 @@
 export type Role = 'player' | 'owner' | 'admin';
 export type Sport = 'football' | 'basketball' | 'volleyball' | 'badminton' | 'tennis' | 'futsal';
 export interface Account {
-  id: string; phone: string; full_name: string; role: Role;
+  id: string; phone: string; full_name: string; role: Role; email?: string;
   is_verified: boolean; is_minor: boolean; created_at: string;
 }
 export interface Venue {

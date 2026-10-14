@@ -1,26 +1,29 @@
 "use client";
 
+import { useLanguage } from "@/i18n/provider";
+import type { MessageKey } from "@/i18n/en";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Home, Search, Tv, Info, Mail } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/stadiums", label: "Venues", icon: Search },
-  { href: "/stadiums/live", label: "Live", icon: Tv },
-  { href: "/about", label: "About", icon: Info },
-  { href: "/contact", label: "Contact", icon: Mail },
+  { href: "/", label: "home", icon: Home },
+  { href: "/stadiums", label: "venues", icon: Search },
+  { href: "/stadiums/live", label: "live", icon: Tv },
+  { href: "/about", label: "about", icon: Info },
+  { href: "/contact", label: "contact", icon: Mail },
 ];
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
   // Don't show on dashboard, admin, official stadium microsites, or registration wizard
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/microsite") ||
+    pathname.startsWith("/microsite") || pathname.startsWith("/s/") ||
     pathname.startsWith("/auth/register")
   ) {
     return null;
@@ -76,7 +79,7 @@ export function MobileNav() {
                     active ? "text-[#2d6a4f]" : "text-[#8a8a8a]"
                   }`}
                 >
-                  {item.label}
+                  {t(item.label as MessageKey)}
                 </span>
               </Link>
             );
