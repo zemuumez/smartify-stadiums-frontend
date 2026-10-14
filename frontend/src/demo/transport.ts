@@ -92,7 +92,7 @@ export function createDemoTransport(storage?: DemoStorage) {
       const item = field(parts[1]); publicVenue(item.venueId);
       const date = url.searchParams.get('date') || ''; validateInterval(date, 0, 1);
       if (!item.active) return [];
-      return Array.from({ length: item.closeHour - item.openHour }, (_, index) => ({ startHour: item.openHour + index, endHour: item.openHour + index + 1, available: available(item.id, date, item.openHour + index, item.openHour + index + 1) }));
+      return Array.from({ length: item.closeHour - item.openHour }, (_, index) => ({ startHour: item.openHour + index, endHour: item.openHour + index + 1, available: Date.parse(`${date}T${String(item.openHour + index).padStart(2, '0')}:00:00+03:00`) > Date.now() && available(item.id, date, item.openHour + index, item.openHour + index + 1) }));
     }
     if (path === '/bookings' && method === 'GET') {
       const user = account();

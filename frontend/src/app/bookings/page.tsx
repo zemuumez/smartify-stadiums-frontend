@@ -1,18 +1,2 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function BookingsRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/microsite#fields");
-  }, [router]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f4f3ef]">
-      <div className="w-8 h-8 border-3 border-[#2d6a4f]/20 border-t-[#2d6a4f] rounded-full animate-spin" />
-    </div>
-  );
-}
+import { BookingList } from '@/components/booking-list';
+export default function Page() { return <main className="mx-auto max-w-5xl px-4 pb-28 pt-28"><BookingList /></main>; }
