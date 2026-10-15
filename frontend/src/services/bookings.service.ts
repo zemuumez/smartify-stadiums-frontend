@@ -1,4 +1,4 @@
-import type { Booking, BookingInput, Closure, Slot, Transport } from './contracts';
+import type { Booking, BookingInput, Closure, RescheduleBookingInput, Slot, Transport, WalkInBookingInput } from './contracts';
 import { ServiceError } from './errors';
 export function validateInterval(date: string, start: number, end: number) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > 24 || end <= start) throw new ServiceError('validation');
@@ -15,6 +15,16 @@ export function createBookingsService(transport: Transport) {
       validateInterval(input.date, input.startHour, input.endHour);
       if (!input.idempotencyKey) throw new ServiceError('validation');
       return transport.request<Booking>('/bookings', { method: 'POST', body: input, idempotencyKey: input.idempotencyKey });
+    },
+    createWalkIn: (input: WalkInBookingInput) => {
+      validateInterval(input.date, input.startHour, input.endHour);
+      if (!input.idempotencyKey || !input.guestName?.trim() || !input.venueId || !input.fieldId) throw new ServiceError('validation');
+      return transport.request<Booking>('/owner/walk-ins', { method: 'POST', body: input, idempotencyKey: input.idempotencyKey });
+    },
+    reschedule: (id: string, input: RescheduleBookingInput) => {
+      validateInterval(input.date, input.startHour, input.endHour);
+      if (!input.idempotencyKey) throw new ServiceError('validation');
+      return transport.request<Booking>(`/bookings/${encodeURIComponent(id)}/reschedule`, { method: 'POST', body: input, idempotencyKey: input.idempotencyKey });
     },
     cancel: (id: string) => transport.request<Booking>(`/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
     closures: (venueId: string) => transport.request<Closure[]>(`/owner/stadiums/${encodeURIComponent(venueId)}/closures`),

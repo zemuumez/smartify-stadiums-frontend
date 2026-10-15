@@ -1,4 +1,4 @@
-import type { Account, BookingInput, Closure, Microsite, RequestOptions, Role, Sport, Transport, VenueInput } from '../services/contracts';
+import type { Account, BookingInput, Closure, Microsite, RequestOptions, RescheduleBookingInput, Role, Sport, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
 import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fixtures';
@@ -111,7 +111,7 @@ export function createDemoTransport(storage?: DemoStorage) {
         return state.bookings.find(b => b.id === previous.bookingId);
       }
       if (!available(item.id, input.date, input.startHour, input.endHour)) throw new ServiceError('conflict', 409);
-      const booking = { id: crypto.randomUUID(), venueId: item.venueId, fieldId: item.id, playerId: user.id, sport: input.sport, date: input.date, startHour: input.startHour, endHour: input.endHour, totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour), currency: 'ETB' as const, status: 'confirmed' as const, paymentStatus: 'unpaid' as const, createdAt: new Date().toISOString() };
+      const booking = { id: crypto.randomUUID(), venueId: item.venueId, fieldId: item.id, playerId: user.id, sport: input.sport, date: input.date, startHour: input.startHour, endHour: input.endHour, totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour), currency: 'ETB' as const, status: 'confirmed' as const, paymentStatus: 'unpaid' as const, createdAt: new Date().toISOString(), source: 'online' as const };
       state.bookings.push(booking); state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
@@ -124,8 +124,98 @@ export function createDemoTransport(storage?: DemoStorage) {
       if (booking.status !== 'cancelled') { booking.status = 'cancelled'; audit('booking.cancelled', booking.id); persist(); }
       return booking;
     }
+    if (parts[0] === 'bookings' && parts[2] === 'reschedule' && method === 'POST') {
+      const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
+      if (!booking) throw new ServiceError('not_found', 404);
+      if (user.role === 'player') {
+        if (booking.playerId !== user.id) throw new ServiceError('forbidden', 403);
+      } else if (user.role === 'owner') {
+        owned(booking.venueId);
+      } else if (user.role !== 'admin') {
+        throw new ServiceError('forbidden', 403);
+      }
+      if (booking.status !== 'confirmed') throw new ServiceError('conflict', 409);
+      // Provisional demo policy: future unpaid bookings only; real rescheduling/refund policy remains open.
+      if (booking.paymentStatus !== 'unpaid' || Date.parse(`${booking.date}T${String(booking.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('conflict', 409);
+
+      const input = options.body as RescheduleBookingInput;
+      validateInterval(input.date, input.startHour, input.endHour);
+      if (!input.idempotencyKey) throw new ServiceError('validation', 422);
+      if (Date.parse(`${input.date}T${String(input.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('validation', 422);
+
+      const item = field(booking.fieldId);
+      publicVenue(item.venueId);
+      if (!item.active || !item.sports.includes(booking.sport) || input.startHour < item.openHour || input.endHour > item.closeHour) throw new ServiceError('validation', 422);
+
+      const key = `${user.id}:${input.idempotencyKey}`;
+      const fingerprint = JSON.stringify({ bookingId: booking.id, ...input });
+      const previous = state.idempotency[key];
+      if (previous) {
+        if (previous.fingerprint !== fingerprint) throw new ServiceError('conflict', 409);
+        return state.bookings.find(b => b.id === previous.bookingId);
+      }
+
+      const isAvailable = !state.bookings.some(b => b.id !== booking.id && b.fieldId === item.id && b.date === input.date && b.status !== 'cancelled' && b.status !== 'no_show' && overlaps(input.startHour, input.endHour, b.startHour, b.endHour)) && !state.closures.some(c => c.fieldId === item.id && c.date === input.date && overlaps(input.startHour, input.endHour, c.startHour, c.endHour));
+      if (!isAvailable) throw new ServiceError('conflict', 409);
+
+      const newTotalMinor = quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour);
+      if (!booking.originalSchedule) {
+        booking.originalSchedule = { date: booking.date, startHour: booking.startHour, endHour: booking.endHour };
+      }
+      booking.date = input.date;
+      booking.startHour = input.startHour;
+      booking.endHour = input.endHour;
+      booking.totalMinor = newTotalMinor;
+      booking.rescheduledAt = new Date().toISOString();
+      state.idempotency[key] = { fingerprint, bookingId: booking.id };
+      audit('booking.rescheduled', booking.id);
+      persist();
+      return booking;
+    }
     if (parts[0] === 'owner') {
       const user = account(); if (!['owner', 'admin'].includes(user.role)) throw new ServiceError('forbidden', 403);
+      if (parts[1] === 'walk-ins' && method === 'POST') {
+        const input = options.body as WalkInBookingInput;
+        if (!input.guestName?.trim() || !input.venueId || !input.fieldId) throw new ServiceError('validation', 422);
+        validateInterval(input.date, input.startHour, input.endHour);
+        const venue = owned(input.venueId);
+        const item = field(input.fieldId);
+        if (item.venueId !== venue.id) throw new ServiceError('validation', 422);
+        if (!input.idempotencyKey || !item.active || !item.sports.includes(input.sport) || input.startHour < item.openHour || input.endHour > item.closeHour || Date.parse(`${input.date}T${String(input.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('validation', 422);
+
+        const key = `${user.id}:${input.idempotencyKey}`;
+        const fingerprint = JSON.stringify(input);
+        const previous = state.idempotency[key];
+        if (previous) {
+          if (previous.fingerprint !== fingerprint) throw new ServiceError('conflict', 409);
+          return state.bookings.find(b => b.id === previous.bookingId);
+        }
+        if (!available(item.id, input.date, input.startHour, input.endHour)) throw new ServiceError('conflict', 409);
+
+        const booking = {
+          id: crypto.randomUUID(),
+          venueId: venue.id,
+          fieldId: item.id,
+          playerId: '',
+          sport: input.sport,
+          date: input.date,
+          startHour: input.startHour,
+          endHour: input.endHour,
+          totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour),
+          currency: 'ETB' as const,
+          status: 'confirmed' as const,
+          paymentStatus: 'unpaid' as const,
+          createdAt: new Date().toISOString(),
+          source: 'walk_in' as const,
+          guestName: input.guestName.trim(),
+          guestPhone: input.guestPhone?.trim() || undefined,
+        };
+        state.bookings.push(booking);
+        state.idempotency[key] = { fingerprint, bookingId: booking.id };
+        audit('booking.walk_in', booking.id);
+        persist();
+        return booking;
+      }
       const venueIds = state.venues.filter(v => user.role === 'admin' || v.ownerId === user.id).map(v => v.id);
       if (path === '/owner/stadiums' && method === 'GET') return state.venues.filter(v => venueIds.includes(v.id));
       if (path === '/owner/stadiums' && method === 'POST') {

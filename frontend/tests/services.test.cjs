@@ -6,6 +6,14 @@ const { createHttpTransport } = require('../.test-build/services/http');
 const { resolveMode } = require('../.test-build/services/config');
 const { quoteMinor } = require('../.test-build/services/bookings.service');
 const { normalizePhone } = require('../.test-build/services/auth.service');
+const {
+  shiftDays,
+  getWeekDays,
+  matchesBookingCriteria,
+  resolveTargetCourt,
+  computeCourtQuote,
+  isValidDate,
+} = require('../.test-build/services/sports');
 const setup = () => { const transport = createDemoTransport(); return { transport, ...createServices(transport) }; };
 const input = (overrides = {}) => ({ fieldId: 'field-2', sport: 'basketball', date: '2099-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID(), ...overrides });
 const rejects = (operation, code) => assert.rejects(operation, error => error.code === code);
@@ -151,3 +159,257 @@ test('Next proxy rewrites tenant home and CMS while blocking a different tenant 
     assert.equal(proxy(request('/s/bambis-meda')).status,404);
   } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_ROOT_DOMAIN;else process.env.NEXT_PUBLIC_ROOT_DOMAIN=previous;}
 });
+
+test('owner walk-in blocks player availability, preserves tenant boundaries and rejects unauthorized actors', async () => {
+  const s = setup();
+  // Anonymous attempt
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'unauthorized');
+
+  // Player attempt
+  s.transport.selectAccount('player-1');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Unrelated owner attempt (owner-2 owns venue-2, trying on venue-1)
+  s.transport.selectAccount('owner-2');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Foreign resource ID (owner-1 owns venue-1, field-3 belongs to venue-2)
+  s.transport.selectAccount('owner-1');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-3', sport: 'volleyball', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Authorized owner creates walk-in at venue-1
+  const key = crypto.randomUUID();
+  const walkIn = await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Walk-in Lions', guestPhone: '+251911000000', idempotencyKey: key });
+  assert.equal(walkIn.source, 'walk_in');
+  assert.equal(walkIn.guestName, 'Walk-in Lions');
+  assert.equal(walkIn.paymentStatus, 'unpaid');
+  assert.equal(walkIn.totalMinor, 500000);
+
+  // Idempotency: exact same call returns same walkIn
+  const replayed = await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Walk-in Lions', guestPhone: '+251911000000', idempotencyKey: key });
+  assert.equal(replayed.id, walkIn.id);
+
+  // Idempotency key reuse with different parameters fails
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 12, endHour: 14, guestName: 'Walk-in Lions', idempotencyKey: key }), 'conflict');
+
+  // Appears in owner-1 schedule
+  const ownerBookings = await s.bookings.list();
+  assert.ok(ownerBookings.some(b => b.id === walkIn.id));
+
+  // Does NOT leak into player-1 bookings
+  s.transport.selectAccount('player-1');
+  const playerBookings = await s.bookings.list();
+  assert.equal(playerBookings.some(b => b.id === walkIn.id), false);
+
+  // Interval disappears from player availability at field-1
+  const slots = await s.bookings.availability('field-1', '2099-01-01');
+  const slot10 = slots.find(sl => sl.startHour === 10);
+  const slot11 = slots.find(sl => sl.startHour === 11);
+  const slot12 = slots.find(sl => sl.startHour === 12);
+  assert.equal(slot10.available, false);
+  assert.equal(slot11.available, false);
+  assert.equal(slot12.available, true);
+
+  // Venue-2 (owner-2) is completely unaffected
+  const v2Slots = await s.bookings.availability('field-3', '2099-01-01');
+  assert.ok(v2Slots.find(sl => sl.startHour === 10).available);
+});
+
+test('multi-sport conflict on shared physical court applies to online and walk-in bookings', async () => {
+  const s = setup();
+  // field-2 is hardwood indoor court supporting basketball and futsal
+  s.transport.selectAccount('owner-1');
+  await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-2', sport: 'basketball', date: '2099-02-01', startHour: 14, endHour: 16, guestName: 'Basketball Team', idempotencyKey: crypto.randomUUID() });
+
+  // Player attempts futsal online on the same physical field during the same interval -> conflict
+  s.transport.selectAccount('player-1');
+  await rejects(s.bookings.create({ fieldId: 'field-2', sport: 'futsal', date: '2099-02-01', startHour: 15, endHour: 17, idempotencyKey: crypto.randomUUID() }), 'conflict');
+
+  // Separate physical court (field-1) is not affected
+  const field1Booking = await s.bookings.create({ fieldId: 'field-1', sport: 'football', date: '2099-02-01', startHour: 14, endHour: 16, idempotencyKey: crypto.randomUUID() });
+  assert.ok(field1Booking.id);
+});
+
+test('safe rescheduling preserves ID, recalculates quote, shifts availability, and enforces permissions and policy', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input({ startHour: 8, endHour: 10 }));
+  assert.equal(booking.totalMinor, 300000);
+
+  // Unrelated owner (owner-2) cannot reschedule venue-1's booking
+  s.transport.selectAccount('owner-2');
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Player-1 reschedules to 3 hours (14 to 17) on the same court
+  s.transport.selectAccount('player-1');
+  const reschedKey = crypto.randomUUID();
+  const moved = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: reschedKey });
+  assert.equal(moved.id, booking.id);
+  assert.equal(moved.startHour, 14);
+  assert.equal(moved.endHour, 17);
+  assert.equal(moved.totalMinor, 450000);
+  assert.deepEqual(moved.originalSchedule, { date: '2099-01-01', startHour: 8, endHour: 10 });
+  assert.ok(moved.rescheduledAt);
+
+  // Idempotency: replay returns exact same outcome
+  const replayed = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: reschedKey });
+  assert.equal(replayed.id, booking.id);
+  assert.equal(replayed.startHour, 14);
+
+  // Old slot (8-10) is released and now available
+  const slots = await s.bookings.availability('field-2', '2099-01-01');
+  assert.equal(slots.find(sl => sl.startHour === 8).available, true);
+  assert.equal(slots.find(sl => sl.startHour === 9).available, true);
+
+  // New slot (14-17) is occupied and unavailable
+  assert.equal(slots.find(sl => sl.startHour === 14).available, false);
+  assert.equal(slots.find(sl => sl.startHour === 15).available, false);
+  assert.equal(slots.find(sl => sl.startHour === 16).available, false);
+
+  // Owner of venue-1 can also reschedule the booking
+  s.transport.selectAccount('owner-1');
+  const ownerMoved = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 18, endHour: 20, idempotencyKey: crypto.randomUUID() });
+  assert.equal(ownerMoved.startHour, 18);
+  assert.equal(ownerMoved.endHour, 20);
+
+  // Ineligible move: conflict with existing closure
+  await s.bookings.close({ fieldId: 'field-2', date: '2099-01-02', startHour: 10, endHour: 12, reason: 'Maintenance' });
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-02', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'conflict');
+
+  // Ineligible move: outside court hours (court closes at 22, open at 6)
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-03', startHour: 21, endHour: 23, idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Ineligible move: past slot
+  await rejects(s.bookings.reschedule(booking.id, { date: '2020-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Ineligible move: cancelled booking cannot be rescheduled
+  await s.bookings.cancel(booking.id);
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-03', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'conflict');
+});
+
+test('calendar navigation and week generation are timezone-safe and Monday-based', () => {
+  // Shifting days forward and backward
+  assert.equal(shiftDays('2026-10-15', 1), '2026-10-16');
+  assert.equal(shiftDays('2026-10-15', -1), '2026-10-14');
+  assert.equal(shiftDays('2026-10-15', 7), '2026-10-22');
+  assert.equal(shiftDays('2026-10-15', -7), '2026-10-08');
+
+  // Month and leap year boundary shifts
+  assert.equal(shiftDays('2026-10-31', 1), '2026-11-01');
+  assert.equal(shiftDays('2026-11-01', -1), '2026-10-31');
+  assert.equal(shiftDays('2024-02-28', 1), '2024-02-29'); // leap year
+  assert.equal(shiftDays('2024-02-29', 1), '2024-03-01');
+
+  // Week calculation strictly starts on Monday and contains 7 sequential days
+  // 2026-10-18 is Sunday; week must start on Monday 2026-10-12, NOT Sunday 2026-10-18
+  const weekFromSunday = getWeekDays('2026-10-18');
+  assert.equal(weekFromSunday.length, 7);
+  assert.equal(weekFromSunday[0], '2026-10-12'); // Monday
+  assert.equal(weekFromSunday[6], '2026-10-18'); // Sunday
+
+  // 2026-10-12 is Monday
+  const weekFromMonday = getWeekDays('2026-10-12');
+  assert.deepEqual(weekFromMonday, weekFromSunday);
+
+  // 2026-10-14 is Wednesday
+  const weekFromWednesday = getWeekDays('2026-10-14');
+  assert.deepEqual(weekFromWednesday, weekFromSunday);
+
+  // Cleared or invalid date inputs must safely fallback to venueToday without crashing
+  assert.equal(isValidDate(''), false);
+  assert.equal(isValidDate(null), false);
+  assert.equal(isValidDate('invalid-date'), false);
+  assert.equal(isValidDate('2026-10-15'), true);
+
+  const safeWeekFromEmpty = getWeekDays('');
+  assert.equal(safeWeekFromEmpty.length, 7);
+  assert.ok(safeWeekFromEmpty.every(d => isValidDate(d)));
+
+  const safeShiftFromEmpty = shiftDays('', 1);
+  assert.ok(isValidDate(safeShiftFromEmpty));
+});
+
+test('player bookings remain visible across multiple venues and future dates without owner venue/day filter restrictions', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+
+  // Create booking at venue-1 on future date
+  const b1 = await s.bookings.create(input({ fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 8, endHour: 10 }));
+  // Create booking at venue-2 on a different future date
+  const b2 = await s.bookings.create(input({ fieldId: 'field-3', sport: 'volleyball', date: '2099-05-15', startHour: 14, endHour: 16 }));
+  // Create booking at venue-1 on a third future date
+  const b3 = await s.bookings.create(input({ fieldId: 'field-2', sport: 'basketball', date: '2099-12-31', startHour: 18, endHour: 20 }));
+
+  const playerBookings = await s.bookings.list();
+  const playerIds = playerBookings.map(b => b.id);
+  assert.ok(playerIds.includes(b1.id));
+  assert.ok(playerIds.includes(b2.id));
+  assert.ok(playerIds.includes(b3.id));
+
+  // Verify the booking-list filter logic using the shared production matchesBookingCriteria function:
+  // For players (!owner), all bookings are visible unless filtered by a specific bookingId query param
+  const visibleToPlayer = playerBookings.filter(b => matchesBookingCriteria(b, {
+    owner: false,
+    effectiveVenueId: 'venue-1',
+    date: '2026-10-15', // today
+    viewMode: 'day',
+    weekDays: getWeekDays('2026-10-15'),
+  }));
+  assert.equal(visibleToPlayer.length, playerBookings.length);
+
+  // In contrast, owner mode filters strictly by venue and date
+  const visibleToOwner = playerBookings.filter(b => matchesBookingCriteria(b, {
+    owner: true,
+    effectiveVenueId: 'venue-1',
+    date: '2099-01-01',
+    viewMode: 'day',
+    weekDays: getWeekDays('2099-01-01'),
+  }));
+  assert.equal(visibleToOwner.some(b => b.id === b1.id), true);
+  assert.equal(visibleToOwner.some(b => b.id === b2.id), false); // venue-2 excluded
+});
+
+test('venue-switch closure targeting prevents cross-venue field closures and enforces tenant bounds', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+
+  // Owner 1 owns venue-1 (field-1, field-2)
+  const venue1Closure = await s.bookings.close({
+    fieldId: 'field-1',
+    date: '2099-06-01',
+    startHour: 10,
+    endHour: 12,
+    reason: 'Pitch renovation',
+  });
+  assert.ok(venue1Closure.id);
+
+  // If a closure targets a court from another venue (e.g. field-3 belonging to venue-2), it is rejected
+  await rejects(
+    s.bookings.close({
+      fieldId: 'field-3',
+      date: '2099-06-01',
+      startHour: 10,
+      endHour: 12,
+      reason: 'Cross-venue closure attempt',
+    }),
+    'forbidden'
+  );
+
+  // Component logic test: exercise production resolveTargetCourt helper directly
+  const venue1Fields = [{ id: 'field-1', venueId: 'venue-1' }, { id: 'field-2', venueId: 'venue-1' }];
+  const venue2Fields = [{ id: 'field-3', venueId: 'venue-2' }, { id: 'field-4', venueId: 'venue-2' }];
+
+  let currentFieldSelection = 'field-1';
+  // Venue switches: fields becomes venue2Fields
+  assert.equal(resolveTargetCourt(venue2Fields, currentFieldSelection), 'field-3');
+  assert.notEqual(resolveTargetCourt(venue2Fields, currentFieldSelection), 'field-1');
+});
+
+test('rescheduling quote computation rejects missing court pricing without fallback rate', () => {
+  // Exercise shared production computeCourtQuote function directly
+  assert.equal(computeCourtQuote(undefined, 10, 12), null);
+  assert.equal(computeCourtQuote({ hourlyRateMinor: undefined }, 10, 12), null);
+  assert.equal(computeCourtQuote({ hourlyRateMinor: 200000 }, 10, 12), 400000);
+});
+
+

@@ -25,10 +25,22 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
   paymentStatus: 'unpaid' | 'processing' | 'paid' | 'failed' | 'refunded';
   createdAt: string;
+  source?: 'online' | 'walk_in';
+  guestName?: string;
+  guestPhone?: string;
+  rescheduledAt?: string;
+  originalSchedule?: { date: string; startHour: number; endHour: number };
 }
 export interface BookingInput {
   fieldId: string; sport: Sport; date: string; startHour: number; endHour: number;
   idempotencyKey: string;
+}
+export interface WalkInBookingInput {
+  venueId: string; fieldId: string; sport: Sport; date: string; startHour: number; endHour: number;
+  guestName: string; guestPhone?: string; idempotencyKey: string;
+}
+export interface RescheduleBookingInput {
+  date: string; startHour: number; endHour: number; idempotencyKey: string;
 }
 export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
