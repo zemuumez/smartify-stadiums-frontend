@@ -9,6 +9,7 @@ export interface Venue {
   id: string; ownerId: string; slug: string; name: string; city: string; address: string;
   description: string; phone: string; image: string; sports: Sport[];
   status: 'draft' | 'pending' | 'active' | 'suspended'; verified: boolean;
+  referee?: boolean; indoor?: boolean; featured?: boolean;
   rating: number | null; reviewCount: number; timezone: string;
 }
 export interface Field {
@@ -30,8 +31,11 @@ export interface BookingInput {
 }
 export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
+export interface SiteHighlight { id: string; title: string; teams: string; duration: string; playbackUrl: string | null }
+export interface SiteEvent { id: string; title: string; sport: Sport; date: string; time: string; spots: number }
 export interface Microsite {
   venueId: string; tagline: string; description: string; primaryColor: string;
+  highlights?: SiteHighlight[]; events?: SiteEvent[];
   published: boolean; updatedAt: string;
 }
 export interface CameraDevice {

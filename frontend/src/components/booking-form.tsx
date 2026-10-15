@@ -22,9 +22,9 @@ export function BookingForm() {
   const { venue, fields } = query.data;
   return <main className="mx-auto max-w-3xl px-4 pb-28 pt-28"><DemoNotice /><Link href={`/s/${venue.slug}`} className="underline">{venue.name}</Link><h1 className="my-6 text-3xl font-bold">{t('booking')}</h1><Reservation key={`${slug}:${params.get('field') || ''}`} fields={fields} /></main>;
 }
-function Reservation({ fields }: { fields: Field[] }) {
+export function Reservation({ fields, initialFieldId, returnTo }: { fields: Field[]; initialFieldId?: string; returnTo?: string }) {
   const params = useSearchParams(); const router = useRouter(); const { t, money } = useLanguage(); const { user, isLoading } = useAuthStore();
-  const [fieldId, setFieldId] = useState(params.get('field') || fields[0]?.id || '');
+  const [fieldId, setFieldId] = useState(initialFieldId || params.get('field') || fields[0]?.id || '');
   const selected = fields.find(field => field.id === fieldId);
   const [sport, setSport] = useState<Sport | ''>(() => { const value = params.get('sport') || ''; return isSport(value) && selected?.sports.includes(value) ? value : selected?.sports[0] || ''; });
   const [date, setDate] = useState(params.get('date') || venueToday()); const [start, setStart] = useState<number | null>(null); const [duration, setDuration] = useState(1);
@@ -34,7 +34,7 @@ function Reservation({ fields }: { fields: Field[] }) {
   const validStarts = (slots.data || []).filter(slot => Array.from({ length: duration }, (_, index) => slot.startHour + index).every(hour => slots.data?.some(s => s.startHour === hour && s.available)));
   const chosenStart = start !== null && validStarts.some(slot => slot.startHour === start) ? start : null;
   if (isLoading) return <Loading />;
-  if (!user) return <div className="panel"><p className="mb-4">{t('accountRequired')}</p><Link className="action" href={`/auth/login?returnTo=${encodeURIComponent(`/bookings/new?${params}`)}`}>{t('signIn')}</Link></div>;
+  if (!user) return <div className="panel"><p className="mb-4">{t('accountRequired')}</p><Link className="action" href={`/auth/login?returnTo=${encodeURIComponent(returnTo || `/bookings/new?${params}`)}`}>{t('signIn')}</Link></div>;
   if (user.role !== 'player') return <p role="alert">{t('forbidden')}</p>;
   if (!selected) return <Link href="/stadiums" className="action">{t('chooseVenue')}</Link>;
   async function submit(event: FormEvent) {

@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { tenantFromHost } from '@/services/tenant-routing';
 import { LanguageProvider, LanguageSwitcher } from '@/i18n/provider';
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
@@ -57,11 +59,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const host = (await headers()).get('host') || '';
+  const tenant = tenantFromHost(host, process.env.NEXT_PUBLIC_ROOT_DOMAIN || '');
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -91,11 +95,11 @@ export default function RootLayout({
       <body className="antialiased overscroll-none" style={{ backgroundColor: '#f4f3ef', color: '#111111' }}>
         <LanguageProvider><ThemeProvider>
           <AuthProvider>
-            <Header />
+            {!tenant && <Header />}
             <div className="min-h-screen pb-20 lg:pb-0">
               {children}
             </div>
-            <MobileNav />
+            {!tenant && <MobileNav />}
           </AuthProvider>
         </ThemeProvider><LanguageSwitcher /></LanguageProvider>
       </body>

@@ -120,3 +120,34 @@ test('unsafe URLs, expired request and missing CSRF are rejected', async () => {
   await rejects(transport.request('/bookings', { method: 'POST' }), 'server');
   await rejects(transport.request('/bookings', { signal: AbortSignal.abort() }), 'cancelled');
 });
+const { tenantFromHost, micrositeUrl } = require('../.test-build/services/tenant-routing');
+test('tenant host resolution validates exact domain boundaries and never picks a default stadium', () => {
+  assert.equal(tenantFromHost('bambis-meda.example.com','example.com'),'bambis-meda');
+  assert.equal(tenantFromHost('unity-complex.localhost:3000','localhost:3000'),'unity-complex');
+  for (const host of ['example.com','www.example.com','api.example.com','bambis.example.com.evil.test','nested.bambis.example.com','bad_slug.example.com']) assert.equal(tenantFromHost(host,'example.com'),null);
+  const previous=process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+  try { process.env.NEXT_PUBLIC_ROOT_DOMAIN='example.com'; assert.equal(micrositeUrl('unity-complex',true),'https://unity-complex.example.com/?book=1'); }
+  finally { if(previous===undefined)delete process.env.NEXT_PUBLIC_ROOT_DOMAIN;else process.env.NEXT_PUBLIC_ROOT_DOMAIN=previous; }
+});
+test('all six venues have distinct sites, fields, owners and tenant-scoped CMS publication', async () => {
+  const s=setup();const venues=await s.venues.list();assert.equal(venues.length,6);
+  assert.equal(new Set(venues.map(v=>v.ownerId)).size,6);
+  for(const venue of venues){const site=await s.content.get(venue.id);assert.equal(site.venueId,venue.id);assert.ok(site.highlights.every(h=>h.id.startsWith(venue.id)));assert.ok((await s.venues.fields(venue.id)).every(f=>f.venueId===venue.id));}
+  s.transport.selectAccount('owner-2');const draft=await s.content.draft('venue-2');
+  draft.highlights[0].title='Unity edited highlight';draft.events[0].title='Unity edited event';await s.content.save(draft);
+  assert.notEqual((await s.content.get('venue-2')).highlights[0].title,'Unity edited highlight');
+  await rejects(s.content.save({...draft,venueId:'venue-1'}),'forbidden');
+  await s.content.publish('venue-2');assert.equal((await s.content.get('venue-2')).events[0].title,'Unity edited event');
+  assert.notEqual((await s.content.get('venue-1')).events[0].title,'Unity edited event');
+  await rejects(s.content.save({...draft,highlights:[{...draft.highlights[0],playbackUrl:'javascript:alert(1)'}]}),'validation');
+});
+test('Next proxy rewrites tenant home and CMS while blocking a different tenant path', () => {
+  const { NextRequest } = require('next/server');const { proxy } = require('../.test-build/proxy');
+  const previous=process.env.NEXT_PUBLIC_ROOT_DOMAIN;process.env.NEXT_PUBLIC_ROOT_DOMAIN='example.com';
+  try {
+    const request=path=>new NextRequest(`https://unity-complex.example.com${path}`,{headers:{host:'unity-complex.example.com'}});
+    assert.equal(new URL(proxy(request('/')).headers.get('x-middleware-rewrite')).pathname,'/s/unity-complex');
+    const cms=new URL(proxy(request('/cms')).headers.get('x-middleware-rewrite'));assert.equal(cms.pathname,'/s/unity-complex/manage');assert.equal(cms.searchParams.get('tab'),'cms');
+    assert.equal(proxy(request('/s/bambis-meda')).status,404);
+  } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_ROOT_DOMAIN;else process.env.NEXT_PUBLIC_ROOT_DOMAIN=previous;}
+});

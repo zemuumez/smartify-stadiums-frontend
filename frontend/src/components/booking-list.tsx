@@ -8,17 +8,17 @@ import { useLanguage } from '@/i18n/provider';
 import { hourLabel, venueToday } from '@/services/sports';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
-export function BookingList({ owner = false, bookingId }: { owner?: boolean; bookingId?: string }) {
-  return <AccessGate roles={owner ? ['owner', 'admin'] : ['player']}><BookingRecords owner={owner} bookingId={bookingId} /></AccessGate>;
+export function BookingList({ owner = false, bookingId, venueId }: { owner?: boolean; bookingId?: string; venueId?: string }) {
+  return <AccessGate roles={owner ? ['owner', 'admin'] : ['player']}><BookingRecords owner={owner} venueId={venueId} bookingId={bookingId} /></AccessGate>;
 }
-function BookingRecords({ owner, bookingId }: { owner: boolean; bookingId?: string }) {
+function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; bookingId?: string; venueId?: string }) {
   const { t, money, date: displayDate } = useLanguage();
   const [date, setDate] = useState(''); const [confirmId, setConfirmId] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>();
   const query = useServiceQuery(useCallback(async signal => {
     const [bookings, venues] = await Promise.all([bookingsService.list(signal), owner ? venuesService.owned(signal) : venuesService.list(signal)]);
-    const fields = (await Promise.all(venues.filter(v => v.status === 'active').map(v => venuesService.fields(v.id, signal)))).flat(); return { bookings, venues, fields };
-  }, [owner]));
-  const records = query.data?.bookings.filter(b => (!bookingId || b.id === bookingId) && (!date || b.date === date)).sort((a, b) => `${a.date}${hourLabel(a.startHour)}`.localeCompare(`${b.date}${hourLabel(b.startHour)}`)) || [];
+    const fields = (await Promise.all(venues.filter(v => v.status === 'active' && (!venueId || v.id === venueId)).map(v => venuesService.fields(v.id, signal)))).flat(); return { bookings, venues, fields };
+  }, [owner, venueId]));
+  const records = query.data?.bookings.filter(b => (!venueId || b.venueId === venueId) && (!bookingId || b.id === bookingId) && (!date || b.date === date)).sort((a, b) => `${a.date}${hourLabel(a.startHour)}`.localeCompare(`${b.date}${hourLabel(b.startHour)}`)) || [];
   return <div className="space-y-6"><DemoNotice /><div className="flex flex-wrap items-center justify-between gap-4"><h1 className="text-3xl font-bold">{t(owner ? 'ownerBookings' : 'bookings')}</h1><Link href="/stadiums" className="action">{t('book')}</Link></div>
     {owner && <label className="form-label max-w-sm">{t('date')}<input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} /></label>}
     {error ? <ServiceErrorMessage error={error} /> : null}

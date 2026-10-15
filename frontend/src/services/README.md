@@ -32,3 +32,15 @@ Bookings send an Idempotency-Key; shared physical courts have one field ID even 
 ## Testing
 
 `npm test` compiles the service/demo layer and runs Node's built-in test runner without adding dependencies. Tests cover mode safety, OTP failure, tenant scope, shared-court overlap, idempotency, quotes, cancellations/closures, draft publication, unset pricing, CSRF and HTTP failure behavior. Passing simulator tests does not prove server security.
+
+## Venue microsites and subdomains
+
+The restored directory, public microsites and management screens share the same venue IDs and service contracts. Demo seeds live in `src/demo`; directory display rates/counts are derived from the operational courts, not separate UI arrays. Six sample venues each have an owner account and separate draft/published content. Demo state v2 intentionally starts fresh so the old two-venue state cannot mask the restored catalog.
+
+- Without domain configuration: `/s/bambis-meda`, `/s/unity-complex`, etc. Management: `/s/{slug}/manage`.
+- With `NEXT_PUBLIC_ROOT_DOMAIN=yourdomain.com` at build/deployment: links use `https://{slug}.yourdomain.com/`. Tenant `/admin` and `/cms` rewrite to that venue's management screen. `/cms` selects the CMS tab.
+- Local subdomains: set `NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000` and restart/rebuild. Chromium resolves `bambis-meda.localhost:3000` locally. No external DNS changes have been made.
+- Deployment requires wildcard DNS and TLS plus a host allowlist at the ingress. A venue slug selects content; it does not authorize an administrator. Backend must derive tenant membership from the authenticated session and validate each field/booking/content resource. Never trust an incoming tenant ID or forwarded host alone.
+- Keep sessions host-only by default; shared cross-subdomain login must be designed explicitly. Demo sessionStorage is origin/tab-local: reservations made on one demo subdomain are not shared across origins. Real backend storage is required for shared production data. Same-origin `/s/` routes support the shared local demo workflow now.
+- CMS `Microsite` includes `highlights` and `events`. Save/publish stays scoped to `/owner/stadiums/{id}/microsite`. Draft changes remain private until publication. Only public HTTPS media should be supplied; private replay authorization and signed URLs are future backend work.
+- Highlights without media show an explicit preview state. Event registration currently contacts the venue; there is no simulated registration/payment success. Prices are illustrative, and commission remains unresolved.

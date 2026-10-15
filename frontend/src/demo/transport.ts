@@ -5,7 +5,7 @@ import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fix
 import type { FieldInput } from '../services/fields.service';
 
 export interface DemoStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
-const DATA_KEY = 'etsf-demo-v1';
+const DATA_KEY = 'etsf-demo-v2';
 const SESSION_KEY = 'etsf-demo-session-v1';
 const overlaps = (start: number, end: number, otherStart: number, otherEnd: number) => start < otherEnd && end > otherStart;
 const sports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
@@ -147,7 +147,9 @@ export function createDemoTransport(storage?: DemoStorage) {
           if (method === 'PATCH') {
             const input = options.body as Microsite;
             if (!/^#[\da-f]{6}$/i.test(input.primaryColor) || !input.tagline.trim() || input.tagline.length > 120 || input.description.length > 5000) throw new ServiceError('validation', 422);
-            Object.assign(draft, { tagline: input.tagline, description: input.description, primaryColor: input.primaryColor, updatedAt: new Date().toISOString() }); persist(); return draft;
+            if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
+            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !/^https:\/\//.test(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0)) throw new ServiceError('validation', 422);
+            Object.assign(draft, { highlights: structuredClone(input.highlights || []), events: structuredClone(input.events || []), tagline: input.tagline, description: input.description, primaryColor: input.primaryColor, updatedAt: new Date().toISOString() }); persist(); return draft;
           }
           if (parts[4] === 'publish' && method === 'POST') {
             if (venue.status !== 'active') throw new ServiceError('conflict', 409);
