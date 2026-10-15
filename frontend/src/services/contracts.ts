@@ -48,6 +48,7 @@ export interface SiteHighlight { id: string; title: string; teams: string; durat
 export interface SiteEvent { id: string; title: string; sport: Sport; date: string; time: string; spots: number }
 export interface Microsite {
   venueId: string; tagline: string; description: string; primaryColor: string;
+  heroImage?: string | null; announcement?: string | null;
   highlights?: SiteHighlight[]; events?: SiteEvent[];
   published: boolean; updatedAt: string;
 }

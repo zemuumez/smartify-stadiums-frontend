@@ -237,13 +237,40 @@ export function createDemoTransport(storage?: DemoStorage) {
           if (method === 'PATCH') {
             const input = options.body as Microsite;
             if (!/^#[\da-f]{6}$/i.test(input.primaryColor) || !input.tagline.trim() || input.tagline.length > 120 || input.description.length > 5000) throw new ServiceError('validation', 422);
+            if (input.heroImage && !/^(https?:\/\/|\/)/.test(input.heroImage)) throw new ServiceError('validation', 422);
+            if (input.announcement && input.announcement.length > 200) throw new ServiceError('validation', 422);
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
             if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !/^https:\/\//.test(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0)) throw new ServiceError('validation', 422);
-            Object.assign(draft, { highlights: structuredClone(input.highlights || []), events: structuredClone(input.events || []), tagline: input.tagline, description: input.description, primaryColor: input.primaryColor, updatedAt: new Date().toISOString() }); persist(); return draft;
+            Object.assign(draft, {
+              highlights: structuredClone(input.highlights || []),
+              events: structuredClone(input.events || []),
+              tagline: input.tagline.trim(),
+              description: input.description.trim(),
+              primaryColor: input.primaryColor,
+              heroImage: input.heroImage ? input.heroImage.trim() : null,
+              announcement: input.announcement ? input.announcement.trim() : null,
+              updatedAt: new Date().toISOString()
+            });
+            persist();
+            return draft;
           }
           if (parts[4] === 'publish' && method === 'POST') {
             if (venue.status !== 'active') throw new ServiceError('conflict', 409);
-            const site = { ...draft, published: true }; state.sites = [...state.sites.filter(item => item.venueId !== venue.id), site]; audit('microsite.published', venue.id); persist(); return site;
+            draft.published = true;
+            draft.updatedAt = new Date().toISOString();
+            const site = structuredClone(draft);
+            state.sites = [...state.sites.filter(item => item.venueId !== venue.id), site];
+            audit('microsite.published', venue.id);
+            persist();
+            return site;
+          }
+          if (parts[4] === 'unpublish' && method === 'POST') {
+            draft.published = false;
+            draft.updatedAt = new Date().toISOString();
+            state.sites = state.sites.filter(item => item.venueId !== venue.id);
+            audit('microsite.unpublished', venue.id);
+            persist();
+            return draft;
           }
         }
       }

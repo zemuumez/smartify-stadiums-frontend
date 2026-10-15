@@ -412,4 +412,113 @@ test('rescheduling quote computation rejects missing court pricing without fallb
   assert.equal(computeCourtQuote({ hourlyRateMinor: 200000 }, 10, 12), 400000);
 });
 
+test('unpublish removes public microsite while preserving draft, venue active status, courts, and bookings', async () => {
+  const s = setup();
+  // 1. Setup an existing booking on venue-1
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input());
+  assert.equal(booking.venueId, 'venue-1');
+
+  // 2. Owner-1 verifies initial published state
+  s.transport.selectAccount('owner-1');
+  const initialDraft = await s.content.draft('venue-1');
+  assert.equal(initialDraft.published, true);
+  const initialPublic = await s.content.get('venue-1');
+  assert.equal(initialPublic.published, true);
+
+  // 3. Owner-1 unpublishes the venue microsite
+  const unpublishedDraft = await s.content.unpublish('venue-1');
+  assert.equal(unpublishedDraft.published, false);
+
+  // 4. Public access now returns not_found
+  await rejects(s.content.get('venue-1'), 'not_found');
+
+  // 5. Operational data is untouched: venue is still active, courts exist, and booking is intact
+  const venue = await s.venues.get('venue-1');
+  assert.equal(venue.status, 'active');
+  const courts = await s.venues.fields('venue-1');
+  assert.ok(courts.length > 0);
+  s.transport.selectAccount('player-1');
+  const playerBookings = await s.bookings.list();
+  assert.ok(playerBookings.some(b => b.id === booking.id && b.status === 'confirmed'));
+
+  // 6. Owner-1 can view draft and republish at any time
+  s.transport.selectAccount('owner-1');
+  const reloadedDraft = await s.content.draft('venue-1');
+  assert.equal(reloadedDraft.published, false);
+  const republishedSite = await s.content.publish('venue-1');
+  assert.equal(republishedSite.published, true);
+  assert.equal((await s.content.get('venue-1')).published, true);
+});
+
+test('unauthorized and cross-tenant access to draft, preview, publish, and unpublish is strictly denied', async () => {
+  const s = setup();
+  // 1. Anonymous visitor cannot access owner draft or publish/unpublish
+  await rejects(s.content.draft('venue-1'), 'unauthorized');
+  await rejects(s.content.publish('venue-1'), 'unauthorized');
+  await rejects(s.content.unpublish('venue-1'), 'unauthorized');
+
+  // 2. Player-1 cannot access owner draft or publish/unpublish
+  s.transport.selectAccount('player-1');
+  await rejects(s.content.draft('venue-1'), 'forbidden');
+  await rejects(s.content.publish('venue-1'), 'forbidden');
+  await rejects(s.content.unpublish('venue-1'), 'forbidden');
+
+  // 3. Owner-2 (Unity Sports Complex) cannot access or modify Venue-1 (Bambis Meda)
+  s.transport.selectAccount('owner-2');
+  await rejects(s.content.draft('venue-1'), 'forbidden');
+  await rejects(s.content.save({ venueId: 'venue-1', tagline: 'Hacked', description: 'Desc', primaryColor: '#123456', published: false, updatedAt: '' }), 'forbidden');
+  await rejects(s.content.publish('venue-1'), 'forbidden');
+  await rejects(s.content.unpublish('venue-1'), 'forbidden');
+
+  // Owner-2 CAN access and manage their own venue (venue-2)
+  const venue2Draft = await s.content.draft('venue-2');
+  assert.equal(venue2Draft.venueId, 'venue-2');
+});
+
+test('microsite validation rejects invalid colors, hero URLs, and lengths while keeping draft intact', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+  const originalTagline = draft.tagline;
+
+  // Invalid hex color
+  await rejects(s.content.save({ ...draft, primaryColor: 'invalid-color' }), 'validation');
+  // Invalid hero image (e.g. ftp protocol)
+  await rejects(s.content.save({ ...draft, heroImage: 'ftp://bad-host.com/img.jpg' }), 'validation');
+  // Insecure http video URL
+  await rejects(s.content.save({ ...draft, highlights: [{ id: 'h1', title: 'Test', teams: '', duration: '1:00', playbackUrl: 'http://insecure.com/video.mp4' }] }), 'validation');
+  // Excessively long announcement (> 200 chars)
+  await rejects(s.content.save({ ...draft, announcement: 'A'.repeat(250) }), 'validation');
+
+  // Draft remains uncorrupted
+  const currentDraft = await s.content.draft('venue-1');
+  assert.equal(currentDraft.tagline, originalTagline);
+});
+
+test('editorial identity fields update in draft without modifying court rates or inventory', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const initialCourts = await s.venues.fields('venue-1');
+  const initialRates = initialCourts.map(c => c.hourlyRateMinor);
+
+  const draft = await s.content.draft('venue-1');
+  await s.content.save({
+    ...draft,
+    tagline: 'Updated Stadium Tagline',
+    heroImage: '/custom-hero.jpg',
+    announcement: 'Special weekend tournament scheduled!',
+  });
+
+  const updatedDraft = await s.content.draft('venue-1');
+  assert.equal(updatedDraft.tagline, 'Updated Stadium Tagline');
+  assert.equal(updatedDraft.heroImage, '/custom-hero.jpg');
+  assert.equal(updatedDraft.announcement, 'Special weekend tournament scheduled!');
+
+  // Operational court rates and counts remain exactly the same
+  const courtsAfter = await s.venues.fields('venue-1');
+  assert.equal(courtsAfter.length, initialCourts.length);
+  assert.deepEqual(courtsAfter.map(c => c.hourlyRateMinor), initialRates);
+});
+
 

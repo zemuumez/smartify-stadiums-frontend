@@ -10,15 +10,54 @@ import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import { DemoMarker, Loading, ServiceErrorMessage } from './service-state';
 import { Reservation } from './booking-form';
-import type { Field, SiteHighlight } from '@/services/contracts';
-export function VenueSite({ slug }: { slug: string }) {
+import type { Field, Microsite, SiteHighlight } from '@/services/contracts';
+export function VenueSite({
+  slug,
+  previewSite,
+  isDraftPreview,
+  onExitPreview,
+}: {
+  slug: string;
+  previewSite?: Microsite;
+  isDraftPreview?: boolean;
+  onExitPreview?: () => void;
+}) {
   const copy = useOriginalCopy();
   const { t, date, locale } = useLanguage(); const params = useSearchParams();
   const [selected, setSelected] = useState<Field | null>(null); const [dismissed, setDismissed] = useState(false);
   const [preview, setPreview] = useState<SiteHighlight | null>(null);
-  const query = useServiceQuery(useCallback(async signal => { const venue = await venuesService.get(slug, signal); const [fields, site] = await Promise.all([venuesService.fields(venue.id, signal), contentService.get(venue.id, signal)]); return { venue, fields, site }; }, [slug]));
+  const query = useServiceQuery(useCallback(async signal => {
+    const venue = await venuesService.get(slug, signal);
+    const fields = await venuesService.fields(venue.id, signal);
+    const site = previewSite || await contentService.get(venue.id, signal);
+    return { venue, fields, site };
+  }, [slug, previewSite]));
   if (query.loading) return <Loading/>;
-  if (query.error || !query.data) return <div className="p-8"><ServiceErrorMessage error={query.error} retry={query.reload}/><Link href="/stadiums" className="action mt-4">{t('venues')}</Link></div>;
+  if (query.error || !query.data) {
+    const isNotFound = (query.error as { code?: string })?.code === 'not_found' || (query.error as { status?: number })?.status === 404;
+    if (isNotFound) {
+      return (
+        <main className="bg-[#f4f3ef] min-h-[70vh] flex items-center justify-center p-6 text-[#111]">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-sm border border-black/5 space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[#f0faf4] text-[#2d6a4f] flex items-center justify-center">
+              <Building2 size={24} />
+            </div>
+            <h1 className="text-2xl font-black">{t('unpublishedNotice')}</h1>
+            <p className="text-sm text-slate-600">{copy("Pitches & Courts")}</p>
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+              <Link href="/stadiums" className="action">
+                {t('browseDirectory')}
+              </Link>
+              <Link href={`/s/${slug}/manage`} className="filter-pill text-center">
+                {t('manageThisVenue')}
+              </Link>
+            </div>
+          </div>
+        </main>
+      );
+    }
+    return <div className="p-8"><ServiceErrorMessage error={query.error} retry={query.reload}/><Link href="/stadiums" className="action mt-4">{t('venues')}</Link></div>;
+  }
   const { venue, fields: rawFields, site } = query.data;
   const fields = rawFields.map(f => ({ ...f, sport: f.sports.map(s => t(s)).join(' / '), price: (f.hourlyRateMinor / 100).toLocaleString(locale === 'am' ? 'am-ET' : 'en-ET') }));
   const matchHighlights = (site.highlights || []).map(h => ({...h, dur: h.duration, views: h.views || 0}));
@@ -27,13 +66,40 @@ export function VenueSite({ slug }: { slug: string }) {
   const handleOpenBooking = (field?: Field) => { if(field) setSelected(field); };
   const bookingField = selected || (!dismissed && params.get('book') === '1' ? rawFields.find(f=>f.id===params.get('field')) || rawFields[0] : null);
   return <main className="bg-[#f4f3ef] text-[#111]">
+  {isDraftPreview && (
+    <div className="bg-amber-900 text-amber-100 px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-0 z-50">
+      <div className="flex items-center gap-2">
+        <span className="font-bold uppercase tracking-wider bg-amber-800 text-amber-200 px-2 py-0.5 rounded text-[10px]">
+          {t('previewMode')}
+        </span>
+        <span>{t('previewDraftHelp')}</span>
+        <span className="ml-2 font-medium bg-black/20 px-2 py-0.5 rounded">
+          {site.published ? t('statusPublished') : t('statusUnpublished')}
+        </span>
+      </div>
+      {onExitPreview && (
+        <button
+          type="button"
+          onClick={onExitPreview}
+          className="bg-white text-amber-950 font-bold px-3 py-1 rounded-full hover:bg-amber-100 transition-colors"
+        >
+          {t('exitPreview')}
+        </button>
+      )}
+    </div>
+  )}
+  {site.announcement && (
+    <div className="bg-[#2d6a4f] text-white px-4 py-2 text-center text-xs font-semibold">
+      📣 {site.announcement}
+    </div>
+  )}
   <DemoMarker/>
     <header className="site-header"><div className="site-wrap flex flex-wrap justify-between items-center gap-4 py-4"><Link className="flex items-center gap-3" href={`/s/${slug}`}><span className="site-logo"><Building2 size={23}/></span><span><strong className="block">{venue.name} {venue.verified && <span className="ml-1 rounded-full bg-[#f0faf4] px-2 py-0.5 align-middle text-[9px] uppercase text-[#2d6a4f]">{copy("Verified")}</span>}</strong><small className="text-slate-500">{t('poweredBy')}</small></span></Link><nav className="flex flex-wrap gap-5 text-sm"><a href="#fields">{copy("Pitches & Courts")}</a><a href="#highlights">{t('matchReplays')}</a><a href="#contact">{t('locationContact')}</a></nav><div className="flex gap-2"><Link className="filter-pill" href={`/auth/login?returnTo=${encodeURIComponent(`/s/${slug}?book=1`)}`}>{t('signIn')}</Link><button className="site-button" disabled={!rawFields.length} onClick={()=>setSelected(rawFields[0])}><Calendar size={14}/>{t('bookPitch')}</button></div></div></header>
       {/* ── HERO SECTION ── */}
       <section className="relative min-h-[75vh] flex items-center overflow-hidden">
         <div className="absolute inset-0">
           <Image
-            src={venue.image}
+            src={site.heroImage || venue.image}
             alt={venue.name}
             fill
             className="object-cover object-center"
