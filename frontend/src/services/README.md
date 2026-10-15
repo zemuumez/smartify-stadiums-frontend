@@ -4,7 +4,7 @@ Components import named domain services from `@/services`. Each domain owns its 
 
 - `authService`: OTP, login, registration, current account, logout.
 - `venuesService`: public discovery, detail, fields, owned venues, registration.
-- `bookingsService`: availability, reservations, cancellation, closures.
+- `bookingsService`: availability, online reservations, owner walk-ins, safe rescheduling, cancellation, closures.
 - `contentService`: public microsites, private drafts, save and publish.
 - `teamsService`: directory, detail, creation.
 - `mediaService`: owner cameras and entitled replay lists.
@@ -27,7 +27,19 @@ Live auth is a proposed secure-cookie session contract: Secure, HttpOnly session
 
 The existing legacy JWT backend assumptions are not claimed compatible with this contract. Backend design must reconcile them intentionally. Requests are not silently downgraded to mock data on failure.
 
-Bookings send an Idempotency-Key; shared physical courts have one field ID even across different sports. The simulator supports future unpaid manual-settlement bookings and future unpaid cancellation only; these are explicitly provisional demo policies. Commission and subscription prices remain null. Database constraints and transactions must enforce real concurrency independently of this simulator.
+Bookings send an Idempotency-Key; shared physical courts have one field ID even across different sports.
+The simulator supports future unpaid manual-settlement bookings, future unpaid cancellation, owner walk-in reservations, and safe rescheduling. These are explicitly provisional demo policies; broader commercial policy, paid-status refunds, penalties, and settlement approval remain open. Commission and subscription prices remain null.
+
+### Booking operations and permissions
+- `POST /bookings`: authorized player creates online reservation. Input: `fieldId`, `sport`, `date`, `startHour`, `endHour`, `idempotencyKey`. Output: `Booking` with `source: 'online'`.
+- `POST /owner/walk-ins`: authorized owner/admin creates walk-in reservation for an owned venue court. Input: `venueId`, `fieldId`, `sport`, `date`, `startHour`, `endHour`, `guestName`, optional `guestPhone`, `idempotencyKey`. Creates an unpaid reservation marked `source: 'walk_in'` and `playerId: ''`. Walk-ins occupy the same physical court inventory as online bookings and appear in the venue owner's schedule; they do not leak into player histories or create pseudo-accounts.
+- `POST /bookings/:id/reschedule`: authorized actor moves a future, confirmed, unpaid booking to a new eligible interval on the same physical court.
+  - Allowed actors: the player who owns the booking, the owner of the venue where the booking takes place, or platform admin. Unauthorized actors receive 403 `forbidden`.
+  - Allowed states: `status === 'confirmed'` and `paymentStatus === 'unpaid'` only. Past bookings, cancelled bookings, or paid bookings receive 409 `conflict`.
+  - Eligibility checks: the target slot must be strictly in the future, within court open/close hours, on an active court supporting the booking's sport, without conflicting closures or overlapping reservations (excluding the booking itself from its own slot check).
+  - Atomic transition: a failed move leaves the original reservation and occupancy untouched; a successful move releases the old interval and occupies the new interval in a single transition, recalculating the quote according to duration and recording original schedule history (`originalSchedule`). Database transactions and row-level locking are required in production.
+  - Idempotency: replaying an identical request returns the same result; reusing the key with different parameters returns 409 `conflict`. Actor authorization is checked before idempotency reuse.
+- `POST /bookings/:id/cancel`: player or venue owner cancels a future unpaid booking, releasing the slot.
 
 ## Testing
 

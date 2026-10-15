@@ -151,3 +151,131 @@ test('Next proxy rewrites tenant home and CMS while blocking a different tenant 
     assert.equal(proxy(request('/s/bambis-meda')).status,404);
   } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_ROOT_DOMAIN;else process.env.NEXT_PUBLIC_ROOT_DOMAIN=previous;}
 });
+
+test('owner walk-in blocks player availability, preserves tenant boundaries and rejects unauthorized actors', async () => {
+  const s = setup();
+  // Anonymous attempt
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'unauthorized');
+
+  // Player attempt
+  s.transport.selectAccount('player-1');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Unrelated owner attempt (owner-2 owns venue-2, trying on venue-1)
+  s.transport.selectAccount('owner-2');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Foreign resource ID (owner-1 owns venue-1, field-3 belongs to venue-2)
+  s.transport.selectAccount('owner-1');
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-3', sport: 'volleyball', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Guest Team', idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Authorized owner creates walk-in at venue-1
+  const key = crypto.randomUUID();
+  const walkIn = await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Walk-in Lions', guestPhone: '+251911000000', idempotencyKey: key });
+  assert.equal(walkIn.source, 'walk_in');
+  assert.equal(walkIn.guestName, 'Walk-in Lions');
+  assert.equal(walkIn.paymentStatus, 'unpaid');
+  assert.equal(walkIn.totalMinor, 500000);
+
+  // Idempotency: exact same call returns same walkIn
+  const replayed = await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 10, endHour: 12, guestName: 'Walk-in Lions', guestPhone: '+251911000000', idempotencyKey: key });
+  assert.equal(replayed.id, walkIn.id);
+
+  // Idempotency key reuse with different parameters fails
+  await rejects(s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-1', sport: 'football', date: '2099-01-01', startHour: 12, endHour: 14, guestName: 'Walk-in Lions', idempotencyKey: key }), 'conflict');
+
+  // Appears in owner-1 schedule
+  const ownerBookings = await s.bookings.list();
+  assert.ok(ownerBookings.some(b => b.id === walkIn.id));
+
+  // Does NOT leak into player-1 bookings
+  s.transport.selectAccount('player-1');
+  const playerBookings = await s.bookings.list();
+  assert.equal(playerBookings.some(b => b.id === walkIn.id), false);
+
+  // Interval disappears from player availability at field-1
+  const slots = await s.bookings.availability('field-1', '2099-01-01');
+  const slot10 = slots.find(sl => sl.startHour === 10);
+  const slot11 = slots.find(sl => sl.startHour === 11);
+  const slot12 = slots.find(sl => sl.startHour === 12);
+  assert.equal(slot10.available, false);
+  assert.equal(slot11.available, false);
+  assert.equal(slot12.available, true);
+
+  // Venue-2 (owner-2) is completely unaffected
+  const v2Slots = await s.bookings.availability('field-3', '2099-01-01');
+  assert.ok(v2Slots.find(sl => sl.startHour === 10).available);
+});
+
+test('multi-sport conflict on shared physical court applies to online and walk-in bookings', async () => {
+  const s = setup();
+  // field-2 is hardwood indoor court supporting basketball and futsal
+  s.transport.selectAccount('owner-1');
+  await s.bookings.createWalkIn({ venueId: 'venue-1', fieldId: 'field-2', sport: 'basketball', date: '2099-02-01', startHour: 14, endHour: 16, guestName: 'Basketball Team', idempotencyKey: crypto.randomUUID() });
+
+  // Player attempts futsal online on the same physical field during the same interval -> conflict
+  s.transport.selectAccount('player-1');
+  await rejects(s.bookings.create({ fieldId: 'field-2', sport: 'futsal', date: '2099-02-01', startHour: 15, endHour: 17, idempotencyKey: crypto.randomUUID() }), 'conflict');
+
+  // Separate physical court (field-1) is not affected
+  const field1Booking = await s.bookings.create({ fieldId: 'field-1', sport: 'football', date: '2099-02-01', startHour: 14, endHour: 16, idempotencyKey: crypto.randomUUID() });
+  assert.ok(field1Booking.id);
+});
+
+test('safe rescheduling preserves ID, recalculates quote, shifts availability, and enforces permissions and policy', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input({ startHour: 8, endHour: 10 }));
+  assert.equal(booking.totalMinor, 300000);
+
+  // Unrelated owner (owner-2) cannot reschedule venue-1's booking
+  s.transport.selectAccount('owner-2');
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: crypto.randomUUID() }), 'forbidden');
+
+  // Player-1 reschedules to 3 hours (14 to 17) on the same court
+  s.transport.selectAccount('player-1');
+  const reschedKey = crypto.randomUUID();
+  const moved = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: reschedKey });
+  assert.equal(moved.id, booking.id);
+  assert.equal(moved.startHour, 14);
+  assert.equal(moved.endHour, 17);
+  assert.equal(moved.totalMinor, 450000);
+  assert.deepEqual(moved.originalSchedule, { date: '2099-01-01', startHour: 8, endHour: 10 });
+  assert.ok(moved.rescheduledAt);
+
+  // Idempotency: replay returns exact same outcome
+  const replayed = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 14, endHour: 17, idempotencyKey: reschedKey });
+  assert.equal(replayed.id, booking.id);
+  assert.equal(replayed.startHour, 14);
+
+  // Old slot (8-10) is released and now available
+  const slots = await s.bookings.availability('field-2', '2099-01-01');
+  assert.equal(slots.find(sl => sl.startHour === 8).available, true);
+  assert.equal(slots.find(sl => sl.startHour === 9).available, true);
+
+  // New slot (14-17) is occupied and unavailable
+  assert.equal(slots.find(sl => sl.startHour === 14).available, false);
+  assert.equal(slots.find(sl => sl.startHour === 15).available, false);
+  assert.equal(slots.find(sl => sl.startHour === 16).available, false);
+
+  // Owner of venue-1 can also reschedule the booking
+  s.transport.selectAccount('owner-1');
+  const ownerMoved = await s.bookings.reschedule(booking.id, { date: '2099-01-01', startHour: 18, endHour: 20, idempotencyKey: crypto.randomUUID() });
+  assert.equal(ownerMoved.startHour, 18);
+  assert.equal(ownerMoved.endHour, 20);
+
+  // Ineligible move: conflict with existing closure
+  await s.bookings.close({ fieldId: 'field-2', date: '2099-01-02', startHour: 10, endHour: 12, reason: 'Maintenance' });
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-02', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'conflict');
+
+  // Ineligible move: outside court hours (court closes at 22, open at 6)
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-03', startHour: 21, endHour: 23, idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Ineligible move: past slot
+  await rejects(s.bookings.reschedule(booking.id, { date: '2020-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'validation');
+
+  // Ineligible move: cancelled booking cannot be rescheduled
+  await s.bookings.cancel(booking.id);
+  await rejects(s.bookings.reschedule(booking.id, { date: '2099-01-03', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID() }), 'conflict');
+});
+
