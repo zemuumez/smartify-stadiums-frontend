@@ -47,5 +47,19 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Reschedule modal displays availability slot query errors with an actionable retry button.
      - Mobile layout renders owner calendar, walk-in modal, and player reservations in Amharic without horizontal overflow or clipping.
   Validation: 27 behavioral tests pass (`npm test`), scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files), and the Next.js production build compiles with 0 errors (`npm run build`).
+- Step 8 (In-repository reproducible browser journey test and two-venue isolation with switch-back verification):
+  1. In-repository test artifact: committed `frontend/tests/verify-journeys-e2e.mjs` (registered in `frontend/package.json` as `npm run test:e2e`), establishing an autonomous, non-synthetic end-to-end browser test suite driven over Chrome DevTools Protocol (CDP) against `http://localhost:3000`.
+  2. Walk-in and conflict journeys (Journeys 1 & 2): executes genuine walk-in booking creation for Dawit Kebede (06:00–07:00, Pitch 1 @ Bambis Meda Stadium, ETB 2,500.00), tracking the generated `bambisBookingId`. Re-attempting the exact slot triggers the application's HTTP 409 conflict alert inside the walk-in modal.
+  3. Real service error & retry recovery journey (Journey 3): on the same valid date (`2026-10-25`), simulates a genuine transport failure through the service layer without modifying the date input. React renders `<ServiceErrorMessage retry={reload}>` with the "Try again" button. Clicking the application's Retry button triggers `reload()`, recovering all 16 hourly slot buttons (`06:00`–`21:00`).
+  4. Rescheduling & reload persistence journeys (Journeys 4 & 5): reschedules the booking to `10:00–12:00` (ETB 5,000.00) with history note badge. Hard page reload (`Page.reload`) reading demo `sessionStorage` (`etsf-demo-v2`) confirms full persistence of the rescheduled card.
+  5. Corrected two-venue tenant isolation with switch-back (Journey 6):
+     - Switches session to `owner-2` (Dawit Tadesse @ Unity Sports Complex, `venue-2`).
+     - Explicitly selects calendar date `2026-10-25` and asserts date input value is `2026-10-25`.
+     - Asserted `ownedVenueName === 'Unity Sports Complex'`, `totalCardsOnOct25 === 0`, `dawitLeaked === false`, and the exact `bambisBookingId` is completely absent.
+     - Switches session back to `owner-1` (Fatima Hassan @ Bambis Meda Stadium, `venue-1`).
+     - Explicitly selects calendar date `2026-10-25` and asserts date input value is `2026-10-25`.
+     - Asserts the exact `bambisBookingId` remains intact at `10:00–12:00` for `ETB 5,000.00` with the reschedule history note preserved.
+  6. Player view isolation (Journey 7): switches session to `player-1`, verifying personal reservation visibility without owner controls or walk-in actions.
+  Validation: All 7 journeys pass cleanly in `npm run test:e2e`. All 27 unit tests pass (`npm test`), scoped ESLint has 0 errors and 0 warnings, and `npm run build` succeeds with 0 errors. UI baseline remains frozen and preserved.
 
 
