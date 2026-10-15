@@ -9,3 +9,4 @@
 - Test meaningful behavior for each implementation step, run applicable lint/type/build checks, then commit that step with a clear message. Do not commit unrelated pre-existing changes or claim untested functionality is complete.
 - Track completed work and remaining migration in IMPLEMENTATION_STATUS.md. Do not present a partially migrated frontend as fully integrated or production-secure.
 - Preserve the founder-approved venue directory and stadium microsite designs. Service migrations must retain rich filters, venue perks, individual venue destinations, operational court cards, highlights, events and the booking modal; do not replace them with simplified generic pages.
+- The initial UI is the frozen visual baseline for now. Match the original screenshots and pre-migration styling; do not redesign pages while implementing services or tenant behavior unless the founder explicitly requests a visual change.
