@@ -46,7 +46,7 @@ export function VenueSite({
       eventDetails = resolveVenueSiteEvents(venue, site, { liveEvents });
     }
     return { venue, fields, site, eventDetails };
-  }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]));
+  }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]), ['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id]);
   if (query.loading && !query.data) return <Loading/>;
   if (query.error || !query.data) {
     const isNotFound = (query.error as { code?: string })?.code === 'not_found' || (query.error as { status?: number })?.status === 404;
@@ -523,7 +523,8 @@ function EventRegistrationDialog({
         captainTeams = allTeams.filter(team => team.captainId === u.id && team.sport === event.sport);
       }
       return { currentUser: u, teams: captainTeams };
-    }, [event.format, event.sport])
+    }, [event.format, event.sport]),
+    ['event-registration-dialog', event.id, event.format, event.sport]
   );
 
   useEffect(() => {

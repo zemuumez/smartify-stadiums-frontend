@@ -252,3 +252,22 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Next.js production build compiles with 0 errors (npm run build).
      - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
      - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.
+
+- Step 19 (Milestone M4 Part 1 Step 5: Shared Query-Hook Resource Identity and Lifecycle Correction):
+  1. Shared query-hook resource identity correction:
+     - In frontend/src/lib/use-service-query.ts, updated useServiceQuery to accept an optional explicit query key (supporting useServiceQuery(loader, key) and useServiceQuery(key, loader)).
+     - Derived effectiveData and effectiveLoading by checking areQueryKeysEqual(state.key, serializedKey).
+     - Same-resource refreshes (reload() or identical query key) preserve previous data during loading, keeping mounted UI elements (such as confirmation dialogs and active forms) mounted.
+     - Resource identity changes (switching team, venue, or preview context) immediately reset effectiveData to undefined during render, preventing any flash of previous actionable data while the new resource loads.
+     - Passed explicit query keys in frontend/src/components/team-panels.tsx (id) and frontend/src/components/venue-site.tsx (['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id] and ['event-registration-dialog', event.id, event.format, event.sport]).
+  2. Hook and component lifecycle tests:
+     - Added comprehensive hook lifecycle unit test in frontend/tests/teams-events.test.cjs exercising:
+       a. Same-resource reload preserving data and keeping confirmation dialogs mounted without skeleton unmounts.
+       b. Switching resources with delayed backend responses immediately resetting data to undefined and rendering loading skeletons, proving previous actionable data is never accessible or displayed during the delay.
+     - Added browser E2E verification in frontend/tests/verify-teams-events-e2e.mjs (Step 1e) validating that switching team routes immediately clears previous team controls and never displays stale actions.
+  3. Verification results:
+     - 61/61 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.

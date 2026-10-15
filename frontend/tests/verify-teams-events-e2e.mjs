@@ -315,6 +315,37 @@ export async function runTeamsEventsE2ETest() {
       throw new Error(`Journey 1: Failed team query must render honest error state with retry button`);
     }
 
+    // Step 1e: Switching resources immediately hides previous resource's actionable data
+    await client.send('Page.navigate', { url: 'http://localhost:3000/teams/team-1' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const team1DataCheck = await client.evaluate(`
+      (() => {
+        const text = document.body.innerText;
+        return { hasBoleLions: text.includes('Bole Lions FC') };
+      })()
+    `);
+    if (!team1DataCheck.hasBoleLions) {
+      throw new Error('Journey 1: Expected Bole Lions FC on team-1');
+    }
+
+    // Navigate to team-2 and immediately sample to verify stale team-1 actionable controls are not displayed
+    await client.send('Page.navigate', { url: 'http://localhost:3000/teams/team-2' });
+    const immediateSwitchCheck = await client.evaluate(`
+      (() => {
+        const text = document.body.innerText;
+        // Old resource (Bole Lions FC) must NOT be displayed while team-2 is loading
+        const showsOldResource = text.includes('Bole Lions FC');
+        return { showsOldResource };
+      })()
+    `);
+    console.log('  Resource switch immediately hides previous resource:', immediateSwitchCheck);
+    if (immediateSwitchCheck.showsOldResource) {
+      throw new Error('Journey 1: Previous resource data must not be displayed when switching resources');
+    }
+    await waitForLoading(client);
+
     // -------------------------------------------------------------------------
     // JOURNEY 2: Captain Team Booking and Privacy Masking
     // -------------------------------------------------------------------------

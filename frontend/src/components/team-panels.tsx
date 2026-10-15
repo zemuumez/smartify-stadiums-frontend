@@ -96,7 +96,8 @@ export function TeamDetail({ id }: { id: string }) {
   const query = useServiceQuery(
     useCallback(async (signal: AbortSignal) => {
       return fetchTeamDetailData(id, { auth: authService, teams: teamsService }, signal);
-    }, [id])
+    }, [id]),
+    id
   );
 
   const [actionBusy, setActionBusy] = useState(false);

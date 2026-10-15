@@ -4,6 +4,7 @@ const { createDemoTransport } = require('../.test-build/demo/transport');
 const { createServices } = require('../.test-build/services/create-services');
 const { fetchTeamDetailData, isGuestAuthError } = require('../.test-build/services/teams.service');
 const { resolveVenueSiteEvents, resolveEffectiveEvent } = require('../.test-build/services/events.service');
+const { useServiceQuery, areQueryKeysEqual } = require('../.test-build/lib/use-service-query');
 
 const setup = () => {
   const transport = createDemoTransport();
@@ -668,6 +669,216 @@ test('fetchTeamDetailData distinguishes guest auth from operational failures and
     (err) => err.code === 'failed'
   );
 });
+
+function createHookHarness() {
+  const React = require('react');
+  const internals = React.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE || React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+
+  let hooks = [];
+  let hookIndex = 0;
+  let activeEffects = [];
+  let cleanups = [];
+  let currentRenderResult = null;
+
+  const dispatcher = {
+    useState(initial) {
+      const idx = hookIndex++;
+      if (hooks[idx] === undefined) {
+        hooks[idx] = typeof initial === 'function' ? initial() : initial;
+      }
+      const setState = (action) => {
+        const next = typeof action === 'function' ? action(hooks[idx]) : action;
+        hooks[idx] = next;
+      };
+      return [hooks[idx], setState];
+    },
+    useRef(initial) {
+      const idx = hookIndex++;
+      if (hooks[idx] === undefined) {
+        hooks[idx] = { current: initial };
+      }
+      return hooks[idx];
+    },
+    useCallback(fn, deps) {
+      const idx = hookIndex++;
+      const prev = hooks[idx];
+      if (prev && deps && prev.deps.every((d, i) => Object.is(d, deps[i]))) {
+        return prev.fn;
+      }
+      hooks[idx] = { fn, deps };
+      return fn;
+    },
+    useEffect(effect, deps) {
+      const idx = hookIndex++;
+      const prev = hooks[idx];
+      const hasChanged = !prev || !deps || !prev.deps || !prev.deps.every((d, i) => Object.is(d, deps[i]));
+      if (hasChanged) {
+        hooks[idx] = { deps };
+        activeEffects.push({ idx, effect });
+      }
+    },
+  };
+
+  function render(Component, props) {
+    hookIndex = 0;
+    const prevDispatcher = internals.H;
+    internals.H = dispatcher;
+    try {
+      currentRenderResult = Component(props);
+      return currentRenderResult;
+    } finally {
+      internals.H = prevDispatcher;
+    }
+  }
+
+  async function flushEffects() {
+    const toRun = [...activeEffects];
+    activeEffects = [];
+    for (const { idx, effect } of toRun) {
+      if (cleanups[idx]) {
+        try { cleanups[idx](); } catch {}
+        cleanups[idx] = undefined;
+      }
+      const cleanup = effect();
+      if (typeof cleanup === 'function') {
+        cleanups[idx] = cleanup;
+      }
+    }
+    // Allow microtasks scheduled by effects (Promise.resolve().then) to run
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  return { render, flushEffects, getLast: () => currentRenderResult };
+}
+
+test('useServiceQuery hook lifecycle: same-resource reload preserves data while resource switch resets data immediately', async () => {
+  const harness = createHookHarness();
+
+  // Test Consumer simulating VenueSite / TeamDetail lifecycle
+  function ConsumerComponent(props) {
+    const query = useServiceQuery(props.loader, props.key);
+    // Simulating consumer loading guard: if (query.loading && !query.data) return <Loading />;
+    const rendersLoadingSkeleton = query.loading && !query.data;
+    // Actionable controls displayed only when data is present
+    const rendersActionableControls = Boolean(query.data);
+    return { ...query, rendersLoadingSkeleton, rendersActionableControls };
+  }
+
+  // --- CASE 1: Successful registration refresh retains confirmation (same-resource refresh) ---
+  let resolveEventInitial;
+  const initialEventPromise = new Promise(r => { resolveEventInitial = r; });
+  let result = harness.render(ConsumerComponent, {
+    key: ['venue-site', 'bambis-meda', false],
+    loader: () => initialEventPromise,
+  });
+
+  // On first mount: loading is true, data is undefined, skeleton is displayed
+  assert.equal(result.loading, true);
+  assert.equal(result.data, undefined);
+  assert.equal(result.rendersLoadingSkeleton, true);
+  assert.equal(result.rendersActionableControls, false);
+  await harness.flushEffects();
+
+  // Initial event details load resolves
+  const initialData = { venueId: 'venue-1', eventId: 'ev-1', spotsOpen: 5, myRegistration: null };
+  resolveEventInitial(initialData);
+  await new Promise(r => setTimeout(r, 10));
+  result = harness.render(ConsumerComponent, {
+    key: ['venue-site', 'bambis-meda', false],
+    loader: () => initialEventPromise,
+  });
+
+  assert.equal(result.loading, false);
+  assert.deepEqual(result.data, initialData);
+  assert.equal(result.rendersLoadingSkeleton, false);
+  assert.equal(result.rendersActionableControls, true);
+
+  // Player registers for event -> triggers query.reload()
+  let resolveEventReload;
+  const reloadPromise = new Promise(r => { resolveEventReload = r; });
+  result = harness.render(ConsumerComponent, {
+    key: ['venue-site', 'bambis-meda', false],
+    loader: () => reloadPromise,
+  });
+  result.reload();
+  await harness.flushEffects();
+
+  result = harness.render(ConsumerComponent, {
+    key: ['venue-site', 'bambis-meda', false],
+    loader: () => reloadPromise,
+  });
+  assert.equal(result.loading, true);
+  assert.deepEqual(result.data, initialData, 'Previous event data MUST be preserved during same-resource reload');
+  assert.equal(result.rendersLoadingSkeleton, false, 'Loading skeleton MUST NOT unmount the dialog during reload');
+  assert.equal(result.rendersActionableControls, true);
+
+  // Reload completes with fresh registration state
+  const refreshedData = { venueId: 'venue-1', eventId: 'ev-1', spotsOpen: 4, myRegistration: { id: 'reg-1' } };
+  resolveEventReload(refreshedData);
+  await new Promise(r => setTimeout(r, 10));
+  result = harness.render(ConsumerComponent, {
+    key: ['venue-site', 'bambis-meda', false],
+    loader: () => reloadPromise,
+  });
+  assert.equal(result.loading, false);
+  assert.deepEqual(result.data, refreshedData);
+
+  // --- CASE 2: Switching resources with a delayed response never displays previous resource\'s actionable data ---
+  const harness2 = createHookHarness();
+  let resolveTeam1;
+  const team1Promise = new Promise(r => { resolveTeam1 = r; });
+  let result2 = harness2.render(ConsumerComponent, {
+    key: 'team-1',
+    loader: () => team1Promise,
+  });
+  await harness2.flushEffects();
+
+  resolveTeam1({ id: 'team-1', name: 'Bole Lions FC', captain: 'Abebe', canLeave: true });
+  await new Promise(r => setTimeout(r, 10));
+  result2 = harness2.render(ConsumerComponent, {
+    key: 'team-1',
+    loader: () => team1Promise,
+  });
+  assert.equal(result2.data.name, 'Bole Lions FC');
+  assert.equal(result2.rendersActionableControls, true);
+
+  // User navigates / switches to team-2, where the backend response is delayed
+  let resolveTeam2;
+  const team2Promise = new Promise(r => { resolveTeam2 = r; });
+  result2 = harness2.render(ConsumerComponent, {
+    key: 'team-2',
+    loader: () => team2Promise,
+  });
+
+  // IMMEDIATELY upon switching key, previous data MUST be reset to undefined!
+  assert.equal(result2.data, undefined, 'Previous resource data MUST NOT leak when query key changes');
+  assert.equal(result2.loading, true);
+  assert.equal(result2.rendersLoadingSkeleton, true, 'Consumer MUST render loading skeleton when switching resources');
+  assert.equal(result2.rendersActionableControls, false, 'Previous resource actionable controls MUST NEVER be displayed');
+
+  // Even after effects run and while response is still delayed in flight:
+  await harness2.flushEffects();
+  result2 = harness2.render(ConsumerComponent, {
+    key: 'team-2',
+    loader: () => team2Promise,
+  });
+  assert.equal(result2.data, undefined);
+  assert.equal(result2.loading, true);
+  assert.equal(result2.rendersLoadingSkeleton, true);
+  assert.equal(result2.rendersActionableControls, false);
+
+  // Once team-2 resolves, team-2 data is displayed
+  resolveTeam2({ id: 'team-2', name: 'Summit Athletics', captain: 'Sara', canLeave: false });
+  await new Promise(r => setTimeout(r, 10));
+  result2 = harness2.render(ConsumerComponent, {
+    key: 'team-2',
+    loader: () => team2Promise,
+  });
+  assert.equal(result2.loading, false);
+  assert.equal(result2.data.name, 'Summit Athletics');
+  assert.equal(result2.rendersActionableControls, true);
+});
+
 
 
 
