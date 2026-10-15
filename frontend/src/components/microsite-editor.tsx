@@ -1,10 +1,11 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { Microsite } from '@/services/contracts';
+import type { Microsite, Venue } from '@/services/contracts';
 import { contentService, venuesService } from '@/services';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
+import { isSupportedImageUrl } from '@/services/media-policy';
 import { SiteContentEditor } from './site-content-editor';
 import { VenueSite } from './venue-site';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
@@ -56,8 +57,7 @@ export function MicrositeEditor({ venueId }: { venueId?: string }) {
 
       <Draft
         key={venue.id}
-        venueId={venue.id}
-        slug={venue.slug}
+        venue={venue}
         onDirtyChange={setDirty}
       />
     </div>
@@ -65,27 +65,25 @@ export function MicrositeEditor({ venueId }: { venueId?: string }) {
 }
 
 function Draft({
-  venueId,
-  slug,
+  venue,
   onDirtyChange,
 }: {
-  venueId: string;
-  slug: string;
+  venue: Venue;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const query = useServiceQuery(useCallback(signal => contentService.draft(venueId, signal), [venueId]));
+  const query = useServiceQuery(useCallback(signal => contentService.draft(venue.id, signal), [venue.id]));
   if (query.loading) return <Loading />;
   if (query.error || !query.data) return <ServiceErrorMessage error={query.error} retry={query.reload} />;
-  return <EditForm initial={query.data} slug={slug} onDirtyChange={onDirtyChange} />;
+  return <EditForm initial={query.data} venue={venue} onDirtyChange={onDirtyChange} />;
 }
 
 function EditForm({
   initial,
-  slug,
+  venue,
   onDirtyChange,
 }: {
   initial: Microsite;
-  slug: string;
+  venue: Venue;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { t } = useLanguage();
@@ -98,19 +96,65 @@ function EditForm({
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
+  const isHeroImageInvalid = Boolean(draft.heroImage && !isSupportedImageUrl(draft.heroImage));
+  const isLogoUrlInvalid = Boolean(draft.logoUrl && !isSupportedImageUrl(draft.logoUrl));
+
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
+  // Protected navigation: beforeunload, client-side clicks, and browser back/forward
   useEffect(() => {
+    if (!dirty) return;
+
+    // 1. Browser tab close / reload
     const warn = (event: BeforeUnloadEvent) => {
-      if (dirty) event.preventDefault();
+      event.preventDefault();
     };
     window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+
+    // 2. Client-side navigation clicks (Next.js Links, dashboard management tabs, header links)
+    const handleCaptureClick = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || anchor.target === '_blank') return;
+      try {
+        const targetUrl = new URL(anchor.href, window.location.href);
+        const currentUrl = new URL(window.location.href);
+        if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+          return;
+        }
+      } catch {
+        // malformed URL
+      }
+      const confirmed = window.confirm(t('discardConfirm'));
+      if (!confirmed) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener('click', handleCaptureClick, true);
+
+    // 3. Browser Back / Forward buttons (popstate)
+    const handlePopState = () => {
+      const confirmed = window.confirm(t('discardConfirm'));
+      if (!confirmed) {
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+      document.removeEventListener('click', handleCaptureClick, true);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [dirty, t]);
 
   async function handleSave(publish = false) {
+    if (isHeroImageInvalid || isLogoUrlInvalid) return;
     setBusy(true);
     setError(undefined);
     setMessage(null);
@@ -119,7 +163,7 @@ function EditForm({
       setDraft(result);
       setSaved(result);
       if (publish) {
-        const pubResult = await contentService.publish(initial.venueId);
+        const pubResult = await contentService.publish(venue.id);
         setDraft(pubResult);
         setSaved(pubResult);
         setMessage('publicationSuccess');
@@ -127,6 +171,7 @@ function EditForm({
         setMessage('saved');
       }
     } catch (err) {
+      // Failed saves preserve in-memory edits and dirty state!
       setError(err);
     } finally {
       setBusy(false);
@@ -134,14 +179,20 @@ function EditForm({
   }
 
   async function handleUnpublish() {
-    if (!window.confirm(t('unpublishConfirm'))) return;
+    const confirmMsg = dirty ? t('unpublishConfirmDirty') : t('unpublishConfirm');
+    if (!window.confirm(confirmMsg)) return;
     setBusy(true);
     setError(undefined);
     setMessage(null);
     try {
-      const result = await contentService.unpublish(initial.venueId);
-      setDraft(result);
+      const result = await contentService.unpublish(venue.id);
       setSaved(result);
+      // Preserve local edits in draft while updating publication status
+      setDraft(prev => ({
+        ...prev,
+        published: false,
+        updatedAt: result.updatedAt,
+      }));
       setMessage('unpublishSuccess');
     } catch (err) {
       setError(err);
@@ -207,7 +258,7 @@ function EditForm({
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className="filter-pill text-xs">
+          <Link href={`/s/${venue.slug}`} target="_blank" rel="noopener noreferrer" className="filter-pill text-xs">
             {t('viewSite')} ↗
           </Link>
         </div>
@@ -216,7 +267,8 @@ function EditForm({
       {mode === 'preview' ? (
         <div className="rounded-3xl border border-slate-200 overflow-hidden shadow-lg">
           <VenueSite
-            slug={slug}
+            slug={venue.slug}
+            previewVenue={venue}
             previewSite={draft}
             isDraftPreview
             onExitPreview={() => setMode('edit')}
@@ -283,27 +335,79 @@ function EditForm({
                 </label>
               </div>
 
-              <label className="form-label">
-                {t('heroImage')}
-                <input
-                  className="form-input"
-                  placeholder="https://... or /venue-card-1.jpg"
-                  value={draft.heroImage || ''}
-                  onChange={e => setDraft({ ...draft, heroImage: e.target.value || null })}
-                />
-                <span className="text-xs text-slate-500 font-normal">{t('heroImageHelp')}</span>
-              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="form-label">
+                  {t('heroImage')}
+                  <input
+                    className="form-input"
+                    placeholder="/venues/... or https://images.unsplash.com/..."
+                    value={draft.heroImage || ''}
+                    aria-invalid={isHeroImageInvalid}
+                    onChange={e => setDraft({ ...draft, heroImage: e.target.value || null })}
+                  />
+                  <span className="text-xs text-slate-500 font-normal">{t('heroImageHelp')}</span>
+                  {isHeroImageInvalid && (
+                    <p role="alert" className="text-xs text-rose-700 font-medium mt-1">
+                      {t('heroImageError')}
+                    </p>
+                  )}
+                </label>
+
+                <label className="form-label">
+                  {t('logoUrl')}
+                  <input
+                    className="form-input"
+                    placeholder="/venues/logo.png or https://images.unsplash.com/..."
+                    value={draft.logoUrl || ''}
+                    aria-invalid={isLogoUrlInvalid}
+                    onChange={e => setDraft({ ...draft, logoUrl: e.target.value || null })}
+                  />
+                  <span className="text-xs text-slate-500 font-normal">{t('logoUrlHelp')}</span>
+                  {isLogoUrlInvalid && (
+                    <p role="alert" className="text-xs text-rose-700 font-medium mt-1">
+                      {t('logoUrlError')}
+                    </p>
+                  )}
+                </label>
+              </div>
+
+              {/* Inquiry Contacts */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="form-label">
+                  {t('contactPhone')}
+                  <input
+                    className="form-input"
+                    type="tel"
+                    placeholder="+251 91 123 4567"
+                    maxLength={30}
+                    value={draft.contactPhone || ''}
+                    onChange={e => setDraft({ ...draft, contactPhone: e.target.value || null })}
+                  />
+                </label>
+
+                <label className="form-label">
+                  {t('contactEmail')}
+                  <input
+                    className="form-input"
+                    type="email"
+                    placeholder="info@stadium.et"
+                    maxLength={100}
+                    value={draft.contactEmail || ''}
+                    onChange={e => setDraft({ ...draft, contactEmail: e.target.value || null })}
+                  />
+                </label>
+              </div>
 
               <SiteContentEditor draft={draft} onChange={setDraft} />
 
               <div className="flex flex-wrap items-center gap-3 pt-4 border-t">
-                <button className="action" disabled={busy} type="submit">
+                <button className="action" disabled={busy || isHeroImageInvalid || isLogoUrlInvalid} type="submit">
                   {t('save')}
                 </button>
 
                 <button
                   className="min-h-11 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-5 disabled:opacity-50 transition-colors"
-                  disabled={busy || !draft.tagline.trim()}
+                  disabled={busy || !draft.tagline.trim() || isHeroImageInvalid || isLogoUrlInvalid}
                   type="button"
                   onClick={event => {
                     if (event.currentTarget.form?.reportValidity()) void handleSave(true);
@@ -372,6 +476,14 @@ function EditForm({
             </div>
 
             <div className="border-t pt-4 text-xs text-slate-500 space-y-2">
+              <div className="flex justify-between">
+                <span>{t('gallery')}:</span>
+                <span className="font-bold text-slate-800">{(draft.gallery || []).length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t('socialLinks')}:</span>
+                <span className="font-bold text-slate-800">{(draft.socialLinks || []).length}</span>
+              </div>
               <div className="flex justify-between">
                 <span>{t('matchHighlights')}:</span>
                 <span className="font-bold text-slate-800">{(draft.highlights || []).length}</span>

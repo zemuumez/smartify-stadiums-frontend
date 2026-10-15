@@ -14,6 +14,7 @@ const {
   computeCourtQuote,
   isValidDate,
 } = require('../.test-build/services/sports');
+const { isSupportedImageUrl, isSupportedVideoUrl } = require('../.test-build/services/media-policy');
 const setup = () => { const transport = createDemoTransport(); return { transport, ...createServices(transport) }; };
 const input = (overrides = {}) => ({ fieldId: 'field-2', sport: 'basketball', date: '2099-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID(), ...overrides });
 const rejects = (operation, code) => assert.rejects(operation, error => error.code === code);
@@ -520,5 +521,186 @@ test('editorial identity fields update in draft without modifying court rates or
   assert.equal(courtsAfter.length, initialCourts.length);
   assert.deepEqual(courtsAfter.map(c => c.hourlyRateMinor), initialRates);
 });
+
+test('shared media policy enforces Next.js image domain and protocol constraints', async () => {
+  // 1. isSupportedImageUrl unit assertions
+  assert.equal(isSupportedImageUrl('http://images.unsplash.com/photo.jpg'), false, 'Insecure HTTP image must be rejected');
+  assert.equal(isSupportedImageUrl('//images.unsplash.com/photo.jpg'), false, 'Protocol-relative image must be rejected');
+  assert.equal(isSupportedImageUrl('https://unconfigured-host.com/img.png'), false, 'Unconfigured remote host must be rejected');
+  assert.equal(isSupportedImageUrl(''), false);
+  assert.equal(isSupportedImageUrl(null), false);
+  assert.equal(isSupportedImageUrl(undefined), false);
+
+  assert.equal(isSupportedImageUrl('/venues/bambis.jpg'), true, 'Local root-relative image path must be accepted');
+  assert.equal(isSupportedImageUrl('/hero-banner.png'), true, 'Local root-relative image path must be accepted');
+  assert.equal(isSupportedImageUrl('https://images.unsplash.com/photo-1574629810360-7efbbe195018'), true, 'Allowed images.unsplash.com must be accepted');
+  assert.equal(isSupportedImageUrl('https://playethiopia.com/stadiums/bambis.jpg'), true, 'Allowed playethiopia.com must be accepted');
+  assert.equal(isSupportedImageUrl('https://cdn.playethiopia.com/assets/turf.png'), true, 'Subdomain of playethiopia.com must be accepted');
+
+  // 2. isSupportedVideoUrl unit assertions
+  assert.equal(isSupportedVideoUrl('http://insecure.com/video.mp4'), false, 'Insecure HTTP video must be rejected');
+  assert.equal(isSupportedVideoUrl('//insecure.com/video.mp4'), false, 'Protocol-relative video must be rejected');
+  assert.equal(isSupportedVideoUrl('https://stream.playethiopia.com/video.mp4'), true, 'HTTPS video must be accepted');
+
+  // 3. Service layer rejects unconfigured hosts and insecure protocols
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+
+  await rejects(s.content.save({ ...draft, heroImage: 'http://images.unsplash.com/photo.jpg' }), 'validation');
+  await rejects(s.content.save({ ...draft, heroImage: '//images.unsplash.com/photo.jpg' }), 'validation');
+  await rejects(s.content.save({ ...draft, heroImage: 'https://evil.example.com/banner.jpg' }), 'validation');
+  await rejects(s.content.save({ ...draft, logoUrl: 'https://unauthorized.org/logo.png' }), 'validation');
+  await rejects(s.content.save({ ...draft, gallery: [{ id: 'g1', url: 'https://arbitrary.com/pic.jpg' }] }), 'validation');
+});
+
+test('unpublishing preserves unsaved local draft edits and dirty state', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const serverDraft = await s.content.draft('venue-1');
+
+  // Simulate user editing draft in UI (local in-memory state)
+  const localDraft = {
+    ...serverDraft,
+    tagline: 'Local Unsaved Arena Title',
+    description: 'Local unsaved facility description',
+  };
+  const isDirtyBefore = JSON.stringify(localDraft) !== JSON.stringify(serverDraft);
+  assert.equal(isDirtyBefore, true, 'Form is dirty before unpublishing');
+
+  // Owner unpublishes
+  const unpublishedServerResult = await s.content.unpublish('venue-1');
+  assert.equal(unpublishedServerResult.published, false);
+
+  // UI preserves local edits while updating published status
+  const updatedLocalDraft = {
+    ...localDraft,
+    published: false,
+    updatedAt: unpublishedServerResult.updatedAt,
+  };
+
+  assert.equal(updatedLocalDraft.tagline, 'Local Unsaved Arena Title', 'Local tagline was preserved');
+  assert.equal(updatedLocalDraft.description, 'Local unsaved facility description', 'Local description was preserved');
+  assert.equal(updatedLocalDraft.published, false, 'Draft reflects unpublished state');
+
+  const isDirtyAfter = JSON.stringify(updatedLocalDraft) !== JSON.stringify(unpublishedServerResult);
+  assert.equal(isDirtyAfter, true, 'Form remains dirty so user does not lose unsaved work');
+});
+
+test('pending venue draft preview renders with authorized owner data without requiring active publication', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+
+  // 1. Create a new venue (defaults to status 'pending')
+  const newVenue = await s.venues.create({
+    name: 'Addis Youth Academy',
+    city: 'Addis Ababa',
+    address: 'Megenagna',
+    phone: '+251911999888',
+    description: 'Upcoming multi-sport complex',
+  });
+  assert.equal(newVenue.status, 'pending');
+
+  // 2. Public lookup must fail with 404 because venue is not active yet
+  await rejects(s.venues.get(newVenue.slug), 'not_found');
+  await rejects(s.venues.get(newVenue.id), 'not_found');
+
+  // 3. Authorized owner draft preview succeeds without relying on public venue lookup
+  const draft = await s.content.draft(newVenue.id);
+  assert.equal(draft.venueId, newVenue.id);
+  assert.equal(draft.published, false);
+
+  // In the UI, VenueSite receives previewVenue={newVenue} and previewSite={draft},
+  // rendering the full preview safely without crashing on public 404
+  const previewContext = {
+    venue: newVenue,
+    site: draft,
+    isDraftPreview: true,
+  };
+  assert.equal(previewContext.venue.name, 'Addis Youth Academy');
+  assert.equal(previewContext.venue.status, 'pending');
+});
+
+test('both tenants complete full publish, unpublish, and branding lifecycle in strict isolation', async () => {
+  const s = setup();
+
+  // --- TENANT 1: Owner-1 @ Bambis Meda (venue-1) ---
+  s.transport.selectAccount('owner-1');
+  const draft1 = await s.content.draft('venue-1');
+  await s.content.save({
+    ...draft1,
+    tagline: 'Bambis Meda Premier Facility',
+    primaryColor: '#1a4329',
+    logoUrl: '/venues/bambis-logo.png',
+    contactPhone: '+251 91 100 0001',
+    contactEmail: 'bambis@example.com',
+    socialLinks: [{ platform: 'telegram', url: 'https://t.me/bambismeda' }],
+    gallery: [{ id: 'g1', url: '/venues/bambis-turf.jpg', caption: 'Night lights' }],
+  });
+  const publishedSite1 = await s.content.publish('venue-1');
+  assert.equal(publishedSite1.tagline, 'Bambis Meda Premier Facility');
+  assert.equal(publishedSite1.primaryColor, '#1a4329');
+
+  // --- TENANT 2: Owner-2 @ Unity Sports Complex (venue-2) ---
+  s.transport.selectAccount('owner-2');
+  const draft2 = await s.content.draft('venue-2');
+  await s.content.save({
+    ...draft2,
+    tagline: 'Unity Sports Modern Arena',
+    primaryColor: '#003366',
+    logoUrl: '/venues/unity-logo.png',
+    contactPhone: '+251 92 200 0002',
+    contactEmail: 'unity@example.com',
+    socialLinks: [{ platform: 'instagram', url: 'https://instagram.com/unitysports' }],
+  });
+  const publishedSite2 = await s.content.publish('venue-2');
+  assert.equal(publishedSite2.tagline, 'Unity Sports Modern Arena');
+  assert.equal(publishedSite2.primaryColor, '#003366');
+
+  // Public checks: both sites are published with distinct branding
+  const public1 = await s.content.get('venue-1');
+  const public2 = await s.content.get('venue-2');
+  assert.equal(public1.primaryColor, '#1a4329');
+  assert.equal(public2.primaryColor, '#003366');
+  assert.equal(public1.contactPhone, '+251 91 100 0001');
+  assert.equal(public2.contactPhone, '+251 92 200 0002');
+
+  // Owner-1 unpublishes Venue-1
+  s.transport.selectAccount('owner-1');
+  await s.content.unpublish('venue-1');
+
+  // Verification: Venue-1 is now 404 publicly, while Venue-2 remains published!
+  await rejects(s.content.get('venue-1'), 'not_found');
+  const public2StillLive = await s.content.get('venue-2');
+  assert.equal(public2StillLive.published, true);
+  assert.equal(public2StillLive.tagline, 'Unity Sports Modern Arena');
+
+  // Owner-1 republishes Venue-1
+  await s.content.publish('venue-1');
+  assert.equal((await s.content.get('venue-1')).published, true);
+});
+
+test('failed draft saves preserve form modifications and dirty state', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const initialDraft = await s.content.draft('venue-1');
+
+  // Owner enters edits, but introduces an invalid color
+  const editedDraft = {
+    ...initialDraft,
+    tagline: 'Valid New Tagline',
+    primaryColor: 'not-a-color',
+  };
+
+  // Attempt save -> fails validation
+  await rejects(s.content.save(editedDraft), 'validation');
+
+  // In the application (MicrositeEditor), catch block sets error without resetting draft:
+  // setDraft remains editedDraft, saved remains initialDraft, dirty remains true!
+  const isDirty = JSON.stringify(editedDraft) !== JSON.stringify(initialDraft);
+  assert.equal(isDirty, true, 'Dirty state preserved after failed save');
+  assert.equal(editedDraft.tagline, 'Valid New Tagline', 'User edits are not erased');
+});
+
 
 

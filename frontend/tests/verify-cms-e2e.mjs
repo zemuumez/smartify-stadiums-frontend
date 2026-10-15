@@ -99,74 +99,62 @@ export async function runCmsE2ETest() {
     '--no-default-browser-check',
     '--headless=new',
     '--disable-gpu',
-    '--disable-extensions',
     '--window-size=1280,900',
     'about:blank',
   ];
 
+  console.log(`Starting headless Chrome for CMS test (${chromePath})...`);
   const proc = spawn(chromePath, chromeArgs, { stdio: 'ignore' });
-  proc.on('error', err => console.error('Failed to launch Chrome:', err));
+
+  let pageTarget = null;
+  for (let i = 0; i < 30; i++) {
+    await sleep(250);
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/json/new`, { method: 'PUT' });
+      if (res.ok) {
+        pageTarget = await res.json();
+        break;
+      }
+    } catch {
+      // Retry connection
+    }
+  }
+
+  if (!pageTarget) {
+    proc.kill();
+    throw new Error('Failed to connect to Chrome remote debugging port.');
+  }
+
+  console.log(`Connected to page target: ${pageTarget.webSocketDebuggerUrl}`);
+  const client = new CDPClient(pageTarget.webSocketDebuggerUrl);
+  await client.connect();
+  await client.send('Page.enable');
+  await client.send('DOM.enable');
+  await client.send('Runtime.enable');
 
   try {
-    let wsUrl = null;
-    for (let i = 0; i < 30; i++) {
-      try {
-        const targetRes = await fetch(`http://127.0.0.1:${port}/json/new`, { method: 'PUT' });
-        const target = await targetRes.json();
-        wsUrl = target.webSocketDebuggerUrl;
-        if (wsUrl) break;
-      } catch {
-        await sleep(200);
-      }
-    }
-    if (!wsUrl) throw new Error('Chrome remote debugging page target unreachable.');
-
-    const client = new CDPClient(wsUrl);
-    await client.connect();
-    await client.send('Page.enable');
-    await client.send('Runtime.enable');
-    await client.send('Page.setLifecycleEventsEnabled', { enabled: true });
-
-    // Override window.confirm and window.alert in evaluate context for precise control
-    await client.evaluate(`
-      (() => {
-        window.__dialogLog = [];
-        window.__confirmResponse = true;
-        window.confirm = (msg) => {
-          window.__dialogLog.push({ type: 'confirm', message: msg, accepted: window.__confirmResponse });
-          return window.__confirmResponse;
-        };
-        window.alert = (msg) => {
-          window.__dialogLog.push({ type: 'alert', message: msg });
-        };
-      })()
-    `);
-
-    // =========================================================================
-    // STEP 0: Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis)
-    // =========================================================================
+    // [STEP 0] Setup pristine session as Owner-1 (Bambis Meda)
     console.log('[STEP 0] Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis Meda Stadium)...');
-    await client.send('Page.navigate', { url: 'http://localhost:3000/auth/login' });
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard' });
     await sleep(1500);
-    await waitForLoading(client);
 
     await client.evaluate(`
       (() => {
-        sessionStorage.clear();
         sessionStorage.setItem('etsf-demo-session-v1', 'owner-1');
+        localStorage.setItem('etsf-locale', 'en');
       })()
     `);
 
     // =========================================================================
-    // JOURNEY 1: In-context draft editing & live preview without publishing
+    // JOURNEY 1: Draft Editing & Live Preview without Publication
     // =========================================================================
     console.log('\n[JOURNEY 1] Draft Editing & Live Preview without Publication...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/microsite' });
-    await sleep(2000);
+    await sleep(1500);
     await waitForLoading(client);
 
-    // Assert initial editor loaded
-    const initialEditorState = await client.evaluate(`
+    // Assert initial editor UI state
+    const initialEditorCheck = await client.evaluate(`
       (() => {
         const h1 = document.querySelector('h1')?.textContent;
         const taglineInput = document.querySelector('input[required]');
@@ -180,23 +168,23 @@ export async function runCmsE2ETest() {
           hasPublish: !!publishBtn,
           hasUnpublish: !!unpublishBtn,
           hasPreviewTab: !!previewTabBtn,
-          statusBadge
+          statusBadge: statusBadge?.trim()
         };
       })()
     `);
-    console.log('  Initial CMS Editor state:', initialEditorState);
-    if (!initialEditorState.hasPublish || !initialEditorState.hasPreviewTab) {
-      throw new Error(`Journey 1 assertion failed: Editor did not render expected controls: ${JSON.stringify(initialEditorState)}`);
+    console.log('  Initial CMS Editor state:', initialEditorCheck);
+    if (!initialEditorCheck.hasPublish || !initialEditorCheck.hasPreviewTab) {
+      throw new Error(`Journey 1 assertion failed: CMS Editor did not load properly: ${JSON.stringify(initialEditorCheck)}`);
     }
 
-    // Type uncommitted changes in tagline and announcement
-    const testTagline = 'Bambis Meda Grand Arena — Live Uncommitted Preview';
-    const testAnnouncement = 'Bole Weekend Cup registration open!';
+    // Make an in-memory draft edit without saving
+    const testDraftTagline = 'Bambis Meda Grand Arena (Live Uncommitted Preview)';
+    const testAnnouncement = 'Live Demo Cup: Draft In-Memory Preview Announcement';
     await client.evaluate(`
       (() => {
         const taglineInput = document.querySelector('input[required]');
         const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-        prototypeValue.set.call(taglineInput, '${testTagline}');
+        prototypeValue.set.call(taglineInput, '${testDraftTagline}');
         taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
         taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -281,18 +269,18 @@ export async function runCmsE2ETest() {
     }
 
     // =========================================================================
-    // JOURNEY 2: Unsaved-Changes Protection (Discard & Venue-Switch Interception)
+    // JOURNEY 2: Unsaved-Changes Protection (Internal Navigation & Dirty Unpublish)
     // =========================================================================
-    console.log('\n[JOURNEY 2] Unsaved-Changes Protection (Discard & Venue-Switch Interception)...');
+    console.log('\n[JOURNEY 2] Unsaved-Changes Protection (Internal Navigation & Dirty Unpublish)...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/microsite' });
     await sleep(1500);
     await waitForLoading(client);
 
-    // Re-install confirm mock for window
+    // Install dialog mock
     await client.evaluate(`
       (() => {
         window.__dialogLog = [];
-        window.__confirmResponse = true;
+        window.__confirmResponse = false; // Cancel by default to test abort
         window.confirm = (msg) => {
           window.__dialogLog.push({ type: 'confirm', message: msg, accepted: window.__confirmResponse });
           return window.__confirmResponse;
@@ -305,14 +293,67 @@ export async function runCmsE2ETest() {
       (() => {
         const taglineInput = document.querySelector('input[required]');
         const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-        prototypeValue.set.call(taglineInput, 'Temporary Tagline To Be Discarded');
+        prototypeValue.set.call(taglineInput, 'Unsaved Edits Protected Against Navigation');
         taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
         taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
       })()
     `);
     await sleep(300);
 
-    // Test 1: Click "Discard changes" button
+    // Test 2a: Intercept internal navigation link click when user cancels
+    console.log('  Attempting internal navigation to /dashboard/bookings while dirty (user cancels)...');
+    await client.evaluate(`
+      (() => {
+        const bookingsLink = Array.from(document.querySelectorAll('a')).find(a => a.href?.includes('/dashboard/bookings'));
+        bookingsLink?.click();
+      })()
+    `);
+    await sleep(500);
+
+    const navCancelCheck = await client.evaluate(`
+      (() => {
+        return {
+          currentUrl: window.location.href,
+          dialogCount: window.__dialogLog.length,
+          lastDialog: window.__dialogLog[window.__dialogLog.length - 1],
+          taglineValue: document.querySelector('input[required]')?.value
+        };
+      })()
+    `);
+    console.log('  Navigation cancellation result:', navCancelCheck);
+    if (!navCancelCheck.currentUrl.includes('/dashboard/microsite') || !navCancelCheck.taglineValue?.includes('Unsaved Edits')) {
+      throw new Error('Journey 2 assertion failed: Internal navigation was not blocked when dirty!');
+    }
+
+    // Test 2b: Dirty Unpublish - unpublishing preserves local in-memory edits
+    console.log('  Testing unpublish while dirty (verifying local edits are preserved)...');
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true; // allow unpublish
+        const unpublishBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Unpublish'));
+        unpublishBtn?.click();
+      })()
+    `);
+    await sleep(1500);
+
+    const dirtyUnpublishCheck = await client.evaluate(`
+      (() => {
+        const taglineValue = document.querySelector('input[required]')?.value;
+        const statusBadge = document.querySelector('span[class*="amber"]')?.textContent;
+        const dirtyBadge = document.querySelector('[role="status"]');
+        return {
+          taglineValue,
+          statusBadge,
+          isDirty: !!dirtyBadge && dirtyBadge.textContent.includes('unsaved')
+        };
+      })()
+    `);
+    console.log('  Dirty unpublish result:', dirtyUnpublishCheck);
+    if (!dirtyUnpublishCheck.taglineValue?.includes('Unsaved Edits') || !dirtyUnpublishCheck.statusBadge?.includes('Unpublished')) {
+      throw new Error('Journey 2 assertion failed: Dirty edits were wiped out by unpublish!');
+    }
+
+    // Test 2c: Discard changes button restores saved baseline
     console.log('  Clicking Discard Changes button...');
     await client.evaluate(`
       (() => {
@@ -333,14 +374,14 @@ export async function runCmsE2ETest() {
       })()
     `);
     console.log('  Discard result:', discardCheck);
-    if (discardCheck.isDirty || discardCheck.tagline?.includes('Temporary Tagline')) {
+    if (discardCheck.isDirty || discardCheck.tagline?.includes('Unsaved Edits')) {
       throw new Error(`Journey 2 assertion failed: Discard did not revert draft: ${JSON.stringify(discardCheck)}`);
     }
 
     // =========================================================================
-    // JOURNEY 3: Media Validation & Highlight Reordering
+    // JOURNEY 3: Media Policy Validation & Highlight Reordering
     // =========================================================================
-    console.log('\n[JOURNEY 3] Media Validation & Highlight Reordering...');
+    console.log('\n[JOURNEY 3] Media Policy Validation & Highlight Reordering...');
     // Reorder first highlight down
     const reorderResult = await client.evaluate(`
       (() => {
@@ -353,40 +394,46 @@ export async function runCmsE2ETest() {
     console.log('  Reorder action:', reorderResult);
     await sleep(500);
 
-    // Enter invalid insecure video URL (http://) to test validation failure
-    console.log('  Testing validation rejection on insecure video URL (http://)...');
+    // Enter invalid hero image URL (unconfigured domain) to test accessible inline validation error
+    console.log('  Testing validation rejection on unconfigured remote image domain...');
     await client.evaluate(`
       (() => {
-        const videoInput = document.querySelector('input[type="url"]');
-        if (videoInput) {
+        const heroInput = Array.from(document.querySelectorAll('input')).find(i => i.placeholder?.includes('/venues/'));
+        if (heroInput) {
           const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-          prototypeValue.set.call(videoInput, 'http://insecure-stream.com/bad.mp4');
-          videoInput.dispatchEvent(new Event('input', { bubbles: true }));
-          videoInput.dispatchEvent(new Event('change', { bubbles: true }));
+          prototypeValue.set.call(heroInput, 'https://unconfigured-cdn.com/bad-hero.jpg');
+          heroInput.dispatchEvent(new Event('input', { bubbles: true }));
+          heroInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       })()
     `);
     await sleep(300);
 
-    // Click Save
-    await client.evaluate(`
+    const mediaErrorCheck = await client.evaluate(`
       (() => {
+        const errorAlert = Array.from(document.querySelectorAll('[role="alert"]')).find(a => a.textContent?.includes('Hero image must be a local asset'));
         const saveBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Save');
-        saveBtn?.click();
+        return {
+          hasErrorAlert: !!errorAlert,
+          isSaveDisabled: !!saveBtn?.disabled
+        };
       })()
     `);
-    await sleep(600);
+    console.log('  Unsupported media validation check:', mediaErrorCheck);
+    if (!mediaErrorCheck.hasErrorAlert || !mediaErrorCheck.isSaveDisabled) {
+      throw new Error('Journey 3 assertion failed: Media policy error was not displayed or save was not prevented!');
+    }
 
-    // Fix URL to valid HTTPS
-    console.log('  Supplying valid HTTPS media URL and saving...');
+    // Supply supported local image URL and save
+    console.log('  Supplying valid supported media URL and saving...');
     await client.evaluate(`
       (() => {
-        const videoInput = document.querySelector('input[type="url"]');
-        if (videoInput) {
+        const heroInput = Array.from(document.querySelectorAll('input')).find(i => i.placeholder?.includes('/venues/'));
+        if (heroInput) {
           const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-          prototypeValue.set.call(videoInput, 'https://example.com/championship-goals.mp4');
-          videoInput.dispatchEvent(new Event('input', { bubbles: true }));
-          videoInput.dispatchEvent(new Event('change', { bubbles: true }));
+          prototypeValue.set.call(heroInput, '/venues/bambis.jpg');
+          heroInput.dispatchEvent(new Event('input', { bubbles: true }));
+          heroInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
         const saveBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Save');
         saveBtn?.click();
@@ -403,10 +450,11 @@ export async function runCmsE2ETest() {
     console.log('  Save result:', savedCheck);
 
     // =========================================================================
-    // JOURNEY 4: Publish Draft and Verify Public Microsite Update
+    // JOURNEY 4: Dynamic Primary-Color Branding & Publication
     // =========================================================================
-    console.log('\n[JOURNEY 4] Publishing Draft and Verifying Public Microsite Update...');
+    console.log('\n[JOURNEY 4] Dynamic Primary-Color Branding & Publication...');
     const publishedHeading = 'Bambis Meda Premier Arena';
+    const customBrandColor = '#1a4329'; // Dark emerald green
     await client.evaluate(`
       (() => {
         const taglineInput = document.querySelector('input[required]');
@@ -415,14 +463,21 @@ export async function runCmsE2ETest() {
         taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
         taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
 
+        const colorInput = document.querySelector('input[type="color"]');
+        if (colorInput) {
+          prototypeValue.set.call(colorInput, '${customBrandColor}');
+          colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+          colorInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
         const publishBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Publish'));
         publishBtn?.click();
       })()
     `);
     await sleep(1500);
 
-    // Navigate to public microsite /s/bambis-meda
-    console.log('  Navigating to public microsite /s/bambis-meda to verify publication...');
+    // Navigate to public microsite /s/bambis-meda to verify branding and publication
+    console.log('  Navigating to public microsite /s/bambis-meda to verify branding...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/s/bambis-meda' });
     await sleep(1500);
     await waitForLoading(client);
@@ -431,14 +486,17 @@ export async function runCmsE2ETest() {
       (() => {
         const h1 = document.querySelector('h1')?.textContent;
         const courtCards = document.querySelectorAll('#fields .bg-white.rounded-3xl');
+        const reserveBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Reserve a Pitch'));
+        const btnBackground = reserveBtn ? window.getComputedStyle(reserveBtn).backgroundColor : null;
         return {
           h1,
           matchesPublishedHeading: h1?.includes('Bambis Meda') && h1?.includes('Premier Arena'),
-          courtCount: courtCards.length
+          courtCount: courtCards.length,
+          btnBackground
         };
       })()
     `);
-    console.log('  Public microsite publication check:', publicPublishedCheck);
+    console.log('  Public microsite publication & branding check:', publicPublishedCheck);
     if (!publicPublishedCheck.matchesPublishedHeading) {
       throw new Error(`Journey 4 assertion failed: Published tagline not visible on public site: ${JSON.stringify(publicPublishedCheck)}`);
     }
@@ -448,7 +506,7 @@ export async function runCmsE2ETest() {
     console.log('  ✓ Screenshot captured (published public site):', shot4Path);
 
     // =========================================================================
-    // JOURNEY 5: Unpublish Lifecycle & Operational Persistence
+    // JOURNEY 5: Unpublish Lifecycle & Operational Invariants
     // =========================================================================
     console.log('\n[JOURNEY 5] Unpublish Lifecycle & Operational Invariants...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/microsite' });

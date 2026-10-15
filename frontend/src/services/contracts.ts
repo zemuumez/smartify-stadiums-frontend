@@ -46,12 +46,24 @@ export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
 export interface SiteHighlight { id: string; title: string; teams: string; duration: string; views?: number; playbackUrl: string | null }
 export interface SiteEvent { id: string; title: string; sport: Sport; date: string; time: string; spots: number }
+export interface SocialLink {
+  platform: 'facebook' | 'instagram' | 'telegram' | 'tiktok' | 'youtube' | 'website';
+  url: string;
+}
+export interface GalleryImage {
+  id: string;
+  url: string;
+  caption?: string;
+}
 export interface Microsite {
   venueId: string; tagline: string; description: string; primaryColor: string;
-  heroImage?: string | null; announcement?: string | null;
+  heroImage?: string | null; logoUrl?: string | null; announcement?: string | null;
+  contactPhone?: string | null; contactEmail?: string | null;
+  socialLinks?: SocialLink[]; gallery?: GalleryImage[];
   highlights?: SiteHighlight[]; events?: SiteEvent[];
   published: boolean; updatedAt: string;
 }
+export { isSupportedImageUrl, isSupportedVideoUrl } from './media-policy';
 export interface CameraDevice {
   id: string; venueId: string; fieldId: string; name: string; model: string;
   status: 'pending' | 'certified' | 'active' | 'offline' | 'revoked';
