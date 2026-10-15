@@ -1,11 +1,11 @@
 'use client';
-import { useCallback, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { bookingsService, venuesService } from '@/services';
 import type { Booking, Closure, Field, Sport, Venue } from '@/services/contracts';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
-import { hourLabel, venueToday } from '@/services/sports';
+import { getWeekDays, hourLabel, shiftDays, venueToday } from '@/services/sports';
 import { quoteMinor } from '@/services/bookings.service';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
@@ -14,25 +14,62 @@ function isFutureBooking(b: Booking): boolean {
   return Date.parse(`${b.date}T${String(b.startHour).padStart(2, '0')}:00:00+03:00`) > Date.now();
 }
 
-function getWeekDays(centerDate: string): string[] {
-  const d = new Date(centerDate + 'T00:00:00');
-  const day = d.getDay();
-  const diffToMonday = (day === 0 ? -6 : 1) - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diffToMonday);
-  const days: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const cur = new Date(monday);
-    cur.setDate(monday.getDate() + i);
-    days.push(cur.toISOString().slice(0, 10));
-  }
-  return days;
-}
+function useModalKeyboard(isOpen: boolean, onClose: () => void) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-function shiftDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return;
+      const focusables = containerRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length > 0) {
+        focusables[0].focus();
+      } else {
+        containerRef.current.focus();
+      }
+    }, 10);
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key === 'Tab' && containerRef.current) {
+        const focusables = Array.from(
+          containerRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length === 0) {
+          event.preventDefault();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [isOpen, onClose]);
+
+  return containerRef;
 }
 
 export function BookingList({ owner = false, bookingId, venueId }: { owner?: boolean; bookingId?: string; venueId?: string }) {
@@ -65,12 +102,18 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
   }, [owner, venueId]));
 
   const activeOwnedVenues = query.data?.venues.filter(v => v.status === 'active' && (!venueId || v.id === venueId)) || [];
-  const effectiveVenueId = venueId || selectedVenueId || (activeOwnedVenues[0]?.id ?? '');
+  const effectiveVenueId = owner ? (venueId || selectedVenueId || (activeOwnedVenues[0]?.id ?? '')) : (venueId || '');
   const availableFields = query.data?.fields.filter(f => !effectiveVenueId || f.venueId === effectiveVenueId) || [];
   const weekDays = getWeekDays(date);
 
   const records = (query.data?.bookings || [])
-    .filter(b => (!effectiveVenueId || b.venueId === effectiveVenueId) && (!bookingId || b.id === bookingId) && (!selectedFieldId || b.fieldId === selectedFieldId) && (owner && viewMode === 'week' ? weekDays.includes(b.date) : (!date || b.date === date)))
+    .filter(b => {
+      if (bookingId) return b.id === bookingId;
+      if (!owner) return true;
+      if (effectiveVenueId && b.venueId !== effectiveVenueId) return false;
+      if (selectedFieldId && b.fieldId !== selectedFieldId) return false;
+      return viewMode === 'week' ? weekDays.includes(b.date) : b.date === date;
+    })
     .sort((a, b) => `${a.date}${hourLabel(a.startHour)}`.localeCompare(`${b.date}${hourLabel(b.startHour)}`));
 
   const venueClosures = (query.data?.closures || [])
@@ -297,7 +340,7 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
       )}
 
       {owner && query.data && availableFields.length > 0 && (
-        <ClosureForm fields={availableFields} onSaved={query.reload} />
+        <ClosureForm key={effectiveVenueId} fields={availableFields} onSaved={query.reload} />
       )}
 
       {showWalkInModal && (
@@ -498,6 +541,7 @@ function RescheduleModal({
   onClose: () => void;
   onRescheduled: () => void;
 }) {
+  const modalRef = useModalKeyboard(true, onClose);
   const { t, money } = useLanguage();
   const [date, setDate] = useState(booking.date >= venueToday() ? booking.date : venueToday());
   const [startHour, setStartHour] = useState(booking.startHour);
@@ -511,17 +555,22 @@ function RescheduleModal({
     useCallback(signal => bookingsService.availability(booking.fieldId, date, signal), [booking.fieldId, date])
   );
 
-  const openHour = field?.openHour ?? 6;
-  const closeHour = field?.closeHour ?? 22;
-  const hourlyRate = field?.hourlyRateMinor ?? 150000;
+  const openHour = field?.openHour ?? 0;
+  const closeHour = field?.closeHour ?? 24;
+  const hourlyRate = field?.hourlyRateMinor;
 
-  let quote = 0;
-  try {
-    if (endHour > startHour) quote = quoteMinor(hourlyRate, startHour, endHour);
-  } catch {}
+  let quote: number | null = null;
+  if (hourlyRate !== undefined && endHour > startHour) {
+    try {
+      quote = quoteMinor(hourlyRate, startHour, endHour);
+    } catch {
+      quote = null;
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (quote === null || !field) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -543,8 +592,16 @@ function RescheduleModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="reschedule-title">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reschedule-title"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div ref={modalRef} tabIndex={-1} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto outline-none">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
           <div>
             <h2 id="reschedule-title" className="text-xl font-bold text-slate-900">
@@ -585,6 +642,8 @@ function RescheduleModal({
 
             {slotsQuery.loading ? (
               <Loading />
+            ) : slotsQuery.error ? (
+              <ServiceErrorMessage error={slotsQuery.error} retry={slotsQuery.reload} />
             ) : slotsQuery.data ? (
               <div className="space-y-2">
                 <span className="text-xs font-semibold uppercase text-slate-500">{t('selectSlot')}</span>
@@ -652,11 +711,13 @@ function RescheduleModal({
 
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 flex items-center justify-between text-sm">
               <span className="font-semibold text-slate-700">{t('total')}:</span>
-              <span className="text-base font-bold text-emerald-800">{money(quote)}</span>
+              <span className="text-base font-bold text-emerald-800">
+                {quote !== null ? money(quote) : '—'}
+              </span>
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <button disabled={busy || success || endHour <= startHour} className="action flex-1" type="submit">
+              <button disabled={busy || success || endHour <= startHour || quote === null || !field} className="action flex-1" type="submit">
                 {t('confirmReschedule')}
               </button>
               <button type="button" className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>
@@ -685,6 +746,7 @@ function WalkInModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const modalRef = useModalKeyboard(true, onClose);
   const { t, money } = useLanguage();
   const [venueId, setVenueId] = useState(initialVenueId || venues[0]?.id || '');
   const venueFields = fields.filter(f => f.venueId === venueId && f.active);
@@ -701,22 +763,24 @@ function WalkInModal({
   const [error, setError] = useState<unknown>();
   const idempotencyKey = useRef(crypto.randomUUID());
 
-  let quote = 0;
-  try {
-    if (currentField && endHour > startHour) {
+  let quote: number | null = null;
+  if (currentField && endHour > startHour) {
+    try {
       quote = quoteMinor(currentField.hourlyRateMinor, startHour, endHour);
+    } catch {
+      quote = null;
     }
-  } catch {}
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!guestName.trim()) return;
+    if (!guestName.trim() || !currentField || quote === null) return;
     setBusy(true);
     setError(undefined);
     try {
       await bookingsService.createWalkIn({
         venueId,
-        fieldId: currentField?.id || fieldId,
+        fieldId: currentField.id,
         sport,
         date,
         startHour,
@@ -735,8 +799,16 @@ function WalkInModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="walkin-title">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="walkin-title"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div ref={modalRef} tabIndex={-1} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto outline-none">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
           <h2 id="walkin-title" className="text-xl font-bold text-slate-900">
             {t('walkInReservation')}
@@ -888,11 +960,13 @@ function WalkInModal({
 
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 flex items-center justify-between text-sm">
               <span className="font-semibold text-slate-700">{t('total')}:</span>
-              <span className="text-base font-bold text-emerald-800">{money(quote)}</span>
+              <span className="text-base font-bold text-emerald-800">
+                {quote !== null ? money(quote) : '—'}
+              </span>
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <button disabled={busy || !guestName.trim() || !venueFields.length} className="action flex-1" type="submit">
+              <button disabled={busy || !guestName.trim() || !venueFields.length || quote === null} className="action flex-1" type="submit">
                 {t('saveWalkIn')}
               </button>
               <button type="button" className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>
@@ -908,7 +982,7 @@ function WalkInModal({
 
 function ClosureForm({ fields, onSaved }: { fields: Field[]; onSaved: () => void }) {
   const { t } = useLanguage();
-  const [fieldId, setFieldId] = useState(fields[0]?.id || '');
+  const [selectedFieldId, setSelectedFieldId] = useState('');
   const [date, setDate] = useState(venueToday());
   const [start, setStart] = useState(8);
   const [end, setEnd] = useState(9);
@@ -917,13 +991,16 @@ function ClosureForm({ fields, onSaved }: { fields: Field[]; onSaved: () => void
   const [error, setError] = useState<unknown>();
   const [saved, setSaved] = useState(false);
 
+  const targetFieldId = fields.some(f => f.id === selectedFieldId) ? selectedFieldId : (fields[0]?.id || '');
+
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!targetFieldId) return;
     setBusy(true);
     setSaved(false);
     setError(undefined);
     try {
-      await bookingsService.close({ fieldId: fieldId || fields[0]?.id, date, startHour: start, endHour: end, reason });
+      await bookingsService.close({ fieldId: targetFieldId, date, startHour: start, endHour: end, reason });
       setSaved(true);
       onSaved();
     } catch (err) {
@@ -941,7 +1018,7 @@ function ClosureForm({ fields, onSaved }: { fields: Field[]; onSaved: () => void
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <label className="form-label">
           {t('field')}
-          <select required value={fieldId || fields[0]?.id} onChange={e => setFieldId(e.target.value)} className="form-input">
+          <select required value={targetFieldId} onChange={e => setSelectedFieldId(e.target.value)} className="form-input">
             {fields.map(field => (
               <option key={field.id} value={field.id}>
                 {field.name}
