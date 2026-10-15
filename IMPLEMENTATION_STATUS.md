@@ -127,3 +127,25 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
   4. Regression test coverage:
      - Created tests/history-trap.test.cjs adding 7 focused unit regression tests verifying immediate clean resolution when trap is absent, confirmed traversal resolution, timeout failure on missing popstate, safe handling of delayed popstate with trap restoration, caller edit preservation upon cleanup failure, and deduplication of concurrent callers.
      - Total unit test suite expanded to 43 passing tests (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen UI baseline preserved.
+
+- Step 14 (Preventing additional cleanup traversals and retry race during unresolved delayed traversal):
+  1. Unresolved delayed traversal lock in cleanHistoryTrap:
+     - In `src/services/history-trap.ts`, `cleanHistoryTrap()` checks `hasPendingDelayedTraversal` before initiating any Back request. If a timed-out traversal remains unresolved, it returns `Promise.resolve(false)` immediately without issuing `window.history.back()` or registering an authorization listener.
+     - Retrying callers (such as re-attempted tab switches, venue changes, or link clicks) are blocked from generating a second Back request or misinterpreting earlier delayed events as authorizing the new request.
+     - Callers preserve local edits and keep the editor mounted until recovery completes.
+  2. Safe delayed event recovery:
+     - Registered a one-time delayed event recovery listener (`delayedRecoveryListener`) on `window` upon cleanup timeout. When the earlier in-flight `popstate` event is delivered, the recovery listener consumes the delayed traversal, unregisters itself, and clears `hasPendingDelayedTraversal = false`.
+     - In `handleTrapPopState()`, when mounted dirty editors intercept the delayed popstate, it cleans up `delayedRecoveryListener`, resets the pending flag, restores the history trap, and swallows the event without showing discard dialogs.
+     - In `resetHistoryTrapState()`, cleans up `delayedRecoveryListener` unconditionally.
+  3. Regression test coverage:
+     - Added test `timeout → retry → delayed-event prevents extra Back and does not authorize retry` in `tests/history-trap.test.cjs` against the compiled production helper (`.test-build/services/history-trap`).
+     - Verifies:
+       - Initial cleanup timeout issues exactly 1 Back request and sets `hasDelayedTraversalPending() === true`.
+       - Immediate retry call returns `false`, maintains `backCallCount === 1` (zero extra Back calls), and keeps `hasDelayedTraversalPending() === true`.
+       - Delivery of delayed popstate from the first Back request completes recovery and clears the pending flag without authorizing the retry.
+       - Subsequent cleanup after recovery completes proceeds cleanly and only then issues a fresh Back request if trap is present.
+  4. Verification:
+     - 44/44 unit tests pass (`npm test`).
+     - Scoped ESLint passes with 0 errors and 0 warnings (`npx eslint src/services/history-trap.ts src/components/microsite-editor.tsx src/components/venue-administration.tsx`).
+     - Next.js production build compiles with 0 errors (`npm run build`).
+     - All 8 CMS browser journeys pass (`npm run test:cms`). Frozen UI baseline strictly preserved.

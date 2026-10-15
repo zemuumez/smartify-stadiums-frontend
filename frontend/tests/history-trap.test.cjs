@@ -217,3 +217,43 @@ test('concurrent callers to cleanHistoryTrap share the same in-flight traversal 
   }
 });
 
+test('timeout → retry → delayed-event prevents extra Back and does not authorize retry', async () => {
+  const env = setupMockWindow({ __cmsTrap: true });
+  try {
+    // 1. Initial cleanup times out
+    const p1 = cleanHistoryTrap(25);
+    assert.equal(isCleaningTrapActive(), true);
+    assert.equal(env.getBackCount(), 1, 'Initial cleanup issues exactly one history.back()');
+
+    const r1 = await p1;
+    assert.equal(r1, false, 'Timed-out cleanup must resolve false');
+    assert.equal(isCleaningTrapActive(), false);
+    assert.equal(hasDelayedTraversalPending(), true, 'Delayed traversal flag must be pending');
+
+    // 2. Retry while delayed traversal remains unresolved
+    const retryPromise = cleanHistoryTrap(25);
+    const retryResult = await retryPromise;
+    assert.equal(retryResult, false, 'Retry must not authorize cleanup while delayed traversal is unresolved');
+    assert.equal(env.getBackCount(), 1, 'Retry must NOT issue an additional history.back()');
+    assert.equal(hasDelayedTraversalPending(), true, 'Pending flag must remain true');
+
+    // 3. Delayed popstate arrives from first Back request
+    env.mockWindow.dispatchPopState({ someOtherState: true });
+
+    // 4. Recovery is complete: pending flag cleared, retry was NOT authorized by delayed event
+    assert.equal(hasDelayedTraversalPending(), false, 'Delayed event must complete recovery and clear pending flag');
+    assert.equal(env.getBackCount(), 1, 'Total history.back() calls must remain 1');
+
+    // 5. Subsequent cleanup after recovery can proceed normally
+    // If trap was restored (e.g. by dirty editor):
+    env.mockWindow.history.state = { __cmsTrap: true };
+    const pAfterRecovery = cleanHistoryTrap(200);
+    assert.equal(env.getBackCount(), 2, 'Subsequent cleanup after recovery issues fresh history.back()');
+    env.mockWindow.dispatchPopState({ clean: true });
+    const rAfter = await pAfterRecovery;
+    assert.equal(rAfter, true, 'Cleanup after recovery completes successfully upon confirmed popstate');
+  } finally {
+    env.teardown();
+  }
+});
+

@@ -9,6 +9,7 @@
 let isCleaningCmsTrap = false;
 let hasPendingDelayedTraversal = false;
 let cleanHistoryTrapPromise: Promise<boolean> | null = null;
+let delayedRecoveryListener: (() => void) | null = null;
 
 export function isCleaningTrapActive(): boolean {
   return isCleaningCmsTrap;
@@ -22,6 +23,10 @@ export function resetHistoryTrapState(): void {
   isCleaningCmsTrap = false;
   hasPendingDelayedTraversal = false;
   cleanHistoryTrapPromise = null;
+  if (delayedRecoveryListener && typeof window !== 'undefined') {
+    window.removeEventListener('popstate', delayedRecoveryListener);
+  }
+  delayedRecoveryListener = null;
 }
 
 /**
@@ -30,9 +35,14 @@ export function resetHistoryTrapState(): void {
  *
  * Returns true ONLY after confirmed history traversal where the trap is removed.
  * A timeout resolves false and does NOT authorize navigation or unmounting.
+ * A retry while a timed-out traversal is unresolved must not issue another Back
+ * or interpret earlier events as completing a new request.
  */
 export function cleanHistoryTrap(timeoutMs = 1000): Promise<boolean> {
   if (typeof window === 'undefined') return Promise.resolve(true);
+  if (hasPendingDelayedTraversal) {
+    return Promise.resolve(false);
+  }
   if (!window.history.state?.__cmsTrap) {
     return Promise.resolve(true);
   }
@@ -73,6 +83,18 @@ export function cleanHistoryTrap(timeoutMs = 1000): Promise<boolean> {
         // A timeout must NOT authorize navigation or unmounting.
         // Record that history.back was dispatched and may arrive delayed.
         hasPendingDelayedTraversal = true;
+
+        if (win && !delayedRecoveryListener) {
+          delayedRecoveryListener = () => {
+            if (win && delayedRecoveryListener) {
+              win.removeEventListener('popstate', delayedRecoveryListener);
+            }
+            delayedRecoveryListener = null;
+            hasPendingDelayedTraversal = false;
+          };
+          win.addEventListener('popstate', delayedRecoveryListener);
+        }
+
         resolve(false);
       }
     }, timeoutMs);
@@ -105,6 +127,10 @@ export function handleTrapPopState(options: {
     // Delayed traversal from timed-out cleanup arrived safely:
     hasPendingDelayedTraversal = false;
     isCleaningCmsTrap = false;
+    if (delayedRecoveryListener && typeof window !== 'undefined') {
+      window.removeEventListener('popstate', delayedRecoveryListener);
+      delayedRecoveryListener = null;
+    }
     if (options.isDirty && options.onRestoreTrap) {
       options.onRestoreTrap();
     }
