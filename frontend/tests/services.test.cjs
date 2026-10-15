@@ -587,7 +587,7 @@ test('unpublishing preserves unsaved local draft edits and dirty state', async (
   assert.equal(isDirtyAfter, true, 'Form remains dirty so user does not lose unsaved work');
 });
 
-test('pending venue draft preview renders with authorized owner data without requiring active publication', async () => {
+test('pending venue draft preview renders with authorized owner data and courts without requiring active publication', async () => {
   const s = setup();
   s.transport.selectAccount('owner-1');
 
@@ -605,20 +605,58 @@ test('pending venue draft preview renders with authorized owner data without req
   await rejects(s.venues.get(newVenue.slug), 'not_found');
   await rejects(s.venues.get(newVenue.id), 'not_found');
 
-  // 3. Authorized owner draft preview succeeds without relying on public venue lookup
+  // 3. Create an owner-scoped court for this pending venue
+  const newCourt = await s.fields.create({
+    venueId: newVenue.id,
+    name: 'Addis Academy Pitch 1',
+    sports: ['football'],
+    hourlyRateMinor: 200000,
+    openHour: 6,
+    closeHour: 22,
+    active: true,
+  });
+  assert.equal(newCourt.venueId, newVenue.id);
+
+  // 4. Public court query fails with 404 for pending venue
+  await rejects(s.venues.fields(newVenue.id), 'not_found');
+
+  // 5. Authorized owner draft and courts are fetched via authenticated services
   const draft = await s.content.draft(newVenue.id);
   assert.equal(draft.venueId, newVenue.id);
   assert.equal(draft.published, false);
 
-  // In the UI, VenueSite receives previewVenue={newVenue} and previewSite={draft},
-  // rendering the full preview safely without crashing on public 404
-  const previewContext = {
-    venue: newVenue,
-    site: draft,
-    isDraftPreview: true,
-  };
-  assert.equal(previewContext.venue.name, 'Addis Youth Academy');
-  assert.equal(previewContext.venue.status, 'pending');
+  const allOwnerCourts = await s.fields.list();
+  const ownerCourtsForVenue = allOwnerCourts.filter(f => f.venueId === newVenue.id);
+  assert.equal(ownerCourtsForVenue.length, 1);
+  assert.equal(ownerCourtsForVenue[0].name, 'Addis Academy Pitch 1');
+
+  // 6. Test production resolution path used by VenueSite
+  async function resolveVenueSite({ slug, previewVenue, previewSite, previewFields }) {
+    const venue = previewVenue || await s.venues.get(slug);
+    const fields = previewFields !== undefined ? previewFields : await s.venues.fields(venue.id);
+    const site = previewSite || await s.content.get(venue.id);
+    return { venue, fields, site };
+  }
+
+  // Without previewFields, resolution fails with 404 due to public venuesService.fields(venue.id)
+  await rejects(
+    resolveVenueSite({ slug: newVenue.slug, previewVenue: newVenue, previewSite: draft }),
+    'not_found'
+  );
+
+  // With authorized owner courts supplied as previewFields, resolution succeeds completely
+  const resolved = await resolveVenueSite({
+    slug: newVenue.slug,
+    previewVenue: newVenue,
+    previewSite: draft,
+    previewFields: ownerCourtsForVenue,
+  });
+  assert.equal(resolved.venue.name, 'Addis Youth Academy');
+  assert.equal(resolved.venue.status, 'pending');
+  assert.equal(resolved.fields.length, 1);
+  assert.equal(resolved.fields[0].name, 'Addis Academy Pitch 1');
+  assert.equal(resolved.fields[0].hourlyRateMinor, 200000);
+  assert.equal(resolved.site.venueId, newVenue.id);
 });
 
 test('both tenants complete full publish, unpublish, and branding lifecycle in strict isolation', async () => {

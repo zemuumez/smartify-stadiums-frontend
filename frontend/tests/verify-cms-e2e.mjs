@@ -325,7 +325,204 @@ export async function runCmsE2ETest() {
       throw new Error('Journey 2 assertion failed: Internal navigation was not blocked when dirty!');
     }
 
-    // Test 2b: Dirty Unpublish - unpublishing preserves local in-memory edits
+    // -------------------------------------------------------------------------
+    // Test 2b: Management-Tab Switching Guard (VenueAdministration buttons)
+    // -------------------------------------------------------------------------
+    console.log('  Testing management-tab switching guard in VenueAdministration (/s/bambis-meda/manage?tab=cms)...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/bambis-meda/manage?tab=cms' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    // Re-install confirm dialog mock
+    await client.evaluate(`
+      (() => {
+        window.__dialogLog = [];
+        window.__confirmResponse = false; // Cancel by default
+        window.confirm = (msg) => {
+          window.__dialogLog.push({ type: 'confirm', message: msg, accepted: window.__confirmResponse });
+          return window.__confirmResponse;
+        };
+      })()
+    `);
+
+    // Type dirty edit in CMS editor
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Bambis Dirty Tab Switch Test');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(400);
+
+    // Try switching to "Bookings" tab button while dirty (user cancels)
+    console.log('  Clicking Bookings tab button while dirty (user cancels confirm)...');
+    await client.evaluate(`
+      (() => {
+        const bookingsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('bookings') || b.textContent?.includes('Bookings'));
+        bookingsTabBtn?.click();
+      })()
+    `);
+    await sleep(400);
+
+    const tabCancelCheck = await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const activeTabBtn = document.querySelector('nav button.selected');
+        return {
+          dialogCount: window.__dialogLog.length,
+          activeTab: activeTabBtn?.textContent,
+          taglineValue: taglineInput?.value,
+          cmsStillMounted: !!taglineInput
+        };
+      })()
+    `);
+    console.log('  Tab switch cancellation check:', tabCancelCheck);
+    if (!tabCancelCheck.cmsStillMounted || !tabCancelCheck.taglineValue?.includes('Bambis Dirty Tab Switch Test') || tabCancelCheck.dialogCount === 0) {
+      throw new Error(`Journey 2 assertion failed: Tab switch was not guarded or edits were lost: ${JSON.stringify(tabCancelCheck)}`);
+    }
+
+    // Try switching to "Fields" tab button while dirty (user cancels)
+    console.log('  Clicking Fields tab button while dirty (user cancels confirm)...');
+    await client.evaluate(`
+      (() => {
+        const fieldsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('fields') || b.textContent?.includes('Fields'));
+        fieldsTabBtn?.click();
+      })()
+    `);
+    await sleep(400);
+
+    const fieldsCancelCheck = await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        return {
+          dialogCount: window.__dialogLog.length,
+          cmsStillMounted: !!taglineInput
+        };
+      })()
+    `);
+    if (!fieldsCancelCheck.cmsStillMounted || fieldsCancelCheck.dialogCount < 2) {
+      throw new Error(`Journey 2 assertion failed: Fields tab switch was not guarded: ${JSON.stringify(fieldsCancelCheck)}`);
+    }
+
+    // Now confirm tab switch to Bookings
+    console.log('  Clicking Bookings tab button while dirty (user confirms discard)...');
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true; // Confirm discard
+        const bookingsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('bookings') || b.textContent?.includes('Bookings'));
+        bookingsTabBtn?.click();
+      })()
+    `);
+    await sleep(600);
+
+    const tabConfirmCheck = await client.evaluate(`
+      (() => {
+        const activeTabBtn = document.querySelector('nav button.selected');
+        const hasCalendar = !!document.querySelector('input[type="date"]');
+        const hasEditor = !!document.querySelector('input[required][maxlength="120"]');
+        return {
+          activeTab: activeTabBtn?.textContent,
+          hasCalendar,
+          hasEditor
+        };
+      })()
+    `);
+    console.log('  Tab switch confirmation check:', tabConfirmCheck);
+    if (!tabConfirmCheck.hasCalendar || tabConfirmCheck.hasEditor) {
+      throw new Error(`Journey 2 assertion failed: Tab did not switch to Bookings upon confirmation: ${JSON.stringify(tabConfirmCheck)}`);
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 2c: Browser Back / Forward History Protection Without Corruption
+    // -------------------------------------------------------------------------
+    console.log('  Testing browser Back/Forward protection without repeated history entries...');
+    // Start at /stadiums, then navigate to /s/bambis-meda/manage?tab=cms
+    await client.send('Page.navigate', { url: 'http://localhost:3000/stadiums' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/bambis-meda/manage?tab=cms' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    // Re-install confirm dialog mock
+    await client.evaluate(`
+      (() => {
+        window.__dialogLog = [];
+        window.__confirmResponse = false; // Cancel by default
+        window.confirm = (msg) => {
+          window.__dialogLog.push({ type: 'confirm', message: msg, accepted: window.__confirmResponse });
+          return window.__confirmResponse;
+        };
+      })()
+    `);
+
+    const initialHistoryLength = await client.evaluate(`window.history.length`);
+    console.log('  Initial history length on CMS editor:', initialHistoryLength);
+
+    // Keystroke 1: dirty transition
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'History Keystroke 1');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const historyAfterFirstDirty = await client.evaluate(`window.history.length`);
+    console.log('  History length after first dirty edit:', historyAfterFirstDirty);
+
+    // Keystrokes 2, 3, 4, 5 (simulating typing/re-renders while already dirty)
+    for (let k = 2; k <= 5; k++) {
+      await client.evaluate(`
+        (() => {
+          const taglineInput = document.querySelector('input[required]');
+          const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          prototypeValue.set.call(taglineInput, 'History Keystroke ' + ${k});
+          taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+          taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+        })()
+      `);
+      await sleep(150);
+    }
+
+    const historyAfterManyKeystrokes = await client.evaluate(`window.history.length`);
+    console.log('  History length after 5 keystrokes:', historyAfterManyKeystrokes);
+
+    if (historyAfterManyKeystrokes > historyAfterFirstDirty) {
+      throw new Error(`Journey 2 assertion failed: History length increased on every dirty keystroke! (${historyAfterFirstDirty} -> ${historyAfterManyKeystrokes})`);
+    }
+
+    // Trigger browser Back while dirty (user cancels confirm)
+    console.log('  Triggering window.history.back() while dirty (user cancels confirm)...');
+    await client.evaluate(`window.history.back()`);
+    await sleep(500);
+
+    const backCancelCheck = await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        return {
+          currentUrl: window.location.href,
+          taglineValue: taglineInput?.value,
+          cmsStillMounted: !!taglineInput,
+          dialogCount: window.__dialogLog.length
+        };
+      })()
+    `);
+    console.log('  Back cancellation check (restored editor):', backCancelCheck);
+    if (!backCancelCheck.currentUrl.includes('/s/bambis-meda/manage') || !backCancelCheck.taglineValue?.includes('History Keystroke 5')) {
+      throw new Error(`Journey 2 assertion failed: Editor was not reliably restored upon Back cancellation: ${JSON.stringify(backCancelCheck)}`);
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 2d: Dirty Unpublish - unpublishing preserves local in-memory edits
+    // -------------------------------------------------------------------------
     console.log('  Testing unpublish while dirty (verifying local edits are preserved)...');
     await client.evaluate(`
       (() => {
@@ -349,11 +546,13 @@ export async function runCmsE2ETest() {
       })()
     `);
     console.log('  Dirty unpublish result:', dirtyUnpublishCheck);
-    if (!dirtyUnpublishCheck.taglineValue?.includes('Unsaved Edits') || !dirtyUnpublishCheck.statusBadge?.includes('Unpublished')) {
+    if (!dirtyUnpublishCheck.taglineValue?.includes('History Keystroke 5') || !dirtyUnpublishCheck.statusBadge?.includes('Unpublished')) {
       throw new Error('Journey 2 assertion failed: Dirty edits were wiped out by unpublish!');
     }
 
-    // Test 2c: Discard changes button restores saved baseline
+    // -------------------------------------------------------------------------
+    // Test 2e: Discard changes button restores saved baseline
+    // -------------------------------------------------------------------------
     console.log('  Clicking Discard Changes button...');
     await client.evaluate(`
       (() => {
@@ -374,7 +573,7 @@ export async function runCmsE2ETest() {
       })()
     `);
     console.log('  Discard result:', discardCheck);
-    if (discardCheck.isDirty || discardCheck.tagline?.includes('Unsaved Edits')) {
+    if (discardCheck.isDirty || discardCheck.tagline?.includes('History Keystroke 5')) {
       throw new Error(`Journey 2 assertion failed: Discard did not revert draft: ${JSON.stringify(discardCheck)}`);
     }
 
@@ -705,6 +904,274 @@ export async function runCmsE2ETest() {
     const shot7Path = path.join(artifactDir, 'journey_7_mobile_amharic_cms.png');
     await client.captureScreenshot(shot7Path);
     console.log('  ✓ Screenshot captured (mobile Amharic CMS):', shot7Path);
+
+    // =========================================================================
+    // JOURNEY 8: Pending-Venue Draft Preview with Owner-Scoped Courts
+    // =========================================================================
+    console.log('\n[JOURNEY 8] Pending-Venue Draft Preview with Owner-Scoped Courts...');
+
+    // Reset desktop viewport
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+
+    // Setup session as owner-1 in English
+    await client.evaluate(`
+      (() => {
+        sessionStorage.setItem('etsf-demo-session-v1', 'owner-1');
+        localStorage.setItem('etsf-locale', 'en');
+        const langSelect = document.querySelector('select[aria-label]');
+        if (langSelect && langSelect.value !== 'en') {
+          const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+          proto.set.call(langSelect, 'en');
+          langSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      })()
+    `);
+
+    // Restore desktop viewport and English locale for Journey 8
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 1280,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await client.evaluate(`
+      (() => {
+        window.localStorage.setItem('et_sport_locale', 'en');
+        document.documentElement.lang = 'en';
+      })()
+    `);
+
+    // 1. Submit a new venue (defaults to pending status)
+    console.log('  Submitting new pending venue via OwnerVenues (/dashboard/stadiums)...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/stadiums' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const pendingVenueName = 'Addis Youth Sports Academy';
+    await client.evaluate(`
+      (() => {
+        const setVal = (selector, val) => {
+          const el = document.querySelector(selector);
+          if (!el) return;
+          const proto = el instanceof HTMLTextAreaElement ?
+            Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value') :
+            Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          proto.set.call(el, val);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        setVal('input[name="name"]', '${pendingVenueName}');
+        setVal('input[name="city"]', 'Addis Ababa');
+        setVal('input[name="address"]', 'Bole Atlas Road');
+        setVal('input[name="phone"]', '+251911887766');
+        setVal('textarea[name="description"]', 'State-of-the-art youth training center and turf pitches.');
+
+        const submitBtn = document.querySelector('form button[type="submit"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Submit'));
+        submitBtn?.click();
+      })()
+    `);
+    await sleep(1500);
+
+    // Verify submission status message
+    const venueSubmitCheck = await client.evaluate(`
+      (() => {
+        const statusMsg = document.querySelector('[role="status"]')?.textContent;
+        const venueCard = Array.from(document.querySelectorAll('h2')).find(h => h.textContent?.includes('${pendingVenueName}'));
+        return {
+          statusMsg,
+          hasCard: !!venueCard
+        };
+      })()
+    `);
+    console.log('  Venue submission check:', venueSubmitCheck);
+    if (!venueSubmitCheck.hasCard) {
+      throw new Error('Journey 8 assertion failed: New pending venue was not created!');
+    }
+
+    // 2. Add an owner-scoped court for this pending venue
+    console.log('  Adding owner-scoped court for the pending venue via OwnerFields (/dashboard/fields)...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/fields' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const pendingCourtName = 'Academy Youth Turf Pitch 1';
+    await client.evaluate(`
+      (() => {
+        const addFieldBtn = Array.from(document.querySelectorAll('button')).find(b =>
+          b.className?.includes('action') ||
+          b.textContent?.includes('Add a court') ||
+          b.textContent?.includes('ሜዳ') ||
+          b.textContent?.includes('Field')
+        );
+        addFieldBtn?.click();
+      })()
+    `);
+    await sleep(800);
+
+    await client.evaluate(`
+      (() => {
+        const setVal = (selector, val) => {
+          const el = document.querySelector(selector);
+          if (!el) return;
+          const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          proto.set.call(el, val);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
+        // Select the new pending venue in dropdown using HTMLSelectElement descriptor
+        const venueSelect = document.querySelector('select');
+        if (venueSelect) {
+          const opt = Array.from(venueSelect.options).find(o => o.textContent.includes('${pendingVenueName}'));
+          if (opt) {
+            const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+            proto.set.call(venueSelect, opt.value);
+            venueSelect.dispatchEvent(new Event('input', { bubbles: true }));
+            venueSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+
+        setVal('input[required][maxlength="120"]', '${pendingCourtName}');
+        setVal('input[required][maxlength="100"]', 'FIFA Turf');
+        setVal('input[type="number"][step="0.01"]', '2500');
+
+        // Check first sport checkbox (Football)
+        const sportBox = document.querySelector('form input[type="checkbox"]');
+        if (sportBox && !sportBox.checked) {
+          sportBox.click();
+        }
+      })()
+    `);
+    await sleep(400);
+
+    // Click Save button once enabled
+    await client.evaluate(`
+      (() => {
+        const saveBtn = document.querySelector('form button[type="submit"]');
+        saveBtn?.click();
+      })()
+    `);
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const courtCreateCheck = await client.evaluate(`
+      (() => {
+        const errorAlert = document.querySelector('[role="alert"]')?.textContent;
+        const allH2 = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim());
+        const courtHeading = allH2.find(text => text?.includes('${pendingCourtName}'));
+        const formExists = !!document.querySelector('form');
+        const saveBtnDisabled = document.querySelector('button[type="submit"]')?.disabled;
+        return { hasCourt: !!courtHeading, allH2, errorAlert, formExists, saveBtnDisabled };
+      })()
+    `);
+    console.log('  Court creation check:', courtCreateCheck);
+    if (!courtCreateCheck.hasCourt) {
+      throw new Error('Journey 8 assertion failed: Court was not created for pending venue! Details: ' + JSON.stringify(courtCreateCheck));
+    }
+
+    // 3. Open Microsite Editor, select pending venue, and test Live Preview
+    console.log('  Opening CMS editor for the pending venue and switching to Live Preview...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/microsite' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    // Select the pending venue in venue select dropdown
+    const selectedPending = await client.evaluate(`
+      (() => {
+        const select = document.querySelector('select');
+        const opt = Array.from(select?.options || []).find(o => o.textContent.includes('${pendingVenueName}'));
+        if (opt) {
+          const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+          proto.set.call(select, opt.value);
+          select.dispatchEvent(new Event('input', { bubbles: true }));
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          return { selected: true, venueId: opt.value };
+        }
+        return { selected: false };
+      })()
+    `);
+    console.log('  Selected pending venue in CMS:', selectedPending);
+    if (!selectedPending.selected) {
+      throw new Error('Journey 8 assertion failed: Pending venue not found in CMS venue selector!');
+    }
+    await sleep(1500);
+    await waitForLoading(client);
+
+    // Verify Unpublished badge on pending venue
+    const pendingStatusCheck = await client.evaluate(`
+      (() => {
+        const unpublishedBadge = document.querySelector('span[class*="amber"]')?.textContent;
+        return { unpublishedBadge };
+      })()
+    `);
+    console.log('  Pending venue CMS status check:', pendingStatusCheck);
+
+    // Switch to Live Preview tab (in-context rendering)
+    console.log('  Switching to Live Preview tab on pending venue...');
+    await client.evaluate(`
+      (() => {
+        const previewBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Live Preview') || b.textContent?.includes('ቅድመ-ዕይታ'));
+        previewBtn?.click();
+      })()
+    `);
+    await sleep(1500);
+
+    // Assert preview rendered with Draft Preview Mode, pending venue title, and owner-scoped court card
+    const pendingPreviewCheck = await client.evaluate(`
+      (() => {
+        const previewBanner = Array.from(document.querySelectorAll('div')).find(d => d.textContent?.includes('Draft Preview Mode'));
+        const heading = Array.from(document.querySelectorAll('h1')).find(h => h.textContent?.includes('${pendingVenueName}'));
+        const courtCard = Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes('${pendingCourtName}'));
+        const notFound = Array.from(document.querySelectorAll('h1')).find(h => h.textContent?.includes('Unpublished') || h.textContent?.includes('Not Found'));
+        return {
+          hasBanner: !!previewBanner,
+          hasHeading: !!heading,
+          hasCourtCard: !!courtCard,
+          isNotFound: !!notFound
+        };
+      })()
+    `);
+    console.log('  Pending venue Live Preview assertion:', pendingPreviewCheck);
+    if (!pendingPreviewCheck.hasBanner || !pendingPreviewCheck.hasHeading || !pendingPreviewCheck.hasCourtCard || pendingPreviewCheck.isNotFound) {
+      throw new Error(`Journey 8 assertion failed: Pending venue preview failed to render owner-scoped courts without 404: ${JSON.stringify(pendingPreviewCheck)}`);
+    }
+
+    const shot8Path = path.join(artifactDir, 'journey_8_pending_venue_preview.png');
+    await client.captureScreenshot(shot8Path);
+    console.log('  ✓ Screenshot captured (pending venue preview with owner courts):', shot8Path);
+
+    // 4. Verify public visitor accessing /s/venue-{id} receives 404 / unpublished notice
+    const pendingSlug = 'venue-' + selectedPending.venueId;
+    console.log('  Verifying public visitor accessing /s/' + pendingSlug + ' receives 404 unpublished notice...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/' + pendingSlug });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const publicPendingCheck = await client.evaluate(`
+      (() => {
+        const notice = Array.from(document.querySelectorAll('h1')).find(h =>
+          h.textContent?.toLowerCase().includes('unpublished') ||
+          h.textContent?.includes('አልታተመም') ||
+          h.textContent?.toLowerCase().includes('not found') ||
+          h.textContent?.toLowerCase().includes('unavailable')
+        );
+        const heading = Array.from(document.querySelectorAll('h1')).find(h => h.textContent?.includes('${pendingVenueName}'));
+        return {
+          hasNotice: !!notice,
+          noticeText: notice?.textContent,
+          leakedPublicly: !!heading
+        };
+      })()
+    `);
+    console.log('  Public pending access denial check:', publicPendingCheck);
+    if (!publicPendingCheck.hasNotice || publicPendingCheck.leakedPublicly) {
+      throw new Error('Journey 8 assertion failed: Pending venue leaked to public access! ' + JSON.stringify(publicPendingCheck));
+    }
 
     client.close();
     proc.kill();

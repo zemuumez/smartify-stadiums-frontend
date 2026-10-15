@@ -1,8 +1,8 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { Microsite, Venue } from '@/services/contracts';
-import { contentService, venuesService } from '@/services';
+import type { Field, Microsite, Venue } from '@/services/contracts';
+import { contentService, fieldsService, venuesService } from '@/services';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import { isSupportedImageUrl } from '@/services/media-policy';
@@ -10,11 +10,22 @@ import { SiteContentEditor } from './site-content-editor';
 import { VenueSite } from './venue-site';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
 
-export function MicrositeEditor({ venueId }: { venueId?: string }) {
+export function MicrositeEditor({
+  venueId,
+  onDirtyChange,
+}: {
+  venueId?: string;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { t } = useLanguage();
   const [selectedId, setSelectedId] = useState('');
   const [dirty, setDirty] = useState(false);
   const venues = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
+
+  const handleDirty = useCallback((isDirty: boolean) => {
+    setDirty(isDirty);
+    onDirtyChange?.(isDirty);
+  }, [onDirtyChange]);
 
   if (venues.loading) return <Loading />;
   if (venues.error) return <ServiceErrorMessage error={venues.error} retry={venues.reload} />;
@@ -32,6 +43,7 @@ export function MicrositeEditor({ venueId }: { venueId?: string }) {
       if (!proceed) return;
     }
     setDirty(false);
+    onDirtyChange?.(false);
     setSelectedId(nextId);
   }
 
@@ -58,7 +70,7 @@ export function MicrositeEditor({ venueId }: { venueId?: string }) {
       <Draft
         key={venue.id}
         venue={venue}
-        onDirtyChange={setDirty}
+        onDirtyChange={handleDirty}
       />
     </div>
   );
@@ -71,22 +83,43 @@ function Draft({
   venue: Venue;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const query = useServiceQuery(useCallback(signal => contentService.draft(venue.id, signal), [venue.id]));
+  const query = useServiceQuery(useCallback(async signal => {
+    const [draft, allFields] = await Promise.all([
+      contentService.draft(venue.id, signal),
+      fieldsService.list(signal),
+    ]);
+    return { draft, fields: allFields.filter(f => f.venueId === venue.id) };
+  }, [venue.id]));
+
   if (query.loading) return <Loading />;
   if (query.error || !query.data) return <ServiceErrorMessage error={query.error} retry={query.reload} />;
-  return <EditForm initial={query.data} venue={venue} onDirtyChange={onDirtyChange} />;
+  return (
+    <EditForm
+      initial={query.data.draft}
+      venue={venue}
+      fields={query.data.fields}
+      onDirtyChange={onDirtyChange}
+    />
+  );
 }
 
 function EditForm({
   initial,
   venue,
+  fields,
   onDirtyChange,
 }: {
   initial: Microsite;
   venue: Venue;
+  fields: Field[];
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { t } = useLanguage();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+
   const [draft, setDraft] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -103,9 +136,22 @@ function EditForm({
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
+  const editorUrlRef = useRef<string>('');
+  const prevDirtyRef = useRef(false);
+
   // Protected navigation: beforeunload, client-side clicks, and browser back/forward
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty) {
+      prevDirtyRef.current = false;
+      return;
+    }
+
+    // Capture editor URL once when first entering dirty state
+    if (!prevDirtyRef.current) {
+      editorUrlRef.current = window.location.href;
+      window.history.pushState({ __cmsTrap: true }, '', editorUrlRef.current);
+      prevDirtyRef.current = true;
+    }
 
     // 1. Browser tab close / reload
     const warn = (event: BeforeUnloadEvent) => {
@@ -128,7 +174,7 @@ function EditForm({
       } catch {
         // malformed URL
       }
-      const confirmed = window.confirm(t('discardConfirm'));
+      const confirmed = window.confirm(tRef.current('discardConfirm'));
       if (!confirmed) {
         event.preventDefault();
         event.stopPropagation();
@@ -138,12 +184,14 @@ function EditForm({
 
     // 3. Browser Back / Forward buttons (popstate)
     const handlePopState = () => {
-      const confirmed = window.confirm(t('discardConfirm'));
+      const confirmed = window.confirm(tRef.current('discardConfirm'));
       if (!confirmed) {
-        window.history.pushState(null, '', window.location.href);
+        // Reliably restore the editor URL rather than pushing the already-changed URL
+        window.history.pushState({ __cmsTrap: true }, '', editorUrlRef.current);
+      } else {
+        prevDirtyRef.current = false;
       }
     };
-    window.history.pushState(null, '', window.location.href);
     window.addEventListener('popstate', handlePopState);
 
     return () => {
@@ -151,7 +199,7 @@ function EditForm({
       document.removeEventListener('click', handleCaptureClick, true);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [dirty, t]);
+  }, [dirty]);
 
   async function handleSave(publish = false) {
     if (isHeroImageInvalid || isLogoUrlInvalid) return;
@@ -270,6 +318,7 @@ function EditForm({
             slug={venue.slug}
             previewVenue={venue}
             previewSite={draft}
+            previewFields={fields}
             isDraftPreview
             onExitPreview={() => setMode('edit')}
           />

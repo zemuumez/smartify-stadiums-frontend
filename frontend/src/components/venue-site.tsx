@@ -33,7 +33,7 @@ export function VenueSite({
   const [preview, setPreview] = useState<SiteHighlight | null>(null);
   const query = useServiceQuery(useCallback(async signal => {
     const venue = previewVenue || await venuesService.get(slug, signal);
-    const fields = previewFields || await venuesService.fields(venue.id, signal);
+    const fields = previewFields !== undefined ? previewFields : await venuesService.fields(venue.id, signal);
     const site = previewSite || await contentService.get(venue.id, signal);
     return { venue, fields, site };
   }, [slug, previewVenue, previewFields, previewSite]));
