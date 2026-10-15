@@ -149,3 +149,125 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Scoped ESLint passes with 0 errors and 0 warnings (`npx eslint src/services/history-trap.ts src/components/microsite-editor.tsx src/components/venue-administration.tsx`).
      - Next.js production build compiles with 0 errors (`npm run build`).
      - All 8 CMS browser journeys pass (`npm run test:cms`). Frozen UI baseline strictly preserved.
+
+- Step 15 (Milestone M4 Part 1 Step 1: Teams & Event Registration Domain Services, Mock Transport, and Invariants):
+  1. Branch & scope:
+     - Merged `codex/venue-cms-publishing` into `main` at `6dd246a` after independent sign-off.
+     - Created branch `codex/teams-events` to implement Teams & Event Registration (Milestone M4 Part 1).
+  2. Participation format & dynamic capacity:
+     - Added `ParticipationFormat` (`'team' | 'singles' | 'doubles'`) explicitly to `SiteEvent`, `EventRegistration`, and `EventDetails`.
+     - Modeled dynamic capacity semantics: `team` counts teams, `singles` counts individuals, `doubles` counts pairs.
+     - `availableSpots` computed dynamically as `Math.max(0, event.spots - registeredCount)`.
+  3. CMS content vs. operational registrations separation:
+     - `Microsite.events` holds editorial event definitions; operational registrations live in `eventRegistrations`.
+     - In `transport.ts`, saving/publishing CMS drafts strictly enforces registration safety:
+       - Attempting to delete an event with active registrations is rejected with 409 `conflict`.
+       - Attempting to reduce event capacity below active registrations is rejected with 409 `conflict`.
+       - Attempting to change sport or format while active registrations exist is rejected with 409 `conflict`.
+       - Events with zero registrations can be safely removed or resized.
+  4. Team authority validation & privacy boundaries:
+     - `POST /bookings` accepts `teamId`, validates caller is the team captain, verifies court sport matches team sport, and server-side derives authoritative `teamName` (ignoring tampered client values).
+     - `GET /teams/:id/bookings`: members/captains see full booking records including `totalMinor`, `paymentStatus`, and contact details; public non-members see sanitized match schedule with financial and personal contact fields stripped.
+  5. Mutation consistency & spot management:
+     - Duplicate submissions rejected: duplicate team join requests, duplicate event registrations (same player or same team) return 409 `conflict`.
+     - Registration rejected for closed events (past date/time) or full events (`availableSpots === 0`).
+     - Registration cancellation marks status `cancelled` and restores capacity once; re-cancellation is rejected with 409 `conflict`.
+  6. Verification:
+     - Created `tests/teams-events.test.cjs` with 12 comprehensive unit regression tests covering team creation, join moderation, roster leaving/removal, team booking authority, visibility boundaries, format handling, spot arithmetic, cancellation recovery, and CMS safety invariants.
+     - Total unit test suite expanded from 44 to 56 passing tests (`npm test`).
+     - Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched services and fixtures).
+     - Production Next.js build compiles cleanly (`npm run build`).
+
+- Step 16 (Milestone M4 Part 1 Step 2: UI Integration, Complete Localization, and 4 Reproducible Browser Journeys):
+  1. UI integration across teams, bookings, and venues:
+     - src/components/team-panels.tsx: rendered TeamDetail and TeamList with useServiceQuery. Added Captain Controls for pending join requests (Approve/Reject) and roster management (Remove member). Added membership actions (Request to Join, pending badge, Leave Team with inline confirmation). Added Team Matches section enforcing privacy boundary (members see full ETB financials and payment status; public non-members see match schedule with financial amounts masked).
+     - src/components/booking-form.tsx: captain team selector appears when booking a court whose sport matches the captain''s team; passes teamId and preserves booking context across login via returnTo.
+     - src/components/booking-list.tsx: displayed teamName · teamMatch badge in both player bookings list and venue owner bookings overview.
+     - src/components/venue-site.tsx: integrated dynamic eventDetails, participation format badges (formatTeam, formatSingles, formatDoubles), real-time spots open, and EventRegistrationDialog modal supporting team (captain selection), singles (individual), and doubles (partner name entry) registrations, along with self-service cancellation that restores capacity.
+  2. Full localization (English & Amharic):
+     - Added matching keys to src/i18n/en.ts and src/i18n/am.ts: captain, teamRoster, requestToJoin, joinRequestPending, leaveTeam, leaveTeamConfirm, removeMember, removeMemberConfirm, captainPanel, pendingRequests, noPendingRequests, approveRequest, rejectRequest, teamBookings, noTeamBookings, bookForTeam, selectTeam, individualBooking, eventRegistration, registerForEvent, cancelRegistration, cancelRegistrationConfirm, registrationSuccess, registrationCancelled, partnerName, partnerNamePlaceholder, partnerNameRequired, selectRegistrationTeam, formatTeam, formatSingles, formatDoubles, spotsAvailable, eventFull, eventClosed, teamSpotsOpen, playerSpotsOpen, pairSpotsOpen, teamMatch, rosterEmpty, youAreCaptain, teamMember, noMatchingTeam, registered.
+  3. Reproducible browser journeys (frontend/tests/verify-teams-events-e2e.mjs):
+     - Journey 1: Teams, Captaincy, and Member Moderation: Sara Mengistu submits join request to Bole Lions FC; Captain Abebe Kebede reviews and approves; roster updates to include Sara with Remove button; Sara visits, clicks Leave Team, confirms, and is cleanly removed from the roster.
+     - Journey 2: Captain Team Booking and Privacy Boundaries: Abebe books Pitch 1 on behalf of Bole Lions FC; booking card displays Bole Lions FC · Team match in player and owner views; captain views team bookings with ETB financials; non-member public view masks financial figures.
+     - Journey 3: Venue Events across Two Venues: Bambis Meda (football team event) registers Bole Lions FC with capacity decrement; Unity Sports Complex (tennis singles event) registers Sara as individual, then cancels registration, restoring capacity and re-enabling registration button.
+     - Journey 4: Mobile Viewport (390x844) & Amharic Localization: verified document.documentElement.scrollWidth <= window.innerWidth (no horizontal overflow) and complete Amharic strings on mobile team profile and venue microsite.
+  4. Verification results:
+     - 56/56 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Saved screenshot artifacts: journey1_join_request_pending.png, journey1_captain_approved_roster.png, journey2_team_booking_badge.png, journey3_event_registered_venue1.png, journey4_mobile_amharic_team.png, journey4_mobile_amharic_venue.png.
+     - Frozen UI baseline strictly preserved. No merge, push, or deployment.
+
+- Step 17 (Milestone M4 Part 1 Step 3: Resolution of 6 Review Findings on Teams & Event Registration):
+  1. Revalidate event registrations when publishing (Finding 1):
+     - Extracted validateEventRegistrationInvariants in frontend/src/demo/transport.ts.
+     - Invoked the invariant check in both draft save (PATCH /owner/stadiums/:id/microsite) AND draft publish (POST /owner/stadiums/:id/microsite/publish), guaranteeing that if registrations occur against a published event while a draft removing, shrinking, or mutating that event is pending, publication is rejected with 409 conflict.
+     - Added comprehensive regression test in tests/teams-events.test.cjs.
+  2. Faithful event preview & honest failure handling (Finding 2):
+     - In frontend/src/components/venue-site.tsx, preview mode (previewSite || isDraftPreview) maps eventDetails directly from previewSite.events / draft definitions rather than loading stale published events.
+     - Live requests to eventsService.list bubble genuine errors directly to useServiceQuery without fabricating zero registrations, full availability, or open status.
+     - Added regression test asserting honest error bubbling for nonexistent venues.
+  3. Complete explicit participation formats & doubles validation (Finding 3):
+     - In frontend/src/components/site-content-editor.tsx, added explicit format selector (formatTeam, formatSingles, formatDoubles) for each CMS event, with dynamic capacity labels (capacityTeams, capacitySingles, capacityDoubles). New events initialize with format: 'team'.
+     - In frontend/src/demo/transport.ts and frontend/src/components/venue-site.tsx, enforced non-empty partnerName (rejecting empty or whitespace strings with 422 validation).
+     - Added negative tests in tests/teams-events.test.cjs verifying empty, whitespace, and omitted partner names are rejected.
+  4. Removal of private booking references from public responses (Finding 4):
+     - Defined dedicated PublicTeamMatch DTO in frontend/src/services/contracts.ts (with opaque matchId: 'match-' + team.id + '-' + date + '-' + startHour + '-' + idx), completely omitting private id, bookingId, totalMinor, and paymentStatus.
+     - Updated TeamMatchDetail extending PublicTeamMatch for authorized captains and members.
+     - Updated frontend/src/demo/transport.ts and frontend/src/components/team-panels.tsx to key match listings by matchId.
+     - Added unit regression test verifying non-members receive strictly undefined for all private booking references.
+  5. Restore pending join status after reload (Finding 5):
+     - Added teamsService.myRequest(teamId, signal) endpoint returning the caller's persisted pending TeamJoinRequest or null.
+     - In frontend/src/components/team-panels.tsx, queried myRequest for authenticated non-members and derived isPending = pendingRequested || myRequest?.status === 'pending', rendering the persistent joinRequestPending badge across reloads.
+     - Added unit regression test verifying persisted request retrieval across sessions.
+  6. Resilient registration-dialog loading states (Finding 6):
+     - Migrated EventRegistrationDialog in frontend/src/components/venue-site.tsx to useServiceQuery, providing explicit loadingInitial and initialError states with an actionable retry button (ServiceErrorMessage).
+     - Distinguished guest unauthenticated status (401 / unauthorized returns currentUser = null) from genuine network/server errors (which bubble up to initialError), preventing authentication or network failures from misrepresenting as 'no matching team'.
+  7. Verification:
+     - 59/59 unit tests pass (npm test).
+     - Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files).
+     - Next.js production build succeeds with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass (node tests/verify-teams-events-e2e.mjs).
+     - Preserved frozen UI baseline. No merge into main, push, or deploy.
+
+- Step 18 (Milestone M4 Part 1 Step 4: Resolution of Event Dialog Stale Registration & Team Profile Error States):
+  1. Event dialog fresh registration resolution:
+     - In frontend/src/components/venue-site.tsx, replaced registeringEvent object state with registeringEventId: string | null. Resolved effectiveEvent dynamically via resolveEffectiveEvent(registeringEventId, eventDetails).
+     - In frontend/src/lib/use-service-query.ts, updated reload() to preserve previous data during background reloads (setState(prev => ({ ...prev, loading: true }))), and updated venue-site guard to if (query.loading && !query.data) so the dialog and page do not unmount on query reload.
+     - Registration and cancellation complete with confirmation messages displayed inside the mounted dialog. Upon closing deliberately, clicking Registered ✓ reopens the dialog resolving fresh details (Cancel Registration), never offering the completed registration form again with a stale snapshot.
+  2. Team-profile honest failure & retry handling:
+     - In frontend/src/services/teams.service.ts, exported fetchTeamDetailData(id, deps, signal) and isGuestAuthError(err). Explicitly treats 401 unauthorized as me = null (genuine guest user), while bubbling real auth service errors (500/network), captain join-request query failures, personal join-request query failures, and team lookup failures to query.error.
+     - In frontend/src/components/team-panels.tsx, integrated fetchTeamDetailData with ServiceErrorMessage error={query.error} retry={query.reload}, preventing operational failures from misrepresenting as 'signed out', empty join requests, or active Join buttons.
+  3. Actual storage reconstruction, renderer resolution, and browser test coverage:
+     - Storage reconstruction: updated teamsService.myRequest unit test in tests/teams-events.test.cjs to serialize storage state, reconstruct a brand new simulator instance, and verify join request persistence across storage reloads.
+     - Production renderer resolution: added unit test exercising resolveVenueSiteEvents (confirming draft events take precedence in preview mode) and resolveEffectiveEvent (confirming fresh registration details resolve dynamically).
+     - Error state isolation: added unit test exercising fetchTeamDetailData, verifying 401 returns me = null while operational failures reject to trigger retry.
+     - Browser E2E coverage in tests/verify-teams-events-e2e.mjs:
+       - Journey 1: reloaded the page via CDP after join request submission, asserting 'Join request pending' persists across page reload; added Step 1d asserting operational query failures render honest error state with retry button.
+       - Journey 3: asserted registration dialog stays mounted with confirmation success text after submission, verified deliberate close, and verified re-opening Registered ✓ resolves fresh details (Cancel Registration button, no registration form).
+  4. Verification results:
+     - 60/60 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.
+
+- Step 19 (Milestone M4 Part 1 Step 5: Shared Query-Hook Resource Identity and Lifecycle Correction):
+  1. Shared query-hook resource identity correction:
+     - In frontend/src/lib/use-service-query.ts, updated useServiceQuery to accept an optional explicit query key (supporting useServiceQuery(loader, key) and useServiceQuery(key, loader)).
+     - Derived effectiveData and effectiveLoading by checking areQueryKeysEqual(state.key, serializedKey).
+     - Same-resource refreshes (reload() or identical query key) preserve previous data during loading, keeping mounted UI elements (such as confirmation dialogs and active forms) mounted.
+     - Resource identity changes (switching team, venue, or preview context) immediately reset effectiveData to undefined during render, preventing any flash of previous actionable data while the new resource loads.
+     - Passed explicit query keys in frontend/src/components/team-panels.tsx (id) and frontend/src/components/venue-site.tsx (['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id] and ['event-registration-dialog', event.id, event.format, event.sport]).
+  2. Hook and component lifecycle tests:
+     - Added comprehensive hook lifecycle unit test in frontend/tests/teams-events.test.cjs exercising:
+       a. Same-resource reload preserving data and keeping confirmation dialogs mounted without skeleton unmounts.
+       b. Switching resources with delayed backend responses immediately resetting data to undefined and rendering loading skeletons, proving previous actionable data is never accessible or displayed during the delay.
+     - Added browser E2E verification in frontend/tests/verify-teams-events-e2e.mjs (Step 1e) validating that switching team routes immediately clears previous team controls and never displays stale actions.
+  3. Verification results:
+     - 61/61 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.

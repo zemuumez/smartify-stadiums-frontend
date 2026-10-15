@@ -17,6 +17,17 @@ const transport: Transport = isDemoMode
   ? { async request<T>(path: string, options?: Parameters<Transport['request']>[1]) { return (await getDemo()).request<T>(path, options); } }
   : createHttpTransport(apiBaseUrl);
 export const services = createServices(transport);
-export const { auth: authService, venues: venuesService, fields: fieldsService, bookings: bookingsService, content: contentService, teams: teamsService, media: mediaService, billing: billingService, admin: adminService } = services;
+export const {
+  auth: authService,
+  venues: venuesService,
+  fields: fieldsService,
+  bookings: bookingsService,
+  content: contentService,
+  teams: teamsService,
+  events: eventsService,
+  media: mediaService,
+  billing: billingService,
+  admin: adminService,
+} = services;
 export async function selectDemoAccount(id: string) { return (await getDemo()).selectAccount(id); }
 export * from './history-trap';

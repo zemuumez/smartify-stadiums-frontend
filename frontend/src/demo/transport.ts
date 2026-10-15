@@ -1,4 +1,4 @@
-import type { Account, BookingInput, Closure, Microsite, RequestOptions, RescheduleBookingInput, Role, Sport, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingInput, Closure, EventRegistration, EventRegistrationInput, Microsite, PublicTeamMatch, RequestOptions, RescheduleBookingInput, Role, SiteEvent, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -20,7 +20,12 @@ export function createDemoTransport(storage?: DemoStorage) {
     const saved = storage?.getItem(DATA_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as DemoState;
-      if (Array.isArray(parsed.venues) && Array.isArray(parsed.accounts) && Array.isArray(parsed.bookings) && Array.isArray(parsed.fields) && Array.isArray(parsed.drafts) && parsed.idempotency) state = parsed;
+      if (Array.isArray(parsed.venues) && Array.isArray(parsed.accounts) && Array.isArray(parsed.bookings) && Array.isArray(parsed.fields) && Array.isArray(parsed.drafts) && parsed.idempotency) {
+        state = parsed;
+        if (!Array.isArray(state.teams)) state.teams = createFixtures().teams;
+        if (!Array.isArray(state.teamRequests)) state.teamRequests = [];
+        if (!Array.isArray(state.eventRegistrations)) state.eventRegistrations = [];
+      }
     }
     currentId = storage?.getItem(SESSION_KEY) || null;
   } catch { state = createFixtures(); }
@@ -57,6 +62,29 @@ export function createDemoTransport(storage?: DemoStorage) {
   const field = (id: string) => { const item = state.fields.find(item => item.id === id); if (!item) throw new ServiceError('not_found', 404); return item; };
   const available = (fieldId: string, date: string, start: number, end: number) => !state.bookings.some(b => b.fieldId === fieldId && b.date === date && b.status !== 'cancelled' && b.status !== 'no_show' && overlaps(start, end, b.startHour, b.endHour)) && !state.closures.some(c => c.fieldId === fieldId && c.date === date && overlaps(start, end, c.startHour, c.endHour));
   const audit = (action: string, resourceId: string) => state.audit.push({ id: crypto.randomUUID(), actorId: account().id, action, resourceId, createdAt: new Date().toISOString() });
+  const validateEventRegistrationInvariants = (venueId: string, candidateEvents: SiteEvent[], existingEvents: SiteEvent[]) => {
+    const activeRegs = state.eventRegistrations.filter(r => r.venueId === venueId && r.status === 'registered');
+    const newEventIds = new Set(candidateEvents.map(e => e.id));
+    for (const reg of activeRegs) {
+      if (!newEventIds.has(reg.eventId)) {
+        throw new ServiceError('conflict', 409);
+      }
+    }
+    for (const newEvent of candidateEvents) {
+      const activeForEvent = activeRegs.filter(r => r.eventId === newEvent.id);
+      if (newEvent.spots < activeForEvent.length) {
+        throw new ServiceError('conflict', 409);
+      }
+      const existingEvent = existingEvents.find(e => e.id === newEvent.id);
+      if (existingEvent && activeForEvent.length > 0) {
+        const oldFormat = existingEvent.format || (['tennis', 'badminton'].includes(existingEvent.sport) ? 'singles' : 'team');
+        const nextFormat = newEvent.format || (['tennis', 'badminton'].includes(newEvent.sport) ? 'singles' : 'team');
+        if (existingEvent.sport !== newEvent.sport || oldFormat !== nextFormat) {
+          throw new ServiceError('conflict', 409);
+        }
+      }
+    }
+  };
 
   function execute(path: string, options: RequestOptions): unknown {
     const url = new URL(path, 'https://demo.invalid');
@@ -105,14 +133,26 @@ export function createDemoTransport(storage?: DemoStorage) {
       validateInterval(input.date, input.startHour, input.endHour);
       const item = field(input.fieldId); publicVenue(item.venueId);
       if (!input.idempotencyKey || !item.active || !item.sports.includes(input.sport) || input.startHour < item.openHour || input.endHour > item.closeHour || Date.parse(`${input.date}T${String(input.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('validation', 422);
-      const key = `${user.id}:${input.idempotencyKey}`; const fingerprint = JSON.stringify(input);
+
+      let teamId: string | undefined;
+      let teamName: string | undefined;
+      if (input.teamId) {
+        const team = state.teams.find(t => t.id === input.teamId);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.captainId !== user.id) throw new ServiceError('forbidden', 403);
+        if (team.sport !== input.sport) throw new ServiceError('validation', 422);
+        teamId = team.id;
+        teamName = team.name;
+      }
+
+      const key = `${user.id}:${input.idempotencyKey}`; const fingerprint = JSON.stringify({ ...input, teamId, teamName });
       const previous = state.idempotency[key];
       if (previous) {
         if (previous.fingerprint !== fingerprint) throw new ServiceError('conflict', 409);
         return state.bookings.find(b => b.id === previous.bookingId);
       }
       if (!available(item.id, input.date, input.startHour, input.endHour)) throw new ServiceError('conflict', 409);
-      const booking = { id: crypto.randomUUID(), venueId: item.venueId, fieldId: item.id, playerId: user.id, sport: input.sport, date: input.date, startHour: input.startHour, endHour: input.endHour, totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour), currency: 'ETB' as const, status: 'confirmed' as const, paymentStatus: 'unpaid' as const, createdAt: new Date().toISOString(), source: 'online' as const };
+      const booking: Booking = { id: crypto.randomUUID(), venueId: item.venueId, fieldId: item.id, playerId: user.id, sport: input.sport, date: input.date, startHour: input.startHour, endHour: input.endHour, totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour), currency: 'ETB' as const, status: 'confirmed' as const, paymentStatus: 'unpaid' as const, createdAt: new Date().toISOString(), source: 'online' as const, teamId, teamName };
       state.bookings.push(booking); state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
@@ -248,7 +288,14 @@ export function createDemoTransport(storage?: DemoStorage) {
             if ((input.gallery || []).length > 30) throw new ServiceError('validation', 422);
             if ((input.gallery || []).some(g => !isSupportedImageUrl(g.url) || (g.caption && g.caption.length > 200))) throw new ServiceError('validation', 422);
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
-            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0)) throw new ServiceError('validation', 422);
+            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
+
+            validateEventRegistrationInvariants(
+              venue.id,
+              (input.events || []) as SiteEvent[],
+              (draft.events || []) as SiteEvent[]
+            );
+
             Object.assign(draft, {
               highlights: structuredClone(input.highlights || []),
               events: structuredClone(input.events || []),
@@ -269,6 +316,12 @@ export function createDemoTransport(storage?: DemoStorage) {
           }
           if (parts[4] === 'publish' && method === 'POST') {
             if (venue.status !== 'active') throw new ServiceError('conflict', 409);
+            const currentSite = state.sites.find(item => item.venueId === venue.id);
+            validateEventRegistrationInvariants(
+              venue.id,
+              (draft.events || []) as SiteEvent[],
+              (currentSite?.events || draft.events || []) as SiteEvent[]
+            );
             draft.published = true;
             draft.updatedAt = new Date().toISOString();
             const site = structuredClone(draft);
@@ -312,12 +365,336 @@ export function createDemoTransport(storage?: DemoStorage) {
         return { bookings: bookings.length, collectedMinor: bookings.filter(b => b.paymentStatus === 'paid').reduce((sum, b) => sum + b.totalMinor, 0), outstandingMinor: bookings.filter(b => b.status === 'confirmed' && b.paymentStatus === 'unpaid').reduce((sum, b) => sum + b.totalMinor, 0), cancelled: bookings.filter(b => b.status === 'cancelled').length };
       }
     }
+    if ((parts[0] === 'venues' || parts[0] === 'stadiums') && parts[2] === 'events') {
+      const venue = state.venues.find(v => v.id === parts[1] || v.slug === parts[1]);
+      if (!venue || venue.status !== 'active') throw new ServiceError('not_found', 404);
+      const site = state.sites.find(s => s.venueId === venue.id && s.published);
+      if (!site) throw new ServiceError('not_found', 404);
+
+      let user: Account | null = null;
+      try { user = account(); } catch {}
+
+      if (parts.length === 3 && method === 'GET') {
+        const active = state.eventRegistrations.filter(r => r.venueId === venue.id && r.status === 'registered');
+        return (site.events || []).map(event => {
+          const regs = active.filter(r => r.eventId === event.id);
+          const registeredCount = regs.length;
+          const availableSpots = Math.max(0, event.spots - registeredCount);
+          const format = event.format || (['tennis', 'badminton'].includes(event.sport) ? 'singles' : 'team');
+          const isClosed = Date.parse(`${event.date}T${event.time}:00+03:00`) <= Date.now();
+          const myReg = user ? regs.find(r => r.playerId === user!.id || (r.teamId && state.teams.find(t => t.id === r.teamId)?.captainId === user!.id)) || null : null;
+          return {
+            ...event,
+            venueId: venue.id,
+            venueName: venue.name,
+            venueSlug: venue.slug,
+            format,
+            registeredCount,
+            availableSpots,
+            isFull: availableSpots <= 0,
+            isClosed,
+            myRegistration: myReg,
+          };
+        });
+      }
+
+      const event = (site.events || []).find(e => e.id === parts[3]);
+      if (!event) throw new ServiceError('not_found', 404);
+      const activeForEvent = state.eventRegistrations.filter(r => r.venueId === venue.id && r.eventId === event.id && r.status === 'registered');
+      const format = event.format || (['tennis', 'badminton'].includes(event.sport) ? 'singles' : 'team');
+      const isClosed = Date.parse(`${event.date}T${event.time}:00+03:00`) <= Date.now();
+
+      if (parts.length === 4 && method === 'GET') {
+        const registeredCount = activeForEvent.length;
+        const availableSpots = Math.max(0, event.spots - registeredCount);
+        const myReg = user ? activeForEvent.find(r => r.playerId === user!.id || (r.teamId && state.teams.find(t => t.id === r.teamId)?.captainId === user!.id)) || null : null;
+        return {
+          ...event,
+          venueId: venue.id,
+          venueName: venue.name,
+          venueSlug: venue.slug,
+          format,
+          registeredCount,
+          availableSpots,
+          isFull: availableSpots <= 0,
+          isClosed,
+          myRegistration: myReg,
+        };
+      }
+
+      if (parts[4] === 'registrations') {
+        if (parts.length === 5 && method === 'GET') {
+          return activeForEvent.map(r => ({
+            id: r.id,
+            eventId: r.eventId,
+            venueId: r.venueId,
+            format: r.format,
+            playerName: r.playerName,
+            teamId: r.teamId,
+            teamName: r.teamName,
+            status: r.status,
+            createdAt: r.createdAt,
+          }));
+        }
+        if (parts.length === 5 && method === 'POST') {
+          const u = requireRole('player');
+          if (isClosed) throw new ServiceError('conflict', 409);
+          if (activeForEvent.length >= event.spots) throw new ServiceError('conflict', 409);
+          const input = (options.body || {}) as EventRegistrationInput;
+
+          if (format === 'team') {
+            if (!input.teamId) throw new ServiceError('validation', 422);
+            const team = state.teams.find(t => t.id === input.teamId);
+            if (!team) throw new ServiceError('not_found', 404);
+            if (team.captainId !== u.id) throw new ServiceError('forbidden', 403);
+            if (team.sport !== event.sport) throw new ServiceError('validation', 422);
+            if (activeForEvent.some(r => r.teamId === team.id)) throw new ServiceError('conflict', 409);
+            const reg: EventRegistration = {
+              id: crypto.randomUUID(),
+              eventId: event.id,
+              venueId: venue.id,
+              playerId: u.id,
+              playerName: u.full_name,
+              format: 'team',
+              teamId: team.id,
+              teamName: team.name,
+              status: 'registered',
+              createdAt: new Date().toISOString(),
+            };
+            state.eventRegistrations.push(reg);
+            audit('event.registered', reg.id);
+            persist();
+            return reg;
+          }
+
+          if (format === 'singles') {
+            if (activeForEvent.some(r => r.playerId === u.id)) throw new ServiceError('conflict', 409);
+            const reg: EventRegistration = {
+              id: crypto.randomUUID(),
+              eventId: event.id,
+              venueId: venue.id,
+              playerId: u.id,
+              playerName: u.full_name,
+              format: 'singles',
+              status: 'registered',
+              createdAt: new Date().toISOString(),
+            };
+            state.eventRegistrations.push(reg);
+            audit('event.registered', reg.id);
+            persist();
+            return reg;
+          }
+
+          if (format === 'doubles') {
+            if (!input.partnerName || !input.partnerName.trim()) {
+              throw new ServiceError('validation', 422);
+            }
+            if (activeForEvent.some(r => r.playerId === u.id)) throw new ServiceError('conflict', 409);
+            const reg: EventRegistration = {
+              id: crypto.randomUUID(),
+              eventId: event.id,
+              venueId: venue.id,
+              playerId: u.id,
+              playerName: u.full_name,
+              format: 'doubles',
+              partnerName: input.partnerName.trim(),
+              status: 'registered',
+              createdAt: new Date().toISOString(),
+            };
+            state.eventRegistrations.push(reg);
+            audit('event.registered', reg.id);
+            persist();
+            return reg;
+          }
+        }
+
+        if (parts[6] === 'cancel' && method === 'POST') {
+          const u = account();
+          const reg = state.eventRegistrations.find(r => r.id === parts[5] && r.eventId === event.id && r.venueId === venue.id);
+          if (!reg) throw new ServiceError('not_found', 404);
+          const isCaptain = reg.teamId ? state.teams.find(t => t.id === reg.teamId)?.captainId === u.id : false;
+          if (reg.playerId !== u.id && !isCaptain && u.role !== 'admin') throw new ServiceError('forbidden', 403);
+          if (reg.status === 'cancelled') throw new ServiceError('conflict', 409);
+          reg.status = 'cancelled';
+          audit('event.registration_cancelled', reg.id);
+          persist();
+          return reg;
+        }
+      }
+    }
     if (parts[0] === 'teams') {
-      if (method === 'GET') { if (!parts[1]) return state.teams; const team = state.teams.find(t => t.id === parts[1]); if (!team) throw new ServiceError('not_found', 404); return team; }
-      if (method === 'POST') {
-        const user = requireRole('player'); const input = options.body as { name: string; sport: Sport; city: string };
-        if (!input.name.trim() || !sports.includes(input.sport)) throw new ServiceError('validation', 422);
-        const team = { ...input, id: crypto.randomUUID(), captainId: user.id, memberIds: [user.id] }; state.teams.push(team); persist(); return team;
+      if (parts[2] === 'bookings' && method === 'GET') {
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        let user: Account | null = null;
+        try { user = account(); } catch {}
+        const isMember = user && (team.memberIds.includes(user.id) || team.captainId === user.id || user.role === 'admin');
+        const teamBookings = state.bookings.filter(b => b.teamId === team.id && b.status !== 'cancelled');
+        if (isMember) {
+          const detailedMatches: TeamMatchDetail[] = teamBookings.map((b, idx) => ({
+            matchId: `match-${team.id}-${b.date}-${b.startHour}-${idx}`,
+            bookingId: b.id,
+            teamId: team.id,
+            venueId: b.venueId,
+            fieldId: b.fieldId,
+            sport: b.sport,
+            date: b.date,
+            startHour: b.startHour,
+            endHour: b.endHour,
+            totalMinor: b.totalMinor,
+            currency: b.currency,
+            paymentStatus: b.paymentStatus,
+            status: b.status,
+          }));
+          return detailedMatches;
+        }
+        // Public visibility: dedicated PublicTeamMatch DTO; strips private booking references, payments, and contacts
+        const publicMatches: PublicTeamMatch[] = teamBookings.map((b, idx) => ({
+          matchId: `match-${team.id}-${b.date}-${b.startHour}-${idx}`,
+          teamId: team.id,
+          fieldId: b.fieldId,
+          sport: b.sport,
+          date: b.date,
+          startHour: b.startHour,
+          endHour: b.endHour,
+          status: b.status,
+        }));
+        return publicMatches;
+      }
+      const hydrateTeam = (t: Team): Team => ({
+        ...t,
+        captainName: state.accounts.find(a => a.id === t.captainId)?.full_name || t.captainName,
+        members: t.memberIds.map(id => ({
+          id,
+          name: state.accounts.find(a => a.id === id)?.full_name || id,
+        })),
+      });
+      if (parts.length === 1 && method === 'GET') {
+        return state.teams.map(hydrateTeam);
+      }
+      if (parts.length === 2 && method === 'GET') {
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        return hydrateTeam(team);
+      }
+      if (parts.length === 1 && method === 'POST') {
+        const user = requireRole('player');
+        const input = options.body as TeamInput;
+        if (!input.name?.trim() || input.name.length > 120 || !sports.includes(input.sport) || !input.city?.trim() || input.city.length > 100) {
+          throw new ServiceError('validation', 422);
+        }
+        const team: Team = {
+          id: crypto.randomUUID(),
+          name: input.name.trim(),
+          sport: input.sport,
+          city: input.city.trim(),
+          description: input.description?.trim() || '',
+          captainId: user.id,
+          captainName: user.full_name,
+          memberIds: [user.id],
+          createdAt: new Date().toISOString(),
+        };
+        state.teams.push(team);
+        audit('team.created', team.id);
+        persist();
+        return team;
+      }
+      if (parts[2] === 'join' && method === 'POST') {
+        const user = requireRole('player');
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.memberIds.includes(user.id)) throw new ServiceError('conflict', 409);
+        if (state.teamRequests.some(r => r.teamId === team.id && r.playerId === user.id && r.status === 'pending')) {
+          throw new ServiceError('conflict', 409);
+        }
+        const request: TeamJoinRequest = {
+          id: crypto.randomUUID(),
+          teamId: team.id,
+          playerId: user.id,
+          playerName: user.full_name,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+        state.teamRequests.push(request);
+        audit('team.join_requested', request.id);
+        persist();
+        return request;
+      }
+      if (parts[2] === 'my-request' && method === 'GET') {
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        let user: Account | null = null;
+        try { user = account(); } catch { return null; }
+        if (!user) return null;
+        const req = state.teamRequests.find(r => r.teamId === team.id && r.playerId === user!.id && r.status === 'pending');
+        return req || null;
+      }
+      if (parts[2] === 'requests' && method === 'GET') {
+        const user = account();
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.captainId !== user.id && user.role !== 'admin') throw new ServiceError('forbidden', 403);
+        return state.teamRequests.filter(r => r.teamId === team.id && r.status === 'pending');
+      }
+      if (parts[2] === 'requests' && parts[4] === 'approve' && method === 'POST') {
+        const user = account();
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.captainId !== user.id && user.role !== 'admin') throw new ServiceError('forbidden', 403);
+        const req = state.teamRequests.find(r => r.id === parts[3] && r.teamId === team.id);
+        if (!req) throw new ServiceError('not_found', 404);
+        if (req.status !== 'pending') throw new ServiceError('conflict', 409);
+        req.status = 'approved';
+        if (!team.memberIds.includes(req.playerId)) {
+          team.memberIds.push(req.playerId);
+        }
+        audit('team.join_approved', req.id);
+        persist();
+        return hydrateTeam(team);
+      }
+      if (parts[2] === 'requests' && parts[4] === 'reject' && method === 'POST') {
+        const user = account();
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.captainId !== user.id && user.role !== 'admin') throw new ServiceError('forbidden', 403);
+        const req = state.teamRequests.find(r => r.id === parts[3] && r.teamId === team.id);
+        if (!req) throw new ServiceError('not_found', 404);
+        if (req.status !== 'pending') throw new ServiceError('conflict', 409);
+        req.status = 'rejected';
+        audit('team.join_rejected', req.id);
+        persist();
+        return req;
+      }
+      if (parts[2] === 'leave' && method === 'POST') {
+        const user = account();
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (!team.memberIds.includes(user.id)) throw new ServiceError('forbidden', 403);
+        if (team.captainId === user.id) {
+          if (team.memberIds.length > 1) {
+            throw new ServiceError('conflict', 409);
+          }
+          state.teams = state.teams.filter(t => t.id !== team.id);
+          audit('team.deleted', team.id);
+          persist();
+          return { success: true };
+        }
+        team.memberIds = team.memberIds.filter(m => m !== user.id);
+        audit('team.left', team.id);
+        persist();
+        return { success: true };
+      }
+      if (parts[2] === 'members' && parts[3] && method === 'DELETE') {
+        const user = account();
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        if (team.captainId !== user.id && user.role !== 'admin') throw new ServiceError('forbidden', 403);
+        if (parts[3] === team.captainId) throw new ServiceError('conflict', 409);
+        if (!team.memberIds.includes(parts[3])) throw new ServiceError('not_found', 404);
+        team.memberIds = team.memberIds.filter(m => m !== parts[3]);
+        audit('team.member_removed', parts[3]);
+        persist();
+        return hydrateTeam(team);
       }
     }
     if (path === '/media' && method === 'GET') { const user = account(); return state.media.filter(m => m.visibility === 'public' || state.bookings.some(b => b.id === m.bookingId && b.playerId === user.id)); }
