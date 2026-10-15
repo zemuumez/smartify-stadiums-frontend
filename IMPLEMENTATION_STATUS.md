@@ -77,7 +77,7 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
   4. Decoupled draft preview from public venue activation: `VenueSite` accepts `previewVenue?: Venue;` and `previewFields?: Field[];`. Authorized owner data is passed directly from `MicrositeEditor`, allowing unapproved or pending venues to preview drafts without failing on public 404 lookup.
   5. Complete identity controls & dynamic branding: added branded logo URL (`logoUrl`), public inquiry contact phone (`contactPhone`), inquiry email (`contactEmail`), social media links (`socialLinks`), and facility photo showcase (`gallery`) to `Microsite`. `VenueSite` consumes `site.primaryColor` as dynamic `brandColor` across primary CTA buttons, badges, section accents, and headers, and renders the logo, facility showcase gallery, and social media pills.
   6. Regression test suite expanded: 36 unit tests pass (`npm test`) covering media policy constraints, dirty unpublish preservation, pending venue preview, tenant publishing isolation, and failed save recovery. Scoped ESLint has 0 errors and 0 warnings. Next.js production build compiles with 0 errors (`npm run build`). All 7 CDP browser journeys in `npm run test:cms` pass with verifiable evidence.
-- Step 11 (Review findings resolution at f379a56):
+- Step 11 (Review findings resolution at f379a56 & b632de7):
   1. Pending-venue preview with owner-scoped courts:
      - In `src/components/venue-site.tsx`, updated court resolution to `previewFields !== undefined ? previewFields : await venuesService.fields(venue.id, signal)`, ensuring supplied `previewFields` (even if empty) bypasses the public endpoint.
      - In `src/components/microsite-editor.tsx`, `Draft` loads authorized owner courts alongside the draft via `Promise.all([contentService.draft(venue.id, signal), fieldsService.list(signal)])`, filters by `f.venueId === venue.id`, and provides `previewFields={fields}` to both `EditForm` and `<VenueSite />`.
@@ -85,14 +85,18 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - In `src/components/venue-administration.tsx`, added `cmsDirty` state and wrapped tab switching buttons in `handleTabChange(nextTab)`.
      - When switching away from CMS while dirty (`tab === 'cms' && cmsDirty`), prompts `window.confirm(t('discardConfirm'))`. If cancelled, the tab switch is aborted and the editor remains mounted with local edits intact.
      - Connected `onDirtyChange` prop from `MicrositeEditor` to report dirty state changes up to the parent shell.
-  3. Clean browser Back/Forward protection without history corruption:
+  3. Clean browser Back/Forward protection without history corruption or accumulated entries:
      - In `src/components/microsite-editor.tsx`, decoupled the navigation protection effect from `t` recreation by storing `t` in `tRef` via `useEffect([t])`.
-     - The dirty effect now depends strictly on `[dirty]`. Pushes the history trap `{ __cmsTrap: true }` exactly once upon transitioning from clean to dirty (`dirty && !prevDirtyRef.current`). Keystrokes while dirty do not generate repeated history entries (`history.length` remains constant).
-     - On `popstate`, if the user cancels discard, the handler restores `editorUrlRef.current` (`window.history.pushState(null, '', editorUrlRef.current)`) rather than pushing the already-changed target URL. If confirmed, flags `prevDirtyRef.current = false` and navigates smoothly.
-  4. Expanded test coverage & verification:
-     - Replaced the object-only pending preview assertion in `tests/services.test.cjs` with a production-path resolution test (`resolveVenueSite`) that reproduces public 404 failure for pending venues without `previewFields` and verifies complete owner-scoped court cards, surface, operating hours, and rates resolve properly with authorized owner courts.
-     - Added Journey 8 to `tests/verify-cms-e2e.mjs` (`npm run test:cms`) testing in-browser pending venue creation, owner court addition, CMS selection, Live Preview rendering with draft banner and owner court cards, and public 404 access denial.
-     - Added Test 2b and Test 2c in Journey 2 verifying dirty tab switching Cancel and Confirm, and asserting history length stability across keystrokes and URL restoration upon Back cancellation.
+     - Preserves Next.js router history state by merging `window.history.state` (`{ ...baseState, __cmsTrap: true }`) rather than overwriting with a plain object.
+     - Pushes a single history trap entry upon entering dirty state. Keystrokes while dirty do not generate repeated entries.
+     - On Back → Cancel, prompts discard confirmation and restores the trap entry while keeping the editor mounted and local edits intact.
+     - On Back → Confirm, discards local edits, marks confirmed exit, and continues back to the preceding page (`window.history.back()`).
+     - Moving Forward from the preceding page returns to the editor cleanly with normal browser forward behavior.
+     - When saved or discarded via UI buttons, cleans up the trap entry (`window.history.back()`) so zero duplicate entries are left behind. Repeated edit/save and edit/discard cycles never accumulate entries.
+  4. Test coverage & accurate verification semantics:
+     - In `tests/services.test.cjs`, the pending preview test uses a test-local simulator function (`resolveVenueSite`) modeling VenueSite's query resolution logic to verify 404 public lookup isolation and owner court resolution without publication.
+     - Full production-path and component renderer coverage is provided in the headless browser suite by Journey 8 in `tests/verify-cms-e2e.mjs` (`npm run test:cms`), verifying in-browser pending venue creation, owner court addition, CMS selection, Live Preview rendering of `<VenueSite>` with draft banner and owner court cards, and public 404 access denial.
+     - Test 2b and Test 2c in Journey 2 verify dirty tab switching Cancel/Confirm, history length stability across keystrokes, Back → Cancel editor restoration, zero accumulation across repeated edit/save and edit/discard cycles, Back → Confirm navigation to the preceding page (`/stadiums`), and normal Forward traversal back to CMS.
      - All 36 behavioral unit tests pass (`npm test`). Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files). Next.js production build succeeds with 0 errors (`npm run build`). All 8 journeys in `npm run test:cms` pass cleanly in headless Chrome. UI baseline remains frozen and preserved.
 
 

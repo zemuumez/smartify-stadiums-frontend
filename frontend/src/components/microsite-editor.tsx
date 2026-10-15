@@ -132,35 +132,48 @@ function EditForm({
   const isHeroImageInvalid = Boolean(draft.heroImage && !isSupportedImageUrl(draft.heroImage));
   const isLogoUrlInvalid = Boolean(draft.logoUrl && !isSupportedImageUrl(draft.logoUrl));
 
+  const isTrapActiveRef = useRef(false);
+  const isCleaningUpRef = useRef(false);
+  const isConfirmedExitRef = useRef(false);
+  const editorUrlRef = useRef<string>('');
+
+  useEffect(() => {
+    editorUrlRef.current = window.location.href;
+  }, []);
+
   useEffect(() => {
     onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
 
-  const editorUrlRef = useRef<string>('');
-  const prevDirtyRef = useRef(false);
+    if (dirty && !isTrapActiveRef.current && !isConfirmedExitRef.current) {
+      // Capture and preserve Next.js history state, adding trap flag
+      const baseState = (typeof window !== 'undefined' && window.history.state) || {};
+      window.history.pushState(
+        { ...baseState, __cmsTrap: true },
+        '',
+        editorUrlRef.current || window.location.href
+      );
+      isTrapActiveRef.current = true;
+    } else if (!dirty && isTrapActiveRef.current && !isCleaningUpRef.current) {
+      // Clean up the trap entry on save or discard so duplicate entries never accumulate
+      isCleaningUpRef.current = true;
+      isTrapActiveRef.current = false;
+      window.history.back();
+    }
+  }, [dirty, onDirtyChange]);
 
   // Protected navigation: beforeunload, client-side clicks, and browser back/forward
   useEffect(() => {
-    if (!dirty) {
-      prevDirtyRef.current = false;
-      return;
-    }
-
-    // Capture editor URL once when first entering dirty state
-    if (!prevDirtyRef.current) {
-      editorUrlRef.current = window.location.href;
-      window.history.pushState({ __cmsTrap: true }, '', editorUrlRef.current);
-      prevDirtyRef.current = true;
-    }
-
     // 1. Browser tab close / reload
     const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
+      if (dirty) {
+        event.preventDefault();
+      }
     };
     window.addEventListener('beforeunload', warn);
 
     // 2. Client-side navigation clicks (Next.js Links, dashboard management tabs, header links)
     const handleCaptureClick = (event: MouseEvent) => {
+      if (!dirty) return;
       const anchor = (event.target as HTMLElement | null)?.closest('a');
       if (!anchor) return;
       const href = anchor.getAttribute('href');
@@ -184,12 +197,31 @@ function EditForm({
 
     // 3. Browser Back / Forward buttons (popstate)
     const handlePopState = () => {
-      const confirmed = window.confirm(tRef.current('discardConfirm'));
-      if (!confirmed) {
-        // Reliably restore the editor URL rather than pushing the already-changed URL
-        window.history.pushState({ __cmsTrap: true }, '', editorUrlRef.current);
-      } else {
-        prevDirtyRef.current = false;
+      if (isCleaningUpRef.current) {
+        isCleaningUpRef.current = false;
+        return;
+      }
+      if (isConfirmedExitRef.current) {
+        return;
+      }
+      if (isTrapActiveRef.current) {
+        const confirmed = window.confirm(tRef.current('discardConfirm'));
+        if (!confirmed) {
+          // Cancel: stay in editor and restore trap entry with preserved Next.js state
+          const baseState = (typeof window !== 'undefined' && window.history.state) || {};
+          window.history.pushState(
+            { ...baseState, __cmsTrap: true },
+            '',
+            editorUrlRef.current || window.location.href
+          );
+        } else {
+          // Confirm discard: the trap entry was already popped by this Back action.
+          // Discard local edits so dirty becomes false, and continue to the preceding page!
+          setDraft(saved);
+          isTrapActiveRef.current = false;
+          isConfirmedExitRef.current = true;
+          window.history.back();
+        }
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -199,7 +231,7 @@ function EditForm({
       document.removeEventListener('click', handleCaptureClick, true);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [dirty]);
+  }, [dirty, saved]);
 
   async function handleSave(publish = false) {
     if (isHeroImageInvalid || isLogoUrlInvalid) return;

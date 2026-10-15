@@ -461,7 +461,9 @@ export async function runCmsE2ETest() {
     `);
 
     const initialHistoryLength = await client.evaluate(`window.history.length`);
+    const initialNextJsState = await client.evaluate(`window.history.state`);
     console.log('  Initial history length on CMS editor:', initialHistoryLength);
+    console.log('  Initial Next.js router state preserved:', { hasNA: !!initialNextJsState?.__NA });
 
     // Keystroke 1: dirty transition
     await client.evaluate(`
@@ -476,7 +478,16 @@ export async function runCmsE2ETest() {
     await sleep(300);
 
     const historyAfterFirstDirty = await client.evaluate(`window.history.length`);
+    const dirtyNextJsState = await client.evaluate(`window.history.state`);
     console.log('  History length after first dirty edit:', historyAfterFirstDirty);
+    console.log('  Dirty state preserves Next.js router keys:', {
+      hasNA: !!dirtyNextJsState?.__NA,
+      hasTrap: !!dirtyNextJsState?.__cmsTrap
+    });
+
+    if (historyAfterFirstDirty !== initialHistoryLength + 1) {
+      throw new Error(`Journey 2 assertion failed: Expected single trap entry (${initialHistoryLength + 1}), got ${historyAfterFirstDirty}`);
+    }
 
     // Keystrokes 2, 3, 4, 5 (simulating typing/re-renders while already dirty)
     for (let k = 2; k <= 5; k++) {
@@ -489,12 +500,11 @@ export async function runCmsE2ETest() {
           taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
         })()
       `);
-      await sleep(150);
+      await sleep(100);
     }
 
     const historyAfterManyKeystrokes = await client.evaluate(`window.history.length`);
     console.log('  History length after 5 keystrokes:', historyAfterManyKeystrokes);
-
     if (historyAfterManyKeystrokes > historyAfterFirstDirty) {
       throw new Error(`Journey 2 assertion failed: History length increased on every dirty keystroke! (${historyAfterFirstDirty} -> ${historyAfterManyKeystrokes})`);
     }
@@ -516,9 +526,152 @@ export async function runCmsE2ETest() {
       })()
     `);
     console.log('  Back cancellation check (restored editor):', backCancelCheck);
-    if (!backCancelCheck.currentUrl.includes('/s/bambis-meda/manage') || !backCancelCheck.taglineValue?.includes('History Keystroke 5')) {
+    if (!backCancelCheck.currentUrl.includes('/s/bambis-meda/manage') || !backCancelCheck.taglineValue?.includes('History Keystroke 5') || !backCancelCheck.cmsStillMounted) {
       throw new Error(`Journey 2 assertion failed: Editor was not reliably restored upon Back cancellation: ${JSON.stringify(backCancelCheck)}`);
     }
+
+    // Test repeated edit/save and edit/discard cycles do NOT accumulate history entries
+    console.log('  Testing repeated edit/save and edit/discard cycles non-accumulation...');
+    // Cycle A: Save
+    await client.evaluate(`
+      (() => {
+        const saveBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Save draft') || b.textContent?.includes('Save'));
+        saveBtn?.click();
+      })()
+    `);
+    await sleep(1000);
+    await waitForLoading(client);
+
+    const lengthAfterSave = await client.evaluate(`window.history.length`);
+    console.log('  History length after saving clean:', lengthAfterSave);
+
+    // Cycle B: Edit then Discard
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Cycle Edit Discard');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const lengthDuringCycleB = await client.evaluate(`window.history.length`);
+    console.log('  History length during dirty cycle B:', lengthDuringCycleB);
+    if (lengthDuringCycleB > historyAfterFirstDirty) {
+      throw new Error(`Journey 2 assertion failed: History accumulated entries on repeat edit/discard! (${lengthDuringCycleB} > ${historyAfterFirstDirty})`);
+    }
+
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true; // confirm discard
+        const discardBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Discard changes'));
+        discardBtn?.click();
+      })()
+    `);
+    await sleep(500);
+
+    const lengthAfterDiscard = await client.evaluate(`window.history.length`);
+    console.log('  History length after discard clean:', lengthAfterDiscard);
+
+    // Cycle C: Another edit and save to confirm zero accumulation across multiple cycles
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Cycle C Edit Save');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const lengthDuringCycleC = await client.evaluate(`window.history.length`);
+    console.log('  History length during dirty cycle C:', lengthDuringCycleC);
+    if (lengthDuringCycleC > historyAfterFirstDirty) {
+      throw new Error(`Journey 2 assertion failed: History accumulated entries on repeat edit/save! (${lengthDuringCycleC} > ${historyAfterFirstDirty})`);
+    }
+
+    await client.evaluate(`
+      (() => {
+        const saveBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Save draft') || b.textContent?.includes('Save'));
+        saveBtn?.click();
+      })()
+    `);
+    await sleep(1000);
+    await waitForLoading(client);
+
+    // Test Back -> Confirm reaches the preceding page (/stadiums)
+    console.log('  Testing Back -> Confirm reaches the preceding page (/stadiums)...');
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Back Confirm Test');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true; // Confirm discard on Back
+        window.history.back();
+      })()
+    `);
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const backConfirmCheck = await client.evaluate(`
+      (() => {
+        const h1 = document.querySelector('h1')?.textContent;
+        return {
+          currentUrl: window.location.href,
+          h1,
+          isPrecedingPage: window.location.href.includes('/stadiums'),
+          hasEditor: !!document.querySelector('input[required][maxlength="120"]')
+        };
+      })()
+    `);
+    console.log('  Back confirmation check (preceding page):', backConfirmCheck);
+    if (!backConfirmCheck.isPrecedingPage || backConfirmCheck.hasEditor) {
+      throw new Error(`Journey 2 assertion failed: Back -> Confirm did not navigate to preceding page: ${JSON.stringify(backConfirmCheck)}`);
+    }
+
+    // Test Forward returns to editor normally
+    console.log('  Testing Forward returns to CMS editor normally...');
+    await client.evaluate(`window.history.forward()`);
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const forwardCheck = await client.evaluate(`
+      (() => {
+        const hasEditor = !!document.querySelector('input[required][maxlength="120"]');
+        return {
+          currentUrl: window.location.href,
+          hasEditor,
+          isEditorUrl: window.location.href.includes('/s/bambis-meda/manage')
+        };
+      })()
+    `);
+    console.log('  Forward navigation check:', forwardCheck);
+    if (!forwardCheck.isEditorUrl || !forwardCheck.hasEditor) {
+      throw new Error(`Journey 2 assertion failed: Forward did not return to editor: ${JSON.stringify(forwardCheck)}`);
+    }
+
+    // Re-apply dirty edit for subsequent Test 2d (dirty unpublish)
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'History Keystroke 5');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
 
     // -------------------------------------------------------------------------
     // Test 2d: Dirty Unpublish - unpublishing preserves local in-memory edits
