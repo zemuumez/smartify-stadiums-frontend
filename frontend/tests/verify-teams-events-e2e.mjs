@@ -191,6 +191,22 @@ export async function runTeamsEventsE2ETest() {
     }
     await client.captureScreenshot(path.join(artifactDir, 'journey1_join_request_pending.png'));
 
+    // Step 1a (reload persistence): reload the browser page and verify pending request survives reload
+    await client.send('Page.reload');
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const reloadedPendingCheck = await client.evaluate(`
+      (() => {
+        const pendingEl = Array.from(document.querySelectorAll('button, span')).find(b => b.textContent?.includes('Join request pending'));
+        return { hasPending: !!pendingEl };
+      })()
+    `);
+    console.log('  After page reload, pending join request persists:', reloadedPendingCheck);
+    if (!reloadedPendingCheck.hasPending) {
+      throw new Error(`Journey 1: Join request pending status must persist across page reload`);
+    }
+
     // Step 1b: Switch to Abebe (player-1, captain) to review and approve request
     await setSession(client, 'player-1', 'en');
     await client.send('Page.navigate', { url: 'http://localhost:3000/teams/team-1' });
@@ -278,6 +294,25 @@ export async function runTeamsEventsE2ETest() {
     console.log('  After Sara leaves team:', afterLeaveCheck);
     if (!afterLeaveCheck.hasJoinBtn) {
       throw new Error(`Journey 1: After leaving, Sara should see Request to Join button again`);
+    }
+
+    // Step 1d: Verify team-profile operational failure exposes honest retry state (not false guest or empty profile)
+    await client.send('Page.navigate', { url: 'http://localhost:3000/teams/nonexistent-team-999' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const failureStateCheck = await client.evaluate(`
+      (() => {
+        const alert = document.querySelector('[role="alert"]');
+        const retryBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Retry') || b.textContent?.includes('Try again'));
+        const text = document.body.innerText;
+        const isHonestError = !!alert || text.includes('not found') || text.includes('Error') || text.includes('Something went wrong');
+        return { isHonestError, hasRetryBtn: !!retryBtn, textSnippet: text.slice(0, 200) };
+      })()
+    `);
+    console.log('  Operational team query failure renders retry state:', failureStateCheck);
+    if (!failureStateCheck.isHonestError || !failureStateCheck.hasRetryBtn) {
+      throw new Error(`Journey 1: Failed team query must render honest error state with retry button`);
     }
 
     // -------------------------------------------------------------------------
@@ -453,7 +488,22 @@ export async function runTeamsEventsE2ETest() {
     `);
     await sleep(1200);
 
-    // Close modal
+    // Verify dialog remains mounted with registration success message without premature unmount or close
+    const successDialogCheck = await client.evaluate(`
+      (() => {
+        const dialog = document.querySelector('dialog');
+        const isOpen = dialog?.open;
+        const text = dialog?.innerText || '';
+        const hasSuccess = text.includes('Registration confirmed') || text.includes('registrationSuccess') || text.includes('registered for this event');
+        return { isOpen, hasSuccess, textSnippet: text.slice(0, 300) };
+      })()
+    `);
+    console.log('  After registration submit, dialog stays open with confirmation:', successDialogCheck);
+    if (!successDialogCheck.isOpen || !successDialogCheck.hasSuccess) {
+      throw new Error(`Journey 3: Registration dialog must remain mounted and open with confirmation success message`);
+    }
+
+    // Close modal deliberately
     await client.evaluate(`
       (() => {
         const dialog = document.querySelector('dialog');
@@ -474,6 +524,40 @@ export async function runTeamsEventsE2ETest() {
       throw new Error(`Journey 3: Venue 1 event button should show "Registered ✓"`);
     }
     await client.captureScreenshot(path.join(artifactDir, 'journey3_event_registered_venue1.png'));
+
+    // Re-open dialog by clicking Registered ✓ to verify it resolves fresh registration details and does NOT offer the registration form again
+    await client.evaluate(`
+      (() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Registered ✓'));
+        btn?.click();
+      })()
+    `);
+    await sleep(800);
+
+    const freshModalCheck = await client.evaluate(`
+      (() => {
+        const dialog = document.querySelector('dialog');
+        const isOpen = dialog?.open;
+        const text = dialog?.innerText || '';
+        const hasRegisteredStatus = text.includes('Cancel Registration') || text.includes('Registered');
+        const hasRegistrationForm = !!dialog?.querySelector('select[name="teamId"], form');
+        return { isOpen, hasRegisteredStatus, hasRegistrationForm, textSnippet: text.slice(0, 300) };
+      })()
+    `);
+    console.log('  Reopening event modal resolves fresh details:', freshModalCheck);
+    if (!freshModalCheck.isOpen || !freshModalCheck.hasRegisteredStatus || freshModalCheck.hasRegistrationForm) {
+      throw new Error(`Journey 3: Re-opened modal must resolve fresh registration state and not display registration form`);
+    }
+
+    // Close modal again
+    await client.evaluate(`
+      (() => {
+        const dialog = document.querySelector('dialog');
+        const closeBtn = Array.from(dialog?.querySelectorAll('button') || []).find(b => b.textContent?.includes('Close'));
+        closeBtn?.click();
+      })()
+    `);
+    await sleep(600);
 
     // Venue 2: Unity Sports Complex (venue-2, singles event)
     await setSession(client, 'player-2', 'en'); // Sara

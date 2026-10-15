@@ -12,6 +12,7 @@ import { DemoMarker, Loading, ServiceErrorMessage } from './service-state';
 import { Reservation } from './booking-form';
 import type { Account, EventDetails, Field, Microsite, SiteHighlight, Team, Venue } from '@/services/contracts';
 import { isSupportedImageUrl } from '@/services/media-policy';
+import { resolveVenueSiteEvents, resolveEffectiveEvent } from '@/services/events.service';
 export function VenueSite({
   slug,
   previewSite,
@@ -31,7 +32,7 @@ export function VenueSite({
   const { t, date, locale } = useLanguage(); const params = useSearchParams();
   const [selected, setSelected] = useState<Field | null>(null); const [dismissed, setDismissed] = useState(false);
   const [preview, setPreview] = useState<SiteHighlight | null>(null);
-  const [registeringEvent, setRegisteringEvent] = useState<EventDetails | null>(null);
+  const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
   const [eventDismissed, setEventDismissed] = useState(false);
   const query = useServiceQuery(useCallback(async signal => {
     const venue = previewVenue || await venuesService.get(slug, signal);
@@ -39,29 +40,14 @@ export function VenueSite({
     const site = previewSite || await contentService.get(venue.id, signal);
     let eventDetails: EventDetails[] = [];
     if (previewSite || isDraftPreview) {
-      const draftEvents = previewSite?.events || site.events || [];
-      eventDetails = draftEvents.map(e => {
-        const eventFormat = e.format || (['tennis', 'badminton'].includes(e.sport) ? 'singles' : 'team');
-        const isPast = Date.parse(`${e.date}T${e.time}:00+03:00`) <= Date.now();
-        return {
-          ...e,
-          venueId: venue.id,
-          venueName: venue.name,
-          venueSlug: venue.slug,
-          format: eventFormat,
-          registeredCount: 0,
-          availableSpots: e.spots,
-          isFull: e.spots <= 0,
-          isClosed: isPast,
-          myRegistration: null,
-        };
-      });
+      eventDetails = resolveVenueSiteEvents(venue, site, { previewSite, isDraftPreview });
     } else {
-      eventDetails = await eventsService.list(venue.id, signal);
+      const liveEvents = await eventsService.list(venue.id, signal);
+      eventDetails = resolveVenueSiteEvents(venue, site, { liveEvents });
     }
     return { venue, fields, site, eventDetails };
   }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]));
-  if (query.loading) return <Loading/>;
+  if (query.loading && !query.data) return <Loading/>;
   if (query.error || !query.data) {
     const isNotFound = (query.error as { code?: string })?.code === 'not_found' || (query.error as { status?: number })?.status === 404;
     if (isNotFound) {
@@ -96,7 +82,8 @@ export function VenueSite({
   const headingLead = site.tagline.split(' ').slice(0,2).join(' '); const headingAccent = site.tagline.split(' ').slice(2).join(' ');
   const handleOpenBooking = (field?: Field) => { if(field) setSelected(field); };
   const bookingField = selected || (!dismissed && params.get('book') === '1' ? rawFields.find(f=>f.id===params.get('field')) || rawFields[0] : null);
-  const effectiveEvent = registeringEvent || (!eventDismissed && params.get('event') ? (eventDetails || []).find(e => e.id === params.get('event')) || null : null);
+  const targetEventId = registeringEventId || (!eventDismissed ? params.get('event') : null);
+  const effectiveEvent = resolveEffectiveEvent(targetEventId, eventDetails);
   return <main className="bg-[#f4f3ef] text-[#111]">
   {isDraftPreview && (
     <div className="bg-amber-900 text-amber-100 px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-0 z-50">
@@ -348,7 +335,7 @@ export function VenueSite({
                 {ev.myRegistration ? (
                   <button
                     type="button"
-                    onClick={() => { setEventDismissed(false); setRegisteringEvent(ev); }}
+                    onClick={() => { setEventDismissed(false); setRegisteringEventId(ev.id); }}
                     className="w-full py-2.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 transition-all text-center hover:bg-emerald-200"
                   >
                     {t('registered')} ✓
@@ -372,7 +359,7 @@ export function VenueSite({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => { setEventDismissed(false); setRegisteringEvent(ev); }}
+                    onClick={() => { setEventDismissed(false); setRegisteringEventId(ev.id); }}
                     className="w-full py-2.5 rounded-full text-xs font-bold border transition-all text-center hover:opacity-90"
                     style={{ borderColor: brandColor, color: brandColor, backgroundColor: `${brandColor}0d` }}
                   >
@@ -466,7 +453,7 @@ export function VenueSite({
         slug={slug}
         brandColor={brandColor}
         onClose={() => {
-          setRegisteringEvent(null);
+          setRegisteringEventId(null);
           setEventDismissed(true);
         }}
         onRegistered={() => {

@@ -4,7 +4,6 @@ import { useCallback, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authService, teamsService } from '@/services';
-import type { Account, TeamJoinRequest } from '@/services/contracts';
 import { supportedSports, isSport } from '@/services/sports';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
@@ -89,38 +88,14 @@ function TeamList() {
   );
 }
 
+import { fetchTeamDetailData } from '@/services/teams.service';
+
 export function TeamDetail({ id }: { id: string }) {
   const { t, money } = useLanguage();
   const router = useRouter();
   const query = useServiceQuery(
     useCallback(async (signal: AbortSignal) => {
-      let me: Account | null = null;
-      try {
-        me = await authService.current();
-      } catch {
-        me = null;
-      }
-      const [teamData, bookingsData] = await Promise.all([
-        teamsService.get(id, signal),
-        teamsService.listBookings(id, signal),
-      ]);
-      let reqs: TeamJoinRequest[] = [];
-      if (me && (teamData.captainId === me.id || me.role === 'admin')) {
-        try {
-          reqs = await teamsService.listRequests(id, signal);
-        } catch {
-          reqs = [];
-        }
-      }
-      let myReq: TeamJoinRequest | null = null;
-      if (me && !teamData.memberIds.includes(me.id)) {
-        try {
-          myReq = await teamsService.myRequest(id, signal);
-        } catch {
-          myReq = null;
-        }
-      }
-      return { me, team: teamData, bookings: bookingsData, requests: reqs, myRequest: myReq };
+      return fetchTeamDetailData(id, { auth: authService, teams: teamsService }, signal);
     }, [id])
   );
 
@@ -130,7 +105,7 @@ export function TeamDetail({ id }: { id: string }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
 
-  if (query.loading) {
+  if (query.loading && !query.data) {
     return (
       <main className="mx-auto max-w-4xl px-4 pb-28 pt-28">
         <Loading />

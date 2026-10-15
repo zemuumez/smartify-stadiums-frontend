@@ -1,4 +1,4 @@
-import type { EventDetails, EventRegistration, EventRegistrationInput, Transport } from './contracts';
+import type { EventDetails, EventRegistration, EventRegistrationInput, SiteEvent, Transport } from './contracts';
 
 export function createEventsService(transport: Transport) {
   return {
@@ -39,3 +39,43 @@ export function createEventsService(transport: Transport) {
       ),
   };
 }
+
+export function resolveVenueSiteEvents(
+  venue: { id: string; name: string; slug: string },
+  site: { events?: SiteEvent[] },
+  options: {
+    previewSite?: { events?: SiteEvent[] };
+    isDraftPreview?: boolean;
+    liveEvents?: EventDetails[];
+  }
+): EventDetails[] {
+  if (options.previewSite || options.isDraftPreview) {
+    const draftEvents = options.previewSite?.events || site.events || [];
+    return draftEvents.map(e => {
+      const eventFormat = e.format || (['tennis', 'badminton'].includes(e.sport) ? 'singles' : 'team');
+      const isPast = Date.parse(`${e.date}T${e.time}:00+03:00`) <= Date.now();
+      return {
+        ...e,
+        venueId: venue.id,
+        venueName: venue.name,
+        venueSlug: venue.slug,
+        format: eventFormat,
+        registeredCount: 0,
+        availableSpots: e.spots,
+        isFull: e.spots <= 0,
+        isClosed: isPast,
+        myRegistration: null,
+      };
+    });
+  }
+  return options.liveEvents || [];
+}
+
+export function resolveEffectiveEvent(
+  selectedEventId: string | null,
+  eventDetails: EventDetails[]
+): EventDetails | null {
+  if (!selectedEventId) return null;
+  return eventDetails.find(e => e.id === selectedEventId) || null;
+}
+

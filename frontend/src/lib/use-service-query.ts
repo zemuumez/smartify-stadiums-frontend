@@ -8,7 +8,7 @@ export function useServiceQuery<T>(loader: (signal: AbortSignal) => Promise<T>) 
   useEffect(() => {
     const controller = new AbortController();
     // The microtask represents the beginning of this async request, not render-time work.
-    Promise.resolve().then(() => { if (!controller.signal.aborted) setState({ loading: true }); });
+    Promise.resolve().then(() => { if (!controller.signal.aborted) setState(prev => ({ ...prev, loading: true })); });
     loader(controller.signal).then(data => { if (!controller.signal.aborted) setState({ data, loading: false }); }).catch(error => { if (!controller.signal.aborted) setState({ error, loading: false }); });
     return () => controller.abort();
   }, [loader, version]);

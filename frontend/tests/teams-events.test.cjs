@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDemoTransport } = require('../.test-build/demo/transport');
 const { createServices } = require('../.test-build/services/create-services');
+const { fetchTeamDetailData, isGuestAuthError } = require('../.test-build/services/teams.service');
+const { resolveVenueSiteEvents, resolveEffectiveEvent } = require('../.test-build/services/events.service');
 
 const setup = () => {
   const transport = createDemoTransport();
@@ -475,38 +477,53 @@ test('event registration rejects full capacity and closed events', async () => {
   );
 });
 
-test('teamsService.myRequest returns pending join request and persists across sessions', async () => {
-  const s = setup();
-  s.transport.selectAccount('player-1');
-  const team = await s.teams.create({
+test('teamsService.myRequest returns pending join request and persists across reconstructed storage reload', async () => {
+  const store = new Map();
+  const mockStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+  };
+
+  // Session 1: create team, submit join request
+  const transport1 = createDemoTransport(mockStorage);
+  const s1 = { transport: transport1, ...createServices(transport1) };
+  transport1.selectAccount('player-1');
+  const team = await s1.teams.create({
     name: 'Gerji Hoops',
     sport: 'basketball',
     city: 'Addis Ababa',
   });
 
-  // Initially player-2 has no pending request
-  s.transport.selectAccount('player-2');
-  const noReq = await s.teams.myRequest(team.id);
-  assert.equal(noReq, null);
+  transport1.selectAccount('player-2');
+  const noReqBefore = await s1.teams.myRequest(team.id);
+  assert.equal(noReqBefore, null);
 
-  // player-2 submits join request
-  await s.teams.join(team.id);
+  await s1.teams.join(team.id);
+  const req1 = await s1.teams.myRequest(team.id);
+  assert.ok(req1);
+  assert.equal(req1.status, 'pending');
 
-  // myRequest returns the persisted pending request
-  const pendingReq = await s.teams.myRequest(team.id);
-  assert.ok(pendingReq);
-  assert.equal(pendingReq.teamId, team.id);
-  assert.equal(pendingReq.playerId, 'player-2');
-  assert.equal(pendingReq.status, 'pending');
+  // Session 2: completely new transport instantiated from persisted mockStorage (simulating hard reload)
+  const transport2 = createDemoTransport(mockStorage);
+  const s2 = { transport: transport2, ...createServices(transport2) };
+  transport2.selectAccount('player-2');
+  const reloadedReq = await s2.teams.myRequest(team.id);
+  assert.ok(reloadedReq);
+  assert.equal(reloadedReq.teamId, team.id);
+  assert.equal(reloadedReq.playerId, 'player-2');
+  assert.equal(reloadedReq.status, 'pending');
 
-  // Captain approves request
-  s.transport.selectAccount('player-1');
-  await s.teams.approveRequest(team.id, pendingReq.id);
+  // Captain approves in Session 2
+  transport2.selectAccount('player-1');
+  await s2.teams.approveRequest(team.id, reloadedReq.id);
 
-  // Once approved, player-2 is a member, so myRequest returns null
-  s.transport.selectAccount('player-2');
-  const approvedReq = await s.teams.myRequest(team.id);
-  assert.equal(approvedReq, null);
+  // Reconstructed Session 3 verifies membership is restored and request clears
+  const transport3 = createDemoTransport(mockStorage);
+  const s3 = { transport: transport3, ...createServices(transport3) };
+  transport3.selectAccount('player-2');
+  const reqAfterApproval = await s3.teams.myRequest(team.id);
+  assert.equal(reqAfterApproval, null);
 });
 
 test('publication revalidates event registrations against draft deletions and mutations', async () => {
@@ -536,12 +553,11 @@ test('publication revalidates event registrations against draft deletions and mu
   assert.equal(cancelRes.status, 'cancelled');
 });
 
-test('draft preview reflects unpublished events and public event failures throw honest errors', async () => {
+test('resolveVenueSiteEvents renders draft events in preview and resolveEffectiveEvent resolves fresh registrations without stale snapshot', async () => {
   const s = setup();
   s.transport.selectAccount('owner-1');
   const draft = await s.content.draft('venue-1');
 
-  // Add a new draft event
   const newDraftEvent = {
     id: 'venue-1-draft-only-event',
     title: 'Unpublished Draft Tournament',
@@ -556,17 +572,102 @@ test('draft preview reflects unpublished events and public event failures throw 
     events: [...draft.events, newDraftEvent],
   });
 
-  // Live list on venue-1 does NOT contain unpublished event
-  const liveEvents = await s.events.list('venue-1');
-  assert.equal(liveEvents.some((e) => e.id === 'venue-1-draft-only-event'), false);
+  const venue = await s.venues.get('bambis-meda');
+  const updatedDraft = await s.content.draft('venue-1');
 
-  // But the draft site content DOES contain it faithfully for preview
-  const previewDraft = await s.content.draft('venue-1');
-  assert.equal(previewDraft.events.some((e) => e.id === 'venue-1-draft-only-event'), true);
+  // Preview renderer path: resolves unpublished draft event faithfully
+  const previewEvents = resolveVenueSiteEvents(venue, updatedDraft, { isDraftPreview: true, previewSite: updatedDraft });
+  const previewFound = previewEvents.find((e) => e.id === 'venue-1-draft-only-event');
+  assert.ok(previewFound);
+  assert.equal(previewFound.title, 'Unpublished Draft Tournament');
+  assert.equal(previewFound.availableSpots, 8);
+  assert.equal(previewFound.registeredCount, 0);
+
+  // Live renderer path: live events list does NOT include unpublished draft event
+  const liveEvents = await s.events.list('venue-1');
+  const liveResolved = resolveVenueSiteEvents(venue, updatedDraft, { liveEvents });
+  assert.equal(liveResolved.some((e) => e.id === 'venue-1-draft-only-event'), false);
+
+  // Test resolveEffectiveEvent avoiding stale snapshots:
+  // Before registration:
+  const eventBefore = liveResolved.find((e) => e.id === 'venue-1-event-0');
+  assert.equal(eventBefore.availableSpots, 6);
+  assert.equal(eventBefore.registeredCount, 0);
+
+  // Player registers:
+  s.transport.selectAccount('player-1');
+  const team = (await s.teams.list()).find((t) => t.id === 'team-1');
+  await s.events.register('venue-1', 'venue-1-event-0', { teamId: team.id });
+
+  // Refreshed live list:
+  const refreshedLive = await s.events.list('venue-1');
+  const refreshedResolved = resolveVenueSiteEvents(venue, updatedDraft, { liveEvents: refreshedLive });
+
+  // Calling resolveEffectiveEvent by ID returns the FRESH object with registration details intact:
+  const effective = resolveEffectiveEvent('venue-1-event-0', refreshedResolved);
+  assert.ok(effective);
+  assert.equal(effective.availableSpots, 5);
+  assert.equal(effective.registeredCount, 1);
+  assert.ok(effective.myRegistration);
+  assert.equal(effective.myRegistration.teamId, team.id);
+  assert.notEqual(effective, eventBefore); // NOT the stale pre-registration snapshot object!
 
   // Failure handling: querying events for nonexistent venue throws not_found instead of inventing zero registrations
   await rejects(s.events.list('nonexistent-venue'), 'not_found');
   await rejects(s.events.get('nonexistent-venue', 'some-event'), 'not_found');
 });
+
+test('fetchTeamDetailData distinguishes guest auth from operational failures and exposes errors with retry', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const team = await s.teams.create({
+    name: 'Summit Athletics',
+    sport: 'basketball',
+    city: 'Addis Ababa',
+  });
+
+  // 1. Genuine guest auth (401 unauthorized): returns me: null, does NOT throw
+  const guestResult = await fetchTeamDetailData(team.id, {
+    auth: { current: async () => { const err = new Error('Unauthorized'); err.code = 'unauthorized'; err.status = 401; throw err; } },
+    teams: s.teams,
+  });
+  assert.equal(guestResult.me, null);
+  assert.equal(guestResult.team.id, team.id);
+  assert.equal(guestResult.myRequest, null);
+
+  // 2. Real auth service failure (e.g. 500 / network error): MUST throw and NOT disguise as guest!
+  await assert.rejects(
+    fetchTeamDetailData(team.id, {
+      auth: { current: async () => { const err = new Error('Service Unavailable'); err.code = 'internal'; err.status = 500; throw err; } },
+      teams: s.teams,
+    }),
+    (err) => err.status === 500
+  );
+
+  // 3. Captain request listing failure: MUST throw and NOT present as empty requests!
+  await assert.rejects(
+    fetchTeamDetailData(team.id, {
+      auth: { current: async () => ({ id: 'player-1', full_name: 'Abebe Kebede', role: 'player' }) },
+      teams: {
+        ...s.teams,
+        listRequests: async () => { const err = new Error('Requests query failed'); err.code = 'failed'; throw err; },
+      },
+    }),
+    (err) => err.code === 'failed'
+  );
+
+  // 4. Personal join request query failure: MUST throw and NOT present as missing request (Join button)!
+  await assert.rejects(
+    fetchTeamDetailData(team.id, {
+      auth: { current: async () => ({ id: 'player-2', full_name: 'Sara Mengistu', role: 'player' }) },
+      teams: {
+        ...s.teams,
+        myRequest: async () => { const err = new Error('My request query failed'); err.code = 'failed'; throw err; },
+      },
+    }),
+    (err) => err.code === 'failed'
+  );
+});
+
 
 

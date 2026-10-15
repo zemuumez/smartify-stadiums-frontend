@@ -230,3 +230,25 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Next.js production build succeeds with 0 errors (npm run build).
      - All 4 end-to-end browser journeys pass (node tests/verify-teams-events-e2e.mjs).
      - Preserved frozen UI baseline. No merge into main, push, or deploy.
+
+- Step 18 (Milestone M4 Part 1 Step 4: Resolution of Event Dialog Stale Registration & Team Profile Error States):
+  1. Event dialog fresh registration resolution:
+     - In frontend/src/components/venue-site.tsx, replaced registeringEvent object state with registeringEventId: string | null. Resolved effectiveEvent dynamically via resolveEffectiveEvent(registeringEventId, eventDetails).
+     - In frontend/src/lib/use-service-query.ts, updated reload() to preserve previous data during background reloads (setState(prev => ({ ...prev, loading: true }))), and updated venue-site guard to if (query.loading && !query.data) so the dialog and page do not unmount on query reload.
+     - Registration and cancellation complete with confirmation messages displayed inside the mounted dialog. Upon closing deliberately, clicking Registered ✓ reopens the dialog resolving fresh details (Cancel Registration), never offering the completed registration form again with a stale snapshot.
+  2. Team-profile honest failure & retry handling:
+     - In frontend/src/services/teams.service.ts, exported fetchTeamDetailData(id, deps, signal) and isGuestAuthError(err). Explicitly treats 401 unauthorized as me = null (genuine guest user), while bubbling real auth service errors (500/network), captain join-request query failures, personal join-request query failures, and team lookup failures to query.error.
+     - In frontend/src/components/team-panels.tsx, integrated fetchTeamDetailData with ServiceErrorMessage error={query.error} retry={query.reload}, preventing operational failures from misrepresenting as 'signed out', empty join requests, or active Join buttons.
+  3. Actual storage reconstruction, renderer resolution, and browser test coverage:
+     - Storage reconstruction: updated teamsService.myRequest unit test in tests/teams-events.test.cjs to serialize storage state, reconstruct a brand new simulator instance, and verify join request persistence across storage reloads.
+     - Production renderer resolution: added unit test exercising resolveVenueSiteEvents (confirming draft events take precedence in preview mode) and resolveEffectiveEvent (confirming fresh registration details resolve dynamically).
+     - Error state isolation: added unit test exercising fetchTeamDetailData, verifying 401 returns me = null while operational failures reject to trigger retry.
+     - Browser E2E coverage in tests/verify-teams-events-e2e.mjs:
+       - Journey 1: reloaded the page via CDP after join request submission, asserting 'Join request pending' persists across page reload; added Step 1d asserting operational query failures render honest error state with retry button.
+       - Journey 3: asserted registration dialog stays mounted with confirmation success text after submission, verified deliberate close, and verified re-opening Registered ✓ resolves fresh details (Cancel Registration button, no registration form).
+  4. Verification results:
+     - 60/60 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.

@@ -1,4 +1,4 @@
-import type { Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport } from './contracts';
+import type { Account, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport } from './contracts';
 
 export function createTeamsService(transport: Transport) {
   return {
@@ -46,3 +46,57 @@ export function createTeamsService(transport: Transport) {
       transport.request<TeamMatchDetail[]>(`/teams/${encodeURIComponent(id)}/bookings`, { signal }),
   };
 }
+
+export function isGuestAuthError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const code = 'code' in err ? (err as { code: unknown }).code : undefined;
+  const status = 'status' in err ? (err as { status: unknown }).status : undefined;
+  return code === 'unauthorized' || status === 401;
+}
+
+export interface TeamDetailData {
+  me: Account | null;
+  team: Team;
+  bookings: TeamMatchDetail[];
+  requests: TeamJoinRequest[];
+  myRequest: TeamJoinRequest | null;
+}
+
+export async function fetchTeamDetailData(
+  id: string,
+  deps: {
+    auth: { current: () => Promise<Account> };
+    teams: {
+      get: (id: string, signal?: AbortSignal) => Promise<Team>;
+      listBookings: (id: string, signal?: AbortSignal) => Promise<TeamMatchDetail[]>;
+      listRequests: (id: string, signal?: AbortSignal) => Promise<TeamJoinRequest[]>;
+      myRequest: (id: string, signal?: AbortSignal) => Promise<TeamJoinRequest | null>;
+    };
+  },
+  signal?: AbortSignal
+): Promise<TeamDetailData> {
+  let me: Account | null = null;
+  try {
+    me = await deps.auth.current();
+  } catch (err: unknown) {
+    if (isGuestAuthError(err)) {
+      me = null;
+    } else {
+      throw err;
+    }
+  }
+  const [teamData, bookingsData] = await Promise.all([
+    deps.teams.get(id, signal),
+    deps.teams.listBookings(id, signal),
+  ]);
+  let reqs: TeamJoinRequest[] = [];
+  if (me && (teamData.captainId === me.id || me.role === 'admin')) {
+    reqs = await deps.teams.listRequests(id, signal);
+  }
+  let myReq: TeamJoinRequest | null = null;
+  if (me && !teamData.memberIds.includes(me.id)) {
+    myReq = await deps.teams.myRequest(id, signal);
+  }
+  return { me, team: teamData, bookings: bookingsData, requests: reqs, myRequest: myReq };
+}
+
