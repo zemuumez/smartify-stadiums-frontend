@@ -61,5 +61,91 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Asserts the exact `bambisBookingId` remains intact at `10:00–12:00` for `ETB 5,000.00` with the reschedule history note preserved.
   6. Player view isolation (Journey 7): switches session to `player-1`, verifying personal reservation visibility without owner controls or walk-in actions.
   Validation: All 7 journeys pass cleanly in `npm run test:e2e`. All 27 unit tests pass (`npm test`), scoped ESLint has 0 errors and 0 warnings, and `npm run build` succeeds with 0 errors. UI baseline remains frozen and preserved.
+- Step 9 (Venue CMS Publishing & Tenant Isolation):
+  1. Typed domain operations & transport contracts: added `unpublish` to `contentService` and simulator (`POST /owner/stadiums/{id}/microsite/unpublish`), updated `Microsite` contract with editorial media fields (`heroImage`, `announcement`), and hardened input validation (HTTPS video URLs, duration formats, valid image paths, character length limits).
+  2. Operational data separation: confirmed court inventory, physical court configurations, hourly rates, availability, closures, and reservations are strictly operational resources. CMS edits never duplicate or alter court pricing or availability.
+  3. Live in-context draft preview: integrated direct draft preview mode inside `MicrositeEditor` reusing the public `VenueSite` renderer (hero, four live stats, operational pitches/courts cards, match highlights, upcoming events, and native booking dialog) with an unmistakable draft mode banner. Previews render in-memory uncommitted edits without prematurely saving or publishing them.
+  4. Precise unpublish lifecycle: unpublishing removes the public microsite from `/s/{slug}` (visitors see an honest, accessible unpublished status notice with directory links) while retaining the venue's active status, owner draft, booking records, and management access. Unpublishing never suspends the venue or cancels reservations.
+  5. Unsaved-change protection: implemented dirty state detection, browser `beforeunload` listener, venue-switch interception confirmation in the selector dropdown, and a confirmed "Discard changes" action to prevent accidental data loss.
+  6. Honest media handling & reordering: added accessible Move Up / Move Down controls to highlights and events with validation preventing insecure or malformed media URLs.
+  7. Full English and Amharic coverage: added 18 localized keys in `en.ts` and `am.ts` covering editor tabs, status badges, unpublish confirmation, dirty state alerts, and unpublished notices.
+  Validation: 31 behavioral unit tests pass cleanly (`npm test`). Scoped ESLint has 0 errors and 0 warnings on all touched files. Next.js production build (`npm run build`) compiles with 0 errors. All 7 journeys in the dedicated in-repository browser suite (`npm run test:cms`, `frontend/tests/verify-cms-e2e.mjs`) pass with full CDP assertions across both tenants, desktop and 390x844 mobile viewports in English and Amharic.
+- Step 10 (Review findings resolution for venue CMS publishing & tenant isolation):
+  1. Internal navigation protection: implemented document capture click interceptor for Next.js `<Link>` / `<a>` clicks, dashboard management tab switches, and browser history `popstate` (back/forward) events when `dirty === true`, prompting `discardConfirm` and aborting navigation if cancelled, preserving user draft edits.
+  2. Dirty unpublish preservation: unpublishing now retains in-memory working draft edits (`setDraft(prev => ({ ...prev, published: false }))`) without silently overwriting local edits with the server baseline, and warns via `unpublishConfirmDirty`.
+  3. Shared supported-media policy: created `frontend/src/services/media-policy.ts` defining `isSupportedImageUrl` and `isSupportedVideoUrl` strictly matching Next.js configured remotePatterns (`images.unsplash.com`, `playethiopia.com`, `*.playethiopia.com`) and local root-relative paths (`/venues/...`). Insecure `http://`, protocol-relative `//`, and arbitrary hosts are rejected with accessible alerts (`heroImageError`, `logoUrlError`, `mediaUrlError`) before saving, and `VenueSite` gracefully falls back to `venue.image` preventing Next Image runtime crashes.
+  4. Decoupled draft preview from public venue activation: `VenueSite` accepts `previewVenue?: Venue;` and `previewFields?: Field[];`. Authorized owner data is passed directly from `MicrositeEditor`, allowing unapproved or pending venues to preview drafts without failing on public 404 lookup.
+  5. Complete identity controls & dynamic branding: added branded logo URL (`logoUrl`), public inquiry contact phone (`contactPhone`), inquiry email (`contactEmail`), social media links (`socialLinks`), and facility photo showcase (`gallery`) to `Microsite`. `VenueSite` consumes `site.primaryColor` as dynamic `brandColor` across primary CTA buttons, badges, section accents, and headers, and renders the logo, facility showcase gallery, and social media pills.
+  6. Regression test suite expanded: 36 unit tests pass (`npm test`) covering media policy constraints, dirty unpublish preservation, pending venue preview, tenant publishing isolation, and failed save recovery. Scoped ESLint has 0 errors and 0 warnings. Next.js production build compiles with 0 errors (`npm run build`). All 7 CDP browser journeys in `npm run test:cms` pass with verifiable evidence.
+- Step 11 (Review findings resolution at f379a56 & b632de7):
+  1. Pending-venue preview with owner-scoped courts:
+     - In `src/components/venue-site.tsx`, updated court resolution to `previewFields !== undefined ? previewFields : await venuesService.fields(venue.id, signal)`, ensuring supplied `previewFields` (even if empty) bypasses the public endpoint.
+     - In `src/components/microsite-editor.tsx`, `Draft` loads authorized owner courts alongside the draft via `Promise.all([contentService.draft(venue.id, signal), fieldsService.list(signal)])`, filters by `f.venueId === venue.id`, and provides `previewFields={fields}` to both `EditForm` and `<VenueSite />`.
+  2. Management-tab switching guard in VenueAdministration:
+     - In `src/components/venue-administration.tsx`, added `cmsDirty` state and wrapped tab switching buttons in `handleTabChange(nextTab)`.
+     - When switching away from CMS while dirty (`tab === 'cms' && cmsDirty`), prompts `window.confirm(t('discardConfirm'))`. If cancelled, the tab switch is aborted and the editor remains mounted with local edits intact.
+     - Connected `onDirtyChange` prop from `MicrositeEditor` to report dirty state changes up to the parent shell.
+  3. Clean browser Back/Forward protection without history corruption or accumulated entries:
+     - In `src/components/microsite-editor.tsx`, decoupled the navigation protection effect from `t` recreation by storing `t` in `tRef` via `useEffect([t])`.
+     - Preserves Next.js router history state by merging `window.history.state` (`{ ...baseState, __cmsTrap: true }`) rather than overwriting with a plain object.
+     - Pushes a single history trap entry upon entering dirty state. Keystrokes while dirty do not generate repeated entries.
+     - On Back → Cancel, prompts discard confirmation and restores the trap entry while keeping the editor mounted and local edits intact.
+     - On Back → Confirm, discards local edits, marks confirmed exit, and continues back to the preceding page (`window.history.back()`).
+     - Moving Forward from the preceding page returns to the editor cleanly with normal browser forward behavior.
+     - When saved or discarded via UI buttons, cleans up the trap entry (`window.history.back()`) so zero duplicate entries are left behind. Repeated edit/save and edit/discard cycles never accumulate entries.
+  4. Test coverage & accurate verification semantics:
+     - In `tests/services.test.cjs`, the pending preview test uses a test-local simulator function (`resolveVenueSite`) modeling VenueSite's query resolution logic to verify 404 public lookup isolation and owner court resolution without publication.
+     - Full production-path and component renderer coverage is provided in the headless browser suite by Journey 8 in `tests/verify-cms-e2e.mjs` (`npm run test:cms`), verifying in-browser pending venue creation, owner court addition, CMS selection, Live Preview rendering of `<VenueSite>` with draft banner and owner court cards, and public 404 access denial.
+     - Test 2b and Test 2c in Journey 2 verify dirty tab switching Cancel/Confirm, history length stability across keystrokes, Back → Cancel editor restoration, zero accumulation across repeated edit/save and edit/discard cycles, Back → Confirm navigation to the preceding page (`/stadiums`), and normal Forward traversal back to CMS.
+     - All 36 behavioral unit tests pass (`npm test`). Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files). Next.js production build succeeds with 0 errors (`npm run build`). All 8 journeys in `npm run test:cms` pass cleanly in headless Chrome. UI baseline remains frozen and preserved.
 
+- Step 12 (Resolution of lifecycle history-trap cleanup across unmount paths):
+  1. Coordinated lifecycle history-trap cleanup:
+     - Exported cleanHistoryTrap() from src/components/microsite-editor.tsx, which inspects window.history.state?.__cmsTrap. If active, sets module-level synchronization flag isCleaningCmsTrap = true, triggers window.history.back(), and awaits the browser popstate event before resolving.
+     - handlePopState inside EditForm intercepts isCleaningCmsTrap and suppresses duplicate discard confirmation prompts during programmatic cleanup.
+  2. Confirmed management-tab switching cleanup before unmount:
+     - In src/components/venue-administration.tsx, handleTabChange awaits cleanHistoryTrap() upon confirmed exit before calling setCmsDirty(false) and setTab(nextTab). Asynchronous history.back() finishes popping the trap entry before the editor unmounts, preventing history queue race conditions.
+  3. Confirmed venue switching cleanup before unmount:
+     - In src/components/microsite-editor.tsx, handleVenueChange awaits cleanHistoryTrap() upon confirmed venue switch before calling setSelectedId(nextId), ensuring the outgoing dirty editor trap entry is removed prior to unmounting.
+  4. Confirmed internal-link navigation cleanup:
+     - In handleCaptureClick inside EditForm, confirmed anchor navigation prevents default click dispatch, sets isConfirmedExitRef.current = true, awaits cleanHistoryTrap(), and then executes client-side routing via router.push(...) (or window.location.assign for external URLs). The intended destination is pushed on top of a clean history entry, preventing in-flight history.back() from undoing navigation.
+  5. Browser test coverage & non-accumulation verification:
+     - In tests/verify-cms-e2e.mjs (Journey 2), added automated tests repeating CMS -> edit -> confirm tab switch -> return -> edit across multiple tabs (bookings, fields), verifying zero history length accumulation and absence of orphan trap entries.
+     - Added repeated CMS -> edit -> confirm venue switch -> return -> edit tests across multiple venue selections, verifying zero history accumulation.
+     - Added dirty internal-link navigation test with confirmed exit, verifying clean transition to destination and subsequent Back navigation returning to the editor without getting trapped.
+     - All 36 behavioral unit tests pass (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build (npm run build) succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen visual baseline preserved.
 
+- Step 13 (Enforcing confirmed history traversal and safe delayed/missing popstate handling):
+  1. Confirmed history traversal requirement:
+     - Modularized history trap logic into src/services/history-trap.ts.
+     - cleanHistoryTrap(timeoutMs = 1000) returns Promise<boolean>, resolving true ONLY after confirmed history traversal via popstate where window.history.state?.__cmsTrap is cleared.
+     - If a timeout occurs before popstate fires, cleanHistoryTrap resolves false and records hasPendingDelayedTraversal = true. Timeouts never resolve true or authorize unmounting or navigation.
+  2. Safe caller guards & edit preservation:
+     - handleTabChange in src/components/venue-administration.tsx, handleVenueChange in src/components/microsite-editor.tsx, and handleCaptureClick in EditForm check if (!cleaned) return;. When cleanup traversal is unconfirmed, tab changes, venue changes, and link routing abort immediately; components remain mounted and dirty edits are 100% preserved.
+  3. Safe delayed traversal handling:
+     - handleTrapPopState detects hasPendingDelayedTraversal. If a late-arriving popstate from a timed-out cleanup is delivered, it swallows the event without prompting discard confirmation, clears the pending flag, and safely restores the trap entry (history.pushState) to protect dirty edits during subsequent navigation.
+  4. Regression test coverage:
+     - Created tests/history-trap.test.cjs adding 7 focused unit regression tests verifying immediate clean resolution when trap is absent, confirmed traversal resolution, timeout failure on missing popstate, safe handling of delayed popstate with trap restoration, caller edit preservation upon cleanup failure, and deduplication of concurrent callers.
+     - Total unit test suite expanded to 43 passing tests (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen UI baseline preserved.
+
+- Step 14 (Preventing additional cleanup traversals and retry race during unresolved delayed traversal):
+  1. Unresolved delayed traversal lock in cleanHistoryTrap:
+     - In `src/services/history-trap.ts`, `cleanHistoryTrap()` checks `hasPendingDelayedTraversal` before initiating any Back request. If a timed-out traversal remains unresolved, it returns `Promise.resolve(false)` immediately without issuing `window.history.back()` or registering an authorization listener.
+     - Retrying callers (such as re-attempted tab switches, venue changes, or link clicks) are blocked from generating a second Back request or misinterpreting earlier delayed events as authorizing the new request.
+     - Callers preserve local edits and keep the editor mounted until recovery completes.
+  2. Safe delayed event recovery:
+     - Registered a one-time delayed event recovery listener (`delayedRecoveryListener`) on `window` upon cleanup timeout. When the earlier in-flight `popstate` event is delivered, the recovery listener consumes the delayed traversal, unregisters itself, and clears `hasPendingDelayedTraversal = false`.
+     - In `handleTrapPopState()`, when mounted dirty editors intercept the delayed popstate, it cleans up `delayedRecoveryListener`, resets the pending flag, restores the history trap, and swallows the event without showing discard dialogs.
+     - In `resetHistoryTrapState()`, cleans up `delayedRecoveryListener` unconditionally.
+  3. Regression test coverage:
+     - Added test `timeout → retry → delayed-event prevents extra Back and does not authorize retry` in `tests/history-trap.test.cjs` against the compiled production helper (`.test-build/services/history-trap`).
+     - Verifies:
+       - Initial cleanup timeout issues exactly 1 Back request and sets `hasDelayedTraversalPending() === true`.
+       - Immediate retry call returns `false`, maintains `backCallCount === 1` (zero extra Back calls), and keeps `hasDelayedTraversalPending() === true`.
+       - Delivery of delayed popstate from the first Back request completes recovery and clears the pending flag without authorizing the retry.
+       - Subsequent cleanup after recovery completes proceeds cleanly and only then issues a fresh Back request if trap is present.
+  4. Verification:
+     - 44/44 unit tests pass (`npm test`).
+     - Scoped ESLint passes with 0 errors and 0 warnings (`npx eslint src/services/history-trap.ts src/components/microsite-editor.tsx src/components/venue-administration.tsx`).
+     - Next.js production build compiles with 0 errors (`npm run build`).
+     - All 8 CMS browser journeys pass (`npm run test:cms`). Frozen UI baseline strictly preserved.

@@ -1,4 +1,5 @@
 import type { Account, BookingInput, Closure, Microsite, RequestOptions, RescheduleBookingInput, Role, Sport, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
 import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fixtures';
@@ -237,13 +238,52 @@ export function createDemoTransport(storage?: DemoStorage) {
           if (method === 'PATCH') {
             const input = options.body as Microsite;
             if (!/^#[\da-f]{6}$/i.test(input.primaryColor) || !input.tagline.trim() || input.tagline.length > 120 || input.description.length > 5000) throw new ServiceError('validation', 422);
+            if (input.heroImage && !isSupportedImageUrl(input.heroImage)) throw new ServiceError('validation', 422);
+            if (input.logoUrl && !isSupportedImageUrl(input.logoUrl)) throw new ServiceError('validation', 422);
+            if (input.announcement && input.announcement.length > 200) throw new ServiceError('validation', 422);
+            if (input.contactPhone && (input.contactPhone.length > 30 || !/^\+?[0-9\s\-()]+$/.test(input.contactPhone))) throw new ServiceError('validation', 422);
+            if (input.contactEmail && (input.contactEmail.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.contactEmail))) throw new ServiceError('validation', 422);
+            if ((input.socialLinks || []).length > 10) throw new ServiceError('validation', 422);
+            if ((input.socialLinks || []).some(s => !s.url.startsWith('https://') || s.url.length > 300)) throw new ServiceError('validation', 422);
+            if ((input.gallery || []).length > 30) throw new ServiceError('validation', 422);
+            if ((input.gallery || []).some(g => !isSupportedImageUrl(g.url) || (g.caption && g.caption.length > 200))) throw new ServiceError('validation', 422);
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
-            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !/^https:\/\//.test(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0)) throw new ServiceError('validation', 422);
-            Object.assign(draft, { highlights: structuredClone(input.highlights || []), events: structuredClone(input.events || []), tagline: input.tagline, description: input.description, primaryColor: input.primaryColor, updatedAt: new Date().toISOString() }); persist(); return draft;
+            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0)) throw new ServiceError('validation', 422);
+            Object.assign(draft, {
+              highlights: structuredClone(input.highlights || []),
+              events: structuredClone(input.events || []),
+              gallery: structuredClone(input.gallery || []),
+              socialLinks: structuredClone(input.socialLinks || []),
+              tagline: input.tagline.trim(),
+              description: input.description.trim(),
+              primaryColor: input.primaryColor,
+              heroImage: input.heroImage ? input.heroImage.trim() : null,
+              logoUrl: input.logoUrl ? input.logoUrl.trim() : null,
+              announcement: input.announcement ? input.announcement.trim() : null,
+              contactPhone: input.contactPhone ? input.contactPhone.trim() : null,
+              contactEmail: input.contactEmail ? input.contactEmail.trim() : null,
+              updatedAt: new Date().toISOString()
+            });
+            persist();
+            return draft;
           }
           if (parts[4] === 'publish' && method === 'POST') {
             if (venue.status !== 'active') throw new ServiceError('conflict', 409);
-            const site = { ...draft, published: true }; state.sites = [...state.sites.filter(item => item.venueId !== venue.id), site]; audit('microsite.published', venue.id); persist(); return site;
+            draft.published = true;
+            draft.updatedAt = new Date().toISOString();
+            const site = structuredClone(draft);
+            state.sites = [...state.sites.filter(item => item.venueId !== venue.id), site];
+            audit('microsite.published', venue.id);
+            persist();
+            return site;
+          }
+          if (parts[4] === 'unpublish' && method === 'POST') {
+            draft.published = false;
+            draft.updatedAt = new Date().toISOString();
+            state.sites = state.sites.filter(item => item.venueId !== venue.id);
+            audit('microsite.unpublished', venue.id);
+            persist();
+            return draft;
           }
         }
       }
