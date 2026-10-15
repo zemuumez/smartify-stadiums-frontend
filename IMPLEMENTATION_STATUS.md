@@ -149,3 +149,31 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Scoped ESLint passes with 0 errors and 0 warnings (`npx eslint src/services/history-trap.ts src/components/microsite-editor.tsx src/components/venue-administration.tsx`).
      - Next.js production build compiles with 0 errors (`npm run build`).
      - All 8 CMS browser journeys pass (`npm run test:cms`). Frozen UI baseline strictly preserved.
+
+- Step 15 (Milestone M4 Part 1 Step 1: Teams & Event Registration Domain Services, Mock Transport, and Invariants):
+  1. Branch & scope:
+     - Merged `codex/venue-cms-publishing` into `main` at `6dd246a` after independent sign-off.
+     - Created branch `codex/teams-events` to implement Teams & Event Registration (Milestone M4 Part 1).
+  2. Participation format & dynamic capacity:
+     - Added `ParticipationFormat` (`'team' | 'singles' | 'doubles'`) explicitly to `SiteEvent`, `EventRegistration`, and `EventDetails`.
+     - Modeled dynamic capacity semantics: `team` counts teams, `singles` counts individuals, `doubles` counts pairs.
+     - `availableSpots` computed dynamically as `Math.max(0, event.spots - registeredCount)`.
+  3. CMS content vs. operational registrations separation:
+     - `Microsite.events` holds editorial event definitions; operational registrations live in `eventRegistrations`.
+     - In `transport.ts`, saving/publishing CMS drafts strictly enforces registration safety:
+       - Attempting to delete an event with active registrations is rejected with 409 `conflict`.
+       - Attempting to reduce event capacity below active registrations is rejected with 409 `conflict`.
+       - Attempting to change sport or format while active registrations exist is rejected with 409 `conflict`.
+       - Events with zero registrations can be safely removed or resized.
+  4. Team authority validation & privacy boundaries:
+     - `POST /bookings` accepts `teamId`, validates caller is the team captain, verifies court sport matches team sport, and server-side derives authoritative `teamName` (ignoring tampered client values).
+     - `GET /teams/:id/bookings`: members/captains see full booking records including `totalMinor`, `paymentStatus`, and contact details; public non-members see sanitized match schedule with financial and personal contact fields stripped.
+  5. Mutation consistency & spot management:
+     - Duplicate submissions rejected: duplicate team join requests, duplicate event registrations (same player or same team) return 409 `conflict`.
+     - Registration rejected for closed events (past date/time) or full events (`availableSpots === 0`).
+     - Registration cancellation marks status `cancelled` and restores capacity once; re-cancellation is rejected with 409 `conflict`.
+  6. Verification:
+     - Created `tests/teams-events.test.cjs` with 12 comprehensive unit regression tests covering team creation, join moderation, roster leaving/removal, team booking authority, visibility boundaries, format handling, spot arithmetic, cancellation recovery, and CMS safety invariants.
+     - Total unit test suite expanded from 44 to 56 passing tests (`npm test`).
+     - Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched services and fixtures).
+     - Production Next.js build compiles cleanly (`npm run build`).

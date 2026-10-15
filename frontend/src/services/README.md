@@ -40,6 +40,42 @@ The simulator supports future unpaid manual-settlement bookings, future unpaid c
   - Atomic transition: a failed move leaves the original reservation and occupancy untouched; a successful move releases the old interval and occupies the new interval in a single transition, recalculating the quote according to duration and recording original schedule history (`originalSchedule`). Database transactions and row-level locking are required in production.
   - Idempotency: replaying an identical request returns the same result; reusing the key with different parameters returns 409 `conflict`. Actor authorization is checked before idempotency reuse.
 - `POST /bookings/:id/cancel`: player or venue owner cancels a future unpaid booking, releasing the slot.
+- `POST /bookings` (with `teamId`): authorized team captain creates a reservation on behalf of their team.
+  - Authority: the authenticated user must be the recorded `captainId` of the specified `teamId`. Unauthorized callers receive 403 `forbidden`.
+  - Compatibility: the team's sport must strictly match the court/booking sport. Mismatches receive 422 `validation`.
+  - Authoritative attribution: `teamName` is derived server-side from the team record; client-provided team names are discarded.
+  - Visibility: the booking appears in both player and owner schedules, as well as the team schedule.
+
+### Teams operations and privacy
+- `GET /teams`: list public teams (ID, name, sport, city, captain name, description, member count).
+- `GET /teams/:id`: get full team profile and roster member list.
+- `POST /teams`: authenticated player creates a team, becoming its captain and first member.
+- `POST /teams/:id/join`: authenticated player requests to join. Duplicate pending requests or requests from existing members receive 409 `conflict`.
+- `GET /teams/:id/requests`: captain lists pending join requests. Non-captains receive 403 `forbidden`.
+- `POST /teams/:id/requests/:requestId/approve`: captain approves join request, adding player to roster.
+- `POST /teams/:id/requests/:requestId/reject`: captain rejects join request.
+- `POST /teams/:id/leave`: member leaves team. Captains cannot leave if other members remain (must transfer captaincy first; otherwise 409 `conflict`). Sole captain leaving deletes the team.
+- `DELETE /teams/:id/members/:memberId`: captain removes a member from the roster. Captain cannot remove themselves (409 `conflict`). Non-captains receive 403 `forbidden`.
+- `GET /teams/:id/bookings`: list team match bookings.
+  - Member view (captains, members, admin): returns full booking records including `totalMinor`, `paymentStatus`, and contact info.
+  - Public view (non-members, guests): returns sanitized match fixtures (`id`, `venueId`, `fieldId`, `sport`, `date`, `startHour`, `endHour`, `status`), stripping financial amounts, payment statuses, and guest phone numbers.
+
+### Venue events and operational registrations
+- `GET /venues/:venueId/events`: list public events for a venue, returning dynamic capacity (`spots`, `registeredCount`, `availableSpots`, `isFull`, `isClosed`) and the caller's registration status.
+- `GET /venues/:venueId/events/:eventId`: detail view for a single event.
+- `POST /venues/:venueId/events/:eventId/registrations`: register for an event.
+  - Formats:
+    - `singles`: registers individual player. Capacity counts individuals.
+    - `doubles`: registers player with optional `partnerName`. Capacity counts pairs.
+    - `team`: requires `teamId`. Authenticated user must be captain of a team matching the event sport. Capacity counts teams.
+  - Validation: closed events (past date/time) or full events (`availableSpots === 0`) receive 409 `conflict`. Duplicate registration by the same player/team receives 409 `conflict`.
+- `POST /venues/:venueId/events/:eventId/registrations/:registrationId/cancel`: cancel registration.
+  - Allowed actors: registering player, registering team captain, or venue owner/admin.
+  - Effect: registration marked `cancelled`, restoring 1 available spot. Cancelling an already cancelled registration receives 409 `conflict`.
+- CMS separation and safety invariants:
+  - Event metadata (title, date, time, sport, format, total spots) is editorial content stored in `Microsite.events`.
+  - Registrations are authoritative operational records stored independently.
+  - CMS edit safety: saving a microsite draft cannot delete an event with active registrations, cannot reduce capacity below existing active registrations, and cannot change an event's sport or format while active registrations exist. Such attempts receive 409 `conflict`.
 
 ## Testing
 

@@ -1,9 +1,10 @@
 import { directoryFixtures } from './directory';
-import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, Field, Invoice, MediaAsset, Microsite, Team, Venue } from '../services/contracts';
+import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MediaAsset, Microsite, ParticipationFormat, Team, TeamJoinRequest, Venue } from '../services/contracts';
 
 /** All operational demo records live here. Amounts are illustrative minor ETB units. */
 export const accounts: Account[] = [
   { id: 'player-1', phone: '+251911234567', full_name: 'Abebe Kebede', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'player-2', phone: '+251911998877', full_name: 'Sara Mengistu', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'owner-1', phone: '+251922345678', full_name: 'Fatima Hassan', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'owner-2', phone: '+251933456789', full_name: 'Dawit Tadesse', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'admin-1', phone: '+251944567890', full_name: 'Demo Administrator', role: 'admin', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
@@ -50,13 +51,81 @@ for (const definition of originalCourts) Object.assign(bambisFields.find(f => f.
 fields.sort((a, b) => a.venueId.localeCompare(b.venueId) || (a.venueId === 'venue-1' ? originalCourts.findIndex(f => f.id === a.id) - originalCourts.findIndex(f => f.id === b.id) : 0));
 export interface DemoState {
   accounts: Account[]; venues: Venue[]; fields: Field[]; bookings: Booking[]; closures: Closure[];
-  sites: Microsite[]; drafts: Microsite[]; teams: Team[]; cameras: CameraDevice[];
+  sites: Microsite[]; drafts: Microsite[]; teams: Team[]; teamRequests: TeamJoinRequest[];
+  eventRegistrations: EventRegistration[]; cameras: CameraDevice[];
   media: MediaAsset[]; invoices: Invoice[]; audit: AuditEntry[];
   idempotency: Record<string, { fingerprint: string; bookingId: string }>;
 }
 export const commercialPolicy: CommercialPolicy = { subscriptionPriceMinor: null, bookingCommissionPercent: null, currency: 'ETB' };
 export function createFixtures(): DemoState {
-  const sites: Microsite[] = venues.map(venue => ({ venueId: venue.id, tagline: venue.id === 'venue-1' ? 'Bambis Meda Sports Ground' : venue.name, description: venue.id === 'venue-1' ? "Addis Ababa's premier multi-sport arena featuring FIFA-certified turf, 24/7 night floodlighting, autonomous 4K Veo live match recording, and instant Telebirr bookings." : venue.description, primaryColor: '#2d6a4f', highlights: Array.from({ length: 3 }, (_, i) => ({ id: `${venue.id}-highlight-${i}`, title: venue.id === 'venue-1' ? ['Bole Derby: Volley of the Month', 'Weekend 7v7 Cup: Double Penalty Save', 'Sunday League: Backheel Goal'][i] : `${venue.name}: ${['Match highlights', 'Weekend cup', 'Goal of the week'][i]}`, teams: venue.id === 'venue-1' ? ['Bole Lions vs Arada FC', 'Unity Stars vs St. George Youth', 'Addis United vs Meskel Warriors'][i] : 'Community match · Demo preview', views: venue.id === 'venue-1' ? [2420, 1890, 3120][i] : 0, duration: ['1:45', '2:10', '1:15'][i], playbackUrl: null })), events: venue.sports.slice(0, 3).map((sport, i) => ({ id: `${venue.id}-event-${i}`, title: venue.id === 'venue-1' ? ['Bole Corporate League Final', 'Addis 3v3 Weekend Basketball Cup', 'Youth Development Futsal Championship'][i] : `${venue.name} ${sport} cup`, sport, date: `2027-09-${String(6 + i * 7).padStart(2, '0')}`, time: '10:00', spots: 6 })), published: true, updatedAt: '2026-01-01T00:00:00Z' }));
-  return structuredClone({ accounts, venues, fields, bookings: [], closures: [], sites, drafts: structuredClone(sites), teams: [], cameras: [{ id: 'camera-1', venueId: 'venue-1', fieldId: 'field-1', name: 'Main pitch camera', model: 'Demo device', status: 'pending' }], media: [], invoices: [], audit: [], idempotency: {} });
+  const sites: Microsite[] = venues.map(venue => ({
+    venueId: venue.id,
+    tagline: venue.id === 'venue-1' ? 'Bambis Meda Sports Ground' : venue.name,
+    description: venue.id === 'venue-1' ? "Addis Ababa's premier multi-sport arena featuring FIFA-certified turf, 24/7 night floodlighting, autonomous 4K Veo live match recording, and instant Telebirr bookings." : venue.description,
+    primaryColor: '#2d6a4f',
+    highlights: Array.from({ length: 3 }, (_, i) => ({
+      id: `${venue.id}-highlight-${i}`,
+      title: venue.id === 'venue-1' ? ['Bole Derby: Volley of the Month', 'Weekend 7v7 Cup: Double Penalty Save', 'Sunday League: Backheel Goal'][i] : `${venue.name}: ${['Match highlights', 'Weekend cup', 'Goal of the week'][i]}`,
+      teams: venue.id === 'venue-1' ? ['Bole Lions vs Arada FC', 'Unity Stars vs St. George Youth', 'Addis United vs Meskel Warriors'][i] : 'Community match · Demo preview',
+      views: venue.id === 'venue-1' ? [2420, 1890, 3120][i] : 0,
+      duration: ['1:45', '2:10', '1:15'][i],
+      playbackUrl: null,
+    })),
+    events: venue.sports.slice(0, 3).map((sport, i) => {
+      const format: ParticipationFormat = ['tennis', 'badminton'].includes(sport) ? (i % 2 === 0 ? 'singles' : 'doubles') : 'team';
+      return {
+        id: `${venue.id}-event-${i}`,
+        title: venue.id === 'venue-1' ? ['Bole Corporate League Final', 'Addis 3v3 Weekend Basketball Cup', 'Youth Development Futsal Championship'][i] : `${venue.name} ${sport} cup`,
+        sport,
+        format,
+        date: `2027-09-${String(6 + i * 7).padStart(2, '0')}`,
+        time: '10:00',
+        spots: 6,
+      };
+    }),
+    published: true,
+    updatedAt: '2026-01-01T00:00:00Z',
+  }));
+  const initialTeams: Team[] = [
+    {
+      id: 'team-1',
+      name: 'Bole Lions FC',
+      sport: 'football',
+      city: 'Addis Ababa',
+      captainId: 'player-1',
+      captainName: 'Abebe Kebede',
+      memberIds: ['player-1'],
+      description: 'Addis Ababa Premier Amateur Football Club',
+      createdAt: '2026-01-01T00:00:00Z',
+    },
+    {
+      id: 'team-2',
+      name: 'Addis Hoops',
+      sport: 'basketball',
+      city: 'Addis Ababa',
+      captainId: 'player-1',
+      captainName: 'Abebe Kebede',
+      memberIds: ['player-1'],
+      description: 'Community basketball team playing at Bambis Meda',
+      createdAt: '2026-01-01T00:00:00Z',
+    },
+  ];
+  return structuredClone({
+    accounts,
+    venues,
+    fields,
+    bookings: [],
+    closures: [],
+    sites,
+    drafts: structuredClone(sites),
+    teams: initialTeams,
+    teamRequests: [],
+    eventRegistrations: [],
+    cameras: [{ id: 'camera-1', venueId: 'venue-1', fieldId: 'field-1', name: 'Main pitch camera', model: 'Demo device', status: 'pending' }],
+    media: [],
+    invoices: [],
+    audit: [],
+    idempotency: {},
+  });
 }
 

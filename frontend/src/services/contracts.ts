@@ -30,10 +30,13 @@ export interface Booking {
   guestPhone?: string;
   rescheduledAt?: string;
   originalSchedule?: { date: string; startHour: number; endHour: number };
+  teamId?: string;
+  teamName?: string;
 }
 export interface BookingInput {
   fieldId: string; sport: Sport; date: string; startHour: number; endHour: number;
   idempotencyKey: string;
+  teamId?: string;
 }
 export interface WalkInBookingInput {
   venueId: string; fieldId: string; sport: Sport; date: string; startHour: number; endHour: number;
@@ -45,7 +48,44 @@ export interface RescheduleBookingInput {
 export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
 export interface SiteHighlight { id: string; title: string; teams: string; duration: string; views?: number; playbackUrl: string | null }
-export interface SiteEvent { id: string; title: string; sport: Sport; date: string; time: string; spots: number }
+export type ParticipationFormat = 'team' | 'singles' | 'doubles';
+export interface SiteEvent {
+  id: string;
+  title: string;
+  sport: Sport;
+  date: string;
+  time: string;
+  spots: number;
+  format?: ParticipationFormat;
+}
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  venueId: string;
+  playerId: string;
+  playerName: string;
+  format: ParticipationFormat;
+  teamId?: string;
+  teamName?: string;
+  partnerName?: string;
+  status: 'registered' | 'cancelled';
+  createdAt: string;
+}
+export interface EventRegistrationInput {
+  teamId?: string;
+  partnerName?: string;
+}
+export interface EventDetails extends SiteEvent {
+  venueId: string;
+  venueName: string;
+  venueSlug: string;
+  format: ParticipationFormat;
+  registeredCount: number;
+  availableSpots: number;
+  isFull: boolean;
+  isClosed: boolean;
+  myRegistration?: EventRegistration | null;
+}
 export interface SocialLink {
   platform: 'facebook' | 'instagram' | 'telegram' | 'tiktok' | 'youtube' | 'website';
   url: string;
@@ -68,7 +108,31 @@ export interface CameraDevice {
   id: string; venueId: string; fieldId: string; name: string; model: string;
   status: 'pending' | 'certified' | 'active' | 'offline' | 'revoked';
 }
-export interface Team { id: string; name: string; sport: Sport; city: string; captainId: string; memberIds: string[] }
+export interface TeamJoinRequest {
+  id: string;
+  teamId: string;
+  playerId: string;
+  playerName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+export interface Team {
+  id: string;
+  name: string;
+  sport: Sport;
+  city: string;
+  captainId: string;
+  captainName?: string;
+  memberIds: string[];
+  description?: string;
+  createdAt: string;
+}
+export interface TeamInput {
+  name: string;
+  sport: Sport;
+  city: string;
+  description?: string;
+}
 export interface MediaAsset {
   id: string; bookingId: string; title: string;
   status: 'scheduled' | 'processing' | 'ready' | 'failed';
