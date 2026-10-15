@@ -5,8 +5,16 @@ import { bookingsService, venuesService } from '@/services';
 import type { Booking, Closure, Field, Sport, Venue } from '@/services/contracts';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
-import { getWeekDays, hourLabel, shiftDays, venueToday } from '@/services/sports';
-import { quoteMinor } from '@/services/bookings.service';
+import {
+  computeCourtQuote,
+  getWeekDays,
+  hourLabel,
+  isValidDate,
+  matchesBookingCriteria,
+  resolveTargetCourt,
+  shiftDays,
+  venueToday,
+} from '@/services/sports';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
 
@@ -104,16 +112,19 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
   const activeOwnedVenues = query.data?.venues.filter(v => v.status === 'active' && (!venueId || v.id === venueId)) || [];
   const effectiveVenueId = owner ? (venueId || selectedVenueId || (activeOwnedVenues[0]?.id ?? '')) : (venueId || '');
   const availableFields = query.data?.fields.filter(f => !effectiveVenueId || f.venueId === effectiveVenueId) || [];
-  const weekDays = getWeekDays(date);
+  const effectiveDate = isValidDate(date) ? date : venueToday();
+  const weekDays = getWeekDays(effectiveDate);
 
   const records = (query.data?.bookings || [])
-    .filter(b => {
-      if (bookingId) return b.id === bookingId;
-      if (!owner) return true;
-      if (effectiveVenueId && b.venueId !== effectiveVenueId) return false;
-      if (selectedFieldId && b.fieldId !== selectedFieldId) return false;
-      return viewMode === 'week' ? weekDays.includes(b.date) : b.date === date;
-    })
+    .filter(b => matchesBookingCriteria(b, {
+      owner,
+      bookingId,
+      effectiveVenueId,
+      selectedFieldId,
+      viewMode,
+      weekDays,
+      date,
+    }))
     .sort((a, b) => `${a.date}${hourLabel(a.startHour)}`.localeCompare(`${b.date}${hourLabel(b.startHour)}`));
 
   const venueClosures = (query.data?.closures || [])
@@ -557,16 +568,7 @@ function RescheduleModal({
 
   const openHour = field?.openHour ?? 0;
   const closeHour = field?.closeHour ?? 24;
-  const hourlyRate = field?.hourlyRateMinor;
-
-  let quote: number | null = null;
-  if (hourlyRate !== undefined && endHour > startHour) {
-    try {
-      quote = quoteMinor(hourlyRate, startHour, endHour);
-    } catch {
-      quote = null;
-    }
-  }
+  const quote = computeCourtQuote(field, startHour, endHour);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -763,14 +765,7 @@ function WalkInModal({
   const [error, setError] = useState<unknown>();
   const idempotencyKey = useRef(crypto.randomUUID());
 
-  let quote: number | null = null;
-  if (currentField && endHour > startHour) {
-    try {
-      quote = quoteMinor(currentField.hourlyRateMinor, startHour, endHour);
-    } catch {
-      quote = null;
-    }
-  }
+  const quote = computeCourtQuote(currentField, startHour, endHour);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -991,7 +986,7 @@ function ClosureForm({ fields, onSaved }: { fields: Field[]; onSaved: () => void
   const [error, setError] = useState<unknown>();
   const [saved, setSaved] = useState(false);
 
-  const targetFieldId = fields.some(f => f.id === selectedFieldId) ? selectedFieldId : (fields[0]?.id || '');
+  const targetFieldId = resolveTargetCourt(fields, selectedFieldId);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

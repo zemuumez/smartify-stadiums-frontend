@@ -38,4 +38,14 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
   4. Secured venue-switch closure targeting by keying `ClosureForm` by `effectiveVenueId` and deriving `targetFieldId` dynamically from active fields, eliminating stale court selection and confirming simulator denies cross-venue closures.
   5. Fixed rescheduling pricing integrity and error handling: eliminated arbitrary ETB 1,500/hr fallback rate, displaying `—` and disabling submission for unpriced courts, and added `<ServiceErrorMessage>` with retry for availability query failures.
   Validation: 27 behavioral tests pass (`npm test`), scoped ESLint passes cleanly (0 errors, 0 warnings), and production build succeeds (`npm run build`). Verified full desktop and mobile English and Amharic journeys.
+- Step 7 (Review blockers resolution): resolved the cleared-date calendar crash, migrated regression tests to exercise shared production logic, and recorded browser journey evidence:
+  1. Cleared-date calendar crash fix: added `isValidDate` validation and UTC calendar fallbacks in `src/services/sports.ts` (`shiftDays`, `getWeekDays`, `parseDateParts`, `formatDateParts`), ensuring invalid or cleared date strings safely default to `venueToday()` instead of producing `NaN` date arithmetic. Hardened `displayDate` in `src/i18n/provider.tsx` with try/catch and `—` fallback, preventing `RangeError: Invalid time value` when clearing the date picker in Week view.
+  2. Direct testing of production UI logic: replaced duplicated test-local helper logic in `tests/services.test.cjs` with shared, exported production functions from `src/services/sports.ts` (`matchesBookingCriteria`, `resolveTargetCourt`, `computeCourtQuote`, `isValidDate`, `shiftDays`, `getWeekDays`), ensuring components (`BookingList`) and regression tests run identical code for booking filtering, court resolution, pricing quotes, and date calculations. Added assertions for `isValidDate` and empty-date resilience.
+  3. Browser journey validation: executed comprehensive CDP browser runs on desktop and mobile viewports (390x844) in English and Amharic, confirming:
+     - Desktop owner Week view with cleared date input maintains stable rendering without crashing.
+     - Walk-in modal opens with proper focus management, accepts input, and submits bookings.
+     - Reschedule modal displays availability slot query errors with an actionable retry button.
+     - Mobile layout renders owner calendar, walk-in modal, and player reservations in Amharic without horizontal overflow or clipping.
+  Validation: 27 behavioral tests pass (`npm test`), scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files), and the Next.js production build compiles with 0 errors (`npm run build`).
+
 

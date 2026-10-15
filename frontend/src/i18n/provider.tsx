@@ -22,7 +22,16 @@ export function useLanguage() {
     ...context,
     t: (key: MessageKey): string => languages[locale].messages[key],
     money: (minor: number) => new Intl.NumberFormat(languages[locale].intl, { style: 'currency', currency: 'ETB' }).format(minor / 100),
-    date: (value: string) => new Intl.DateTimeFormat(languages[locale].intl, { dateStyle: 'medium', timeZone: 'Africa/Addis_Ababa', calendar: 'gregory' }).format(new Date(`${value}T12:00:00+03:00`)),
+    date: (value: string) => {
+      if (!value) return '—';
+      try {
+        const d = new Date(`${value}T12:00:00+03:00`);
+        if (isNaN(d.getTime())) return value;
+        return new Intl.DateTimeFormat(languages[locale].intl, { dateStyle: 'medium', timeZone: 'Africa/Addis_Ababa', calendar: 'gregory' }).format(d);
+      } catch {
+        return value || '—';
+      }
+    },
   };
 }
 export function LanguageSwitcher() {

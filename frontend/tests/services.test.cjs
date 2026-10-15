@@ -6,7 +6,14 @@ const { createHttpTransport } = require('../.test-build/services/http');
 const { resolveMode } = require('../.test-build/services/config');
 const { quoteMinor } = require('../.test-build/services/bookings.service');
 const { normalizePhone } = require('../.test-build/services/auth.service');
-const { shiftDays, getWeekDays } = require('../.test-build/services/sports');
+const {
+  shiftDays,
+  getWeekDays,
+  matchesBookingCriteria,
+  resolveTargetCourt,
+  computeCourtQuote,
+  isValidDate,
+} = require('../.test-build/services/sports');
 const setup = () => { const transport = createDemoTransport(); return { transport, ...createServices(transport) }; };
 const input = (overrides = {}) => ({ fieldId: 'field-2', sport: 'basketball', date: '2099-01-01', startHour: 10, endHour: 12, idempotencyKey: crypto.randomUUID(), ...overrides });
 const rejects = (operation, code) => assert.rejects(operation, error => error.code === code);
@@ -307,6 +314,19 @@ test('calendar navigation and week generation are timezone-safe and Monday-based
   // 2026-10-14 is Wednesday
   const weekFromWednesday = getWeekDays('2026-10-14');
   assert.deepEqual(weekFromWednesday, weekFromSunday);
+
+  // Cleared or invalid date inputs must safely fallback to venueToday without crashing
+  assert.equal(isValidDate(''), false);
+  assert.equal(isValidDate(null), false);
+  assert.equal(isValidDate('invalid-date'), false);
+  assert.equal(isValidDate('2026-10-15'), true);
+
+  const safeWeekFromEmpty = getWeekDays('');
+  assert.equal(safeWeekFromEmpty.length, 7);
+  assert.ok(safeWeekFromEmpty.every(d => isValidDate(d)));
+
+  const safeShiftFromEmpty = shiftDays('', 1);
+  assert.ok(isValidDate(safeShiftFromEmpty));
 });
 
 test('player bookings remain visible across multiple venues and future dates without owner venue/day filter restrictions', async () => {
@@ -326,17 +346,9 @@ test('player bookings remain visible across multiple venues and future dates wit
   assert.ok(playerIds.includes(b2.id));
   assert.ok(playerIds.includes(b3.id));
 
-  // Verify the booking-list filter logic:
+  // Verify the booking-list filter logic using the shared production matchesBookingCriteria function:
   // For players (!owner), all bookings are visible unless filtered by a specific bookingId query param
-  const filterRecord = (b, { owner, bookingId, effectiveVenueId, selectedFieldId, viewMode, weekDays, date }) => {
-    if (bookingId) return b.id === bookingId;
-    if (!owner) return true;
-    if (effectiveVenueId && b.venueId !== effectiveVenueId) return false;
-    if (selectedFieldId && b.fieldId !== selectedFieldId) return false;
-    return viewMode === 'week' ? weekDays.includes(b.date) : b.date === date;
-  };
-
-  const visibleToPlayer = playerBookings.filter(b => filterRecord(b, {
+  const visibleToPlayer = playerBookings.filter(b => matchesBookingCriteria(b, {
     owner: false,
     effectiveVenueId: 'venue-1',
     date: '2026-10-15', // today
@@ -346,7 +358,7 @@ test('player bookings remain visible across multiple venues and future dates wit
   assert.equal(visibleToPlayer.length, playerBookings.length);
 
   // In contrast, owner mode filters strictly by venue and date
-  const visibleToOwner = playerBookings.filter(b => filterRecord(b, {
+  const visibleToOwner = playerBookings.filter(b => matchesBookingCriteria(b, {
     owner: true,
     effectiveVenueId: 'venue-1',
     date: '2099-01-01',
@@ -383,36 +395,21 @@ test('venue-switch closure targeting prevents cross-venue field closures and enf
     'forbidden'
   );
 
-  // Component logic test: simulate venue switch where available fields change from venue-1 to venue-2
+  // Component logic test: exercise production resolveTargetCourt helper directly
   const venue1Fields = [{ id: 'field-1', venueId: 'venue-1' }, { id: 'field-2', venueId: 'venue-1' }];
   const venue2Fields = [{ id: 'field-3', venueId: 'venue-2' }, { id: 'field-4', venueId: 'venue-2' }];
 
   let currentFieldSelection = 'field-1';
   // Venue switches: fields becomes venue2Fields
-  const resolveTargetFieldId = (fields, currentSelection) =>
-    fields.some(f => f.id === currentSelection) ? currentSelection : (fields[0]?.id || '');
-
-  assert.equal(resolveTargetFieldId(venue2Fields, currentFieldSelection), 'field-3');
-  assert.notEqual(resolveTargetFieldId(venue2Fields, currentFieldSelection), 'field-1');
+  assert.equal(resolveTargetCourt(venue2Fields, currentFieldSelection), 'field-3');
+  assert.notEqual(resolveTargetCourt(venue2Fields, currentFieldSelection), 'field-1');
 });
 
 test('rescheduling quote computation rejects missing court pricing without fallback rate', () => {
-  // When hourlyRateMinor is undefined or missing, quote calculation must be null, never 150,000 fallback
-  const calculateQuote = (field, startHour, endHour) => {
-    const hourlyRate = field?.hourlyRateMinor;
-    if (hourlyRate !== undefined && endHour > startHour) {
-      try {
-        return quoteMinor(hourlyRate, startHour, endHour);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
-  assert.equal(calculateQuote(undefined, 10, 12), null);
-  assert.equal(calculateQuote({ hourlyRateMinor: undefined }, 10, 12), null);
-  assert.equal(calculateQuote({ hourlyRateMinor: 200000 }, 10, 12), 400000);
+  // Exercise shared production computeCourtQuote function directly
+  assert.equal(computeCourtQuote(undefined, 10, 12), null);
+  assert.equal(computeCourtQuote({ hourlyRateMinor: undefined }, 10, 12), null);
+  assert.equal(computeCourtQuote({ hourlyRateMinor: 200000 }, 10, 12), 400000);
 });
 
 
