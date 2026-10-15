@@ -124,6 +124,7 @@ export interface Team {
   captainId: string;
   captainName?: string;
   memberIds: string[];
+  members?: { id: string; name: string }[];
   description?: string;
   createdAt: string;
 }

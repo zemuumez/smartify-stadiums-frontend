@@ -416,6 +416,11 @@ function BookingCard({
           <p className="text-sm text-slate-600">{venueName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {booking.teamName ? (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">
+              {booking.teamName} · {t('teamMatch')}
+            </span>
+          ) : null}
           {booking.source === 'walk_in' ? (
             <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-900">
               {t('walkIn')}

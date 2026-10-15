@@ -532,19 +532,21 @@ export function createDemoTransport(storage?: DemoStorage) {
           status: b.status,
         }));
       }
+      const hydrateTeam = (t: Team): Team => ({
+        ...t,
+        captainName: state.accounts.find(a => a.id === t.captainId)?.full_name || t.captainName,
+        members: t.memberIds.map(id => ({
+          id,
+          name: state.accounts.find(a => a.id === id)?.full_name || id,
+        })),
+      });
       if (parts.length === 1 && method === 'GET') {
-        return state.teams.map(t => ({
-          ...t,
-          captainName: state.accounts.find(a => a.id === t.captainId)?.full_name || t.captainName,
-        }));
+        return state.teams.map(hydrateTeam);
       }
       if (parts.length === 2 && method === 'GET') {
         const team = state.teams.find(t => t.id === parts[1]);
         if (!team) throw new ServiceError('not_found', 404);
-        return {
-          ...team,
-          captainName: state.accounts.find(a => a.id === team.captainId)?.full_name || team.captainName,
-        };
+        return hydrateTeam(team);
       }
       if (parts.length === 1 && method === 'POST') {
         const user = requireRole('player');
@@ -610,7 +612,7 @@ export function createDemoTransport(storage?: DemoStorage) {
         }
         audit('team.join_approved', req.id);
         persist();
-        return team;
+        return hydrateTeam(team);
       }
       if (parts[2] === 'requests' && parts[4] === 'reject' && method === 'POST') {
         const user = account();
@@ -654,7 +656,7 @@ export function createDemoTransport(storage?: DemoStorage) {
         team.memberIds = team.memberIds.filter(m => m !== parts[3]);
         audit('team.member_removed', parts[3]);
         persist();
-        return team;
+        return hydrateTeam(team);
       }
     }
     if (path === '/media' && method === 'GET') { const user = account(); return state.media.filter(m => m.visibility === 'public' || state.bookings.some(b => b.id === m.bookingId && b.playerId === user.id)); }

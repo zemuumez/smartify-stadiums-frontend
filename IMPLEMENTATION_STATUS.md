@@ -177,3 +177,24 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Total unit test suite expanded from 44 to 56 passing tests (`npm test`).
      - Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched services and fixtures).
      - Production Next.js build compiles cleanly (`npm run build`).
+
+- Step 16 (Milestone M4 Part 1 Step 2: UI Integration, Complete Localization, and 4 Reproducible Browser Journeys):
+  1. UI integration across teams, bookings, and venues:
+     - src/components/team-panels.tsx: rendered TeamDetail and TeamList with useServiceQuery. Added Captain Controls for pending join requests (Approve/Reject) and roster management (Remove member). Added membership actions (Request to Join, pending badge, Leave Team with inline confirmation). Added Team Matches section enforcing privacy boundary (members see full ETB financials and payment status; public non-members see match schedule with financial amounts masked).
+     - src/components/booking-form.tsx: captain team selector appears when booking a court whose sport matches the captain''s team; passes teamId and preserves booking context across login via returnTo.
+     - src/components/booking-list.tsx: displayed teamName · teamMatch badge in both player bookings list and venue owner bookings overview.
+     - src/components/venue-site.tsx: integrated dynamic eventDetails, participation format badges (formatTeam, formatSingles, formatDoubles), real-time spots open, and EventRegistrationDialog modal supporting team (captain selection), singles (individual), and doubles (partner name entry) registrations, along with self-service cancellation that restores capacity.
+  2. Full localization (English & Amharic):
+     - Added matching keys to src/i18n/en.ts and src/i18n/am.ts: captain, teamRoster, requestToJoin, joinRequestPending, leaveTeam, leaveTeamConfirm, removeMember, removeMemberConfirm, captainPanel, pendingRequests, noPendingRequests, approveRequest, rejectRequest, teamBookings, noTeamBookings, bookForTeam, selectTeam, individualBooking, eventRegistration, registerForEvent, cancelRegistration, cancelRegistrationConfirm, registrationSuccess, registrationCancelled, partnerName, partnerNamePlaceholder, partnerNameRequired, selectRegistrationTeam, formatTeam, formatSingles, formatDoubles, spotsAvailable, eventFull, eventClosed, teamSpotsOpen, playerSpotsOpen, pairSpotsOpen, teamMatch, rosterEmpty, youAreCaptain, teamMember, noMatchingTeam, registered.
+  3. Reproducible browser journeys (frontend/tests/verify-teams-events-e2e.mjs):
+     - Journey 1: Teams, Captaincy, and Member Moderation: Sara Mengistu submits join request to Bole Lions FC; Captain Abebe Kebede reviews and approves; roster updates to include Sara with Remove button; Sara visits, clicks Leave Team, confirms, and is cleanly removed from the roster.
+     - Journey 2: Captain Team Booking and Privacy Boundaries: Abebe books Pitch 1 on behalf of Bole Lions FC; booking card displays Bole Lions FC · Team match in player and owner views; captain views team bookings with ETB financials; non-member public view masks financial figures.
+     - Journey 3: Venue Events across Two Venues: Bambis Meda (football team event) registers Bole Lions FC with capacity decrement; Unity Sports Complex (tennis singles event) registers Sara as individual, then cancels registration, restoring capacity and re-enabling registration button.
+     - Journey 4: Mobile Viewport (390x844) & Amharic Localization: verified document.documentElement.scrollWidth <= window.innerWidth (no horizontal overflow) and complete Amharic strings on mobile team profile and venue microsite.
+  4. Verification results:
+     - 56/56 unit tests pass (npm test).
+     - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+     - Next.js production build compiles with 0 errors (npm run build).
+     - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
+     - Saved screenshot artifacts: journey1_join_request_pending.png, journey1_captain_approved_roster.png, journey2_team_booking_badge.png, journey3_event_registered_venue1.png, journey4_mobile_amharic_team.png, journey4_mobile_amharic_venue.png.
+     - Frozen UI baseline strictly preserved. No merge, push, or deployment.
