@@ -19,3 +19,4 @@ const transport: Transport = isDemoMode
 export const services = createServices(transport);
 export const { auth: authService, venues: venuesService, fields: fieldsService, bookings: bookingsService, content: contentService, teams: teamsService, media: mediaService, billing: billingService, admin: adminService } = services;
 export async function selectDemoAccount(id: string) { return (await getDemo()).selectAccount(id); }
+export * from './history-trap';

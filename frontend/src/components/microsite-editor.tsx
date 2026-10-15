@@ -10,39 +10,9 @@ import { isSupportedImageUrl } from '@/services/media-policy';
 import { SiteContentEditor } from './site-content-editor';
 import { VenueSite } from './venue-site';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
+import { cleanHistoryTrap, handleTrapPopState } from '@/services/history-trap';
 
-let isCleaningCmsTrap = false;
-let cleanHistoryTrapPromise: Promise<void> | null = null;
-
-export async function cleanHistoryTrap(): Promise<void> {
-  if (typeof window === 'undefined') return;
-  if (!window.history.state?.__cmsTrap) {
-    return;
-  }
-  if (cleanHistoryTrapPromise) {
-    return cleanHistoryTrapPromise;
-  }
-  isCleaningCmsTrap = true;
-  cleanHistoryTrapPromise = new Promise<void>((resolve) => {
-    let resolved = false;
-    const finish = () => {
-      if (!resolved) {
-        resolved = true;
-        window.removeEventListener('popstate', onPop);
-        isCleaningCmsTrap = false;
-        cleanHistoryTrapPromise = null;
-        resolve();
-      }
-    };
-    const onPop = () => {
-      finish();
-    };
-    window.addEventListener('popstate', onPop);
-    window.history.back();
-    setTimeout(finish, 500);
-  });
-  return cleanHistoryTrapPromise;
-}
+export { cleanHistoryTrap };
 
 export function MicrositeEditor({
   venueId,
@@ -75,7 +45,8 @@ export function MicrositeEditor({
     if (dirty) {
       const proceed = window.confirm(t('switchVenueConfirm'));
       if (!proceed) return;
-      await cleanHistoryTrap();
+      const cleaned = await cleanHistoryTrap();
+      if (!cleaned) return;
     }
     setDirty(false);
     onDirtyChange?.(false);
@@ -230,8 +201,11 @@ function EditForm({
       }
       event.preventDefault();
       event.stopPropagation();
+      const cleaned = await cleanHistoryTrap();
+      if (!cleaned) {
+        return;
+      }
       isConfirmedExitRef.current = true;
-      await cleanHistoryTrap();
       const targetUrl = new URL(anchor.href, window.location.href);
       if (targetUrl.origin === window.location.origin) {
         router.push(targetUrl.pathname + targetUrl.search + targetUrl.hash);
@@ -243,11 +217,26 @@ function EditForm({
 
     // 3. Browser Back / Forward buttons (popstate)
     const handlePopState = () => {
-      if (isCleaningCmsTrap || isCleaningUpRef.current) {
+      if (isCleaningUpRef.current) {
         isCleaningUpRef.current = false;
         return;
       }
       if (isConfirmedExitRef.current) {
+        return;
+      }
+      const handled = handleTrapPopState({
+        isDirty: dirty,
+        onRestoreTrap: () => {
+          const baseState = (typeof window !== 'undefined' && window.history.state) || {};
+          window.history.pushState(
+            { ...baseState, __cmsTrap: true },
+            '',
+            editorUrlRef.current || window.location.href
+          );
+          isTrapActiveRef.current = true;
+        },
+      });
+      if (handled) {
         return;
       }
       if (isTrapActiveRef.current) {

@@ -22,7 +22,8 @@ function Administration({slug}:{slug:string}) {
     if (tab === 'cms' && cmsDirty) {
       const proceed = window.confirm(t('discardConfirm'));
       if (!proceed) return;
-      await cleanHistoryTrap();
+      const cleaned = await cleanHistoryTrap();
+      if (!cleaned) return;
     }
     setCmsDirty(false);
     setTab(nextTab);

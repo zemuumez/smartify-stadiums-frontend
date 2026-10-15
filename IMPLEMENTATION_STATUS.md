@@ -114,3 +114,16 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Added repeated CMS -> edit -> confirm venue switch -> return -> edit tests across multiple venue selections, verifying zero history accumulation.
      - Added dirty internal-link navigation test with confirmed exit, verifying clean transition to destination and subsequent Back navigation returning to the editor without getting trapped.
      - All 36 behavioral unit tests pass (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build (npm run build) succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen visual baseline preserved.
+
+- Step 13 (Enforcing confirmed history traversal and safe delayed/missing popstate handling):
+  1. Confirmed history traversal requirement:
+     - Modularized history trap logic into src/services/history-trap.ts.
+     - cleanHistoryTrap(timeoutMs = 1000) returns Promise<boolean>, resolving true ONLY after confirmed history traversal via popstate where window.history.state?.__cmsTrap is cleared.
+     - If a timeout occurs before popstate fires, cleanHistoryTrap resolves false and records hasPendingDelayedTraversal = true. Timeouts never resolve true or authorize unmounting or navigation.
+  2. Safe caller guards & edit preservation:
+     - handleTabChange in src/components/venue-administration.tsx, handleVenueChange in src/components/microsite-editor.tsx, and handleCaptureClick in EditForm check if (!cleaned) return;. When cleanup traversal is unconfirmed, tab changes, venue changes, and link routing abort immediately; components remain mounted and dirty edits are 100% preserved.
+  3. Safe delayed traversal handling:
+     - handleTrapPopState detects hasPendingDelayedTraversal. If a late-arriving popstate from a timed-out cleanup is delivered, it swallows the event without prompting discard confirmation, clears the pending flag, and safely restores the trap entry (history.pushState) to protect dirty edits during subsequent navigation.
+  4. Regression test coverage:
+     - Created tests/history-trap.test.cjs adding 7 focused unit regression tests verifying immediate clean resolution when trap is absent, confirmed traversal resolution, timeout failure on missing popstate, safe handling of delayed popstate with trap restoration, caller edit preservation upon cleanup failure, and deduplication of concurrent callers.
+     - Total unit test suite expanded to 43 passing tests (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen UI baseline preserved.
