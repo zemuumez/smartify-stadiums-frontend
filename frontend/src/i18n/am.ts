@@ -93,4 +93,9 @@ export const am: Record<MessageKey, string> = {
   teamSpots: "የቡድን አቅም",
   durationLabel: "የቪዲዮ ርዝመት",
   facilityHelp: "ከማስያዝዎ በፊት የእያንዳንዱን ሜዳ አገልግሎቶች ያወዳድሩ።",
+  demoPreview: "የሙከራ ቅድመ እይታ · ምሳሌ ቁጥሮችና የታቀዱ አገልግሎቶች",
+  ratingLabel: "ደረጃ",
+  pitchesLabel: "ሜዳዎች",
+  exploreAll: "ሁሉንም ይመልከቱ",
+  closePreview: "ቅድመ እይታውን ዝጋ",
 };

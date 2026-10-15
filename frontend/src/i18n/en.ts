@@ -92,5 +92,10 @@ export const en = {
   teamSpots: "Team capacity",
   durationLabel: "Video duration",
   facilityHelp: "Compare the facilities listed for each pitch before booking.",
+  demoPreview: "Demo preview · sample figures and planned features",
+  ratingLabel: "Rating",
+  pitchesLabel: "Pitches",
+  exploreAll: "Explore All",
+  closePreview: "Close preview",
 } as const;
 export type MessageKey = keyof typeof en;

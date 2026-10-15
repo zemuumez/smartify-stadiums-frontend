@@ -1,25 +1,580 @@
 'use client';
-import { useCallback, useState } from 'react';
-import Image from 'next/image';
-import { Camera, Award, ShieldCheck, Lightbulb, Shirt, Building2, MapPin, Star, ArrowUpRight, Search, SlidersHorizontal } from 'lucide-react';
-import { venuesService } from '@/services';
+import { useOriginalCopy } from '@/i18n/original-copy';
+
+import { useState, useCallback, useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  Search, MapPin, Star, Video, Shield, ArrowUpRight,
+  SlidersHorizontal, ArrowRight,
+  ChevronDown, Award, Smartphone,
+  Activity, Camera, Lightbulb, Shirt, ShieldCheck,
+  Building2, RotateCcw
+} from "lucide-react";
+import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
+import { directoryService } from '@/services/directory.service';
 import { micrositeUrl } from '@/services/tenant-routing';
-import { supportedSports } from '@/services/sports';
 import { useServiceQuery } from '@/lib/use-service-query';
-import { useLanguage } from '@/i18n/provider';
-import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
-const filters = [ ['camera', 'cameraFeature', Camera], ['referee', 'refereeFeature', Award], ['verified', 'verified', ShieldCheck], ['lighting', 'nightFeature', Lightbulb], ['changing', 'lockerFeature', Shirt], ['indoor', 'indoorFeature', Building2] ] as const;
+import { DemoMarker, ServiceErrorMessage } from './service-state';
+
+
+const cities = ["All Cities", "Addis Ababa", "Dire Dawa", "Bahir Dar", "Hawassa", "Mekelle"];
+
+const sports = [
+  { id: "All",        label: "All Sports" },
+  { id: "Football",   label: "Football" },
+  { id: "Basketball", label: "Basketball" },
+  { id: "Volleyball", label: "Volleyball" },
+  { id: "Badminton",  label: "Badminton" },
+  { id: "Tennis",     label: "Tennis" },
+  { id: "Futsal",     label: "Futsal" },
+];
+
+const featureFilters = [
+  { id: "camera",   label: "AI Camera (Veo)",   icon: Video },
+  { id: "referee",  label: "Referee Available", icon: Award },
+  { id: "verified", label: "ULS Verified",      icon: ShieldCheck },
+  { id: "lighting", label: "Night Games",       icon: Lightbulb },
+  { id: "changing", label: "Locker & Showers",  icon: Shirt },
+  { id: "indoor",   label: "Indoor Arena",      icon: Building2 },
+];
+
+type SortOption = "recommended" | "rating_desc" | "price_asc" | "price_desc" | "reviews_desc" | "fields_desc";
+
 export function Marketplace() {
-  const { t, money, locale } = useLanguage();
-  const [search, setSearch] = useState(''); const [city, setCity] = useState(''); const [sport, setSport] = useState(''); const [features, setFeatures] = useState<string[]>([]); const [sort, setSort] = useState('recommended');
-  const query = useServiceQuery(useCallback(async signal => { const venues = await venuesService.list(signal); return Promise.all(venues.map(async venue => { const fields = await venuesService.fields(venue.id, signal); return { venue, fields, price: fields.length ? Math.min(...fields.map(f => f.hourlyRateMinor)) : 0, flags: { camera: fields.some(f => f.camera), referee: !!venue.referee, verified: venue.verified, lighting: fields.some(f => f.lighting), changing: fields.some(f => f.changingRoom), indoor: !!venue.indoor } }; })); }, []));
-  const results = (query.data || []).filter(({venue,flags}) => (!search || `${venue.name} ${venue.city} ${venue.address}`.toLowerCase().includes(search.toLowerCase())) && (!city || city === venue.city) && (!sport || venue.sports.some(s => s === sport)) && features.every(f => flags[f as keyof typeof flags])).sort((a,b) => sort === 'priceLow' ? a.price-b.price : sort === 'priceHigh' ? b.price-a.price : sort === 'topRated' ? (b.venue.rating || 0)-(a.venue.rating || 0) : Number(b.venue.featured || false)-Number(a.venue.featured || false));
-  return <main className="venue-directory pb-24">
-    <section className="directory-hero"><Image src="/hero-sports-field.jpg" alt="" fill priority sizes="100vw" className="object-cover"/><div className="venue-wrap relative"><p className="site-badge"><ShieldCheck size={15}/> ET Smart Fields · {t('allSports')}</p><h1>{t('directoryTitle')}<br/>{locale === 'en' ? <><span>Sports Fields</span> in Ethiopia</> : <span>{t('directoryAccent')}</span>}</h1><p className="max-w-xl text-lg leading-relaxed">{t('directoryIntro')}</p></div></section>
-    <div className="venue-wrap"><form className="directory-search" onSubmit={e => { e.preventDefault(); document.getElementById('venue-results')?.scrollIntoView({behavior:'smooth'}); }}><label><span className="sr-only">{t('search')}</span><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t('searchHint')}/></label><label><MapPin size={20}/><span><small>{t('city')}</small><select aria-label={t('city')} value={city} onChange={e=>setCity(e.target.value)}><option value="">{t('allCities')}</option>{[...new Set(query.data?.map(v=>v.venue.city))].map(c=><option key={c}>{c}</option>)}</select></span></label><label><span><small>{t('sport')}</small><select aria-label={t('sport')} value={sport} onChange={e=>setSport(e.target.value)}><option value="">{t('allSports')}</option>{supportedSports.map(s=><option value={s} key={s}>{t(s)}</option>)}</select></span></label><button className="site-button">{t('findVenues')} <ArrowUpRight size={16}/></button></form>
-    <div className="my-7"><DemoNotice/></div><div className="flex flex-wrap gap-2 mb-5"><button className={`filter-pill ${!sport?'selected':''}`} onClick={()=>setSport('')}>{t('allSports')}</button>{supportedSports.map(s=><button key={s} className={`filter-pill ${sport===s?'selected':''}`} onClick={()=>setSport(s)} aria-pressed={sport===s}>{t(s)}</button>)}</div>
-    <div className="feature-bar"><span className="flex items-center gap-1 text-xs uppercase text-slate-500"><SlidersHorizontal size={14}/>{t('features')}:</span>{filters.map(([id,label,Icon])=><button key={id} aria-pressed={features.includes(id)} className={`feature-pill ${features.includes(id)?'selected':''}`} onClick={()=>setFeatures(prev=>prev.includes(id)?prev.filter(f=>f!==id):[...prev,id])}><Icon size={14}/>{t(label)}</button>)}</div>
-    <section id="venue-results" className="scroll-mt-24 py-12"><div className="flex flex-wrap items-end justify-between gap-4 border-b pb-5 mb-8"><div><p className="site-eyebrow">{city||t('allCities')} · {sport?t(sport as typeof supportedSports[number]):t('allSports')}</p><h2 className="text-3xl font-black">{t('availableVenues')}</h2></div><div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-500">{results.length} {t('venues')}</span><label className="text-sm">{t('sort')} <select className="filter-pill" value={sort} onChange={e=>setSort(e.target.value)}>{(['recommended','priceLow','priceHigh','topRated'] as const).map(s=><option value={s} key={s}>{t(s)}</option>)}</select></label><button className="text-sm underline min-h-11" onClick={()=>{setSearch('');setCity('');setSport('');setFeatures([]);setSort('recommended');}}>{t('resetFilters')}</button></div></div>
-    {query.loading?<Loading/>:query.error?<ServiceErrorMessage error={query.error} retry={query.reload}/>:!results.length?<Empty/>:<div className="grid gap-7 md:grid-cols-2 lg:grid-cols-3">{results.map(({venue,fields,price,flags})=><article key={venue.id} className="directory-card"><div className="relative h-64"><Image src={venue.image} alt={venue.name} fill sizes="(max-width:768px) 100vw, 33vw" className="object-cover"/><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"/><div className="absolute top-3 left-3 right-3 flex flex-wrap gap-2">{venue.verified&&<span className="rounded-full bg-white px-3 py-1 text-xs flex items-center gap-1"><ShieldCheck size={12}/>{t('verified')}</span>}{flags.camera&&<span className="site-badge text-xs"><Camera size={12}/>{t('cameraFeature')}</span>}</div><div className="absolute bottom-4 left-4 text-white"><small>{t('startingFrom')}</small><p className="text-xl font-black">{money(price)} <small className="font-normal">/ {t('perHour')}</small></p></div></div><div className="flex flex-1 flex-col p-6"><div className="flex justify-between gap-2 text-xs"><span className="flex items-center gap-1"><Star size={15} className="text-amber-500"/>{venue.rating ?? '—'} <span className="text-slate-500">({venue.reviewCount} {t('reviews')})</span></span><span className="text-emerald-800">{fields.length} {t('availableFields')}</span></div><h3 className="text-xl font-black mt-4">{venue.name}</h3><p className="flex gap-1 text-sm text-slate-500 mt-2"><MapPin size={15} className="shrink-0"/>{venue.address}</p><div className="flex flex-wrap gap-2 border-t mt-4 pt-3">{venue.sports.map(s=><span className="perk" key={s}>{t(s)}</span>)}{filters.filter(([id])=>flags[id]).map(([id,label,Icon])=><span className="perk" key={id}><Icon size={12}/>{t(label)}</span>)}</div><div className="flex flex-wrap justify-between items-center gap-3 mt-auto pt-9"><a className="text-sm font-semibold text-emerald-800 min-h-11 inline-flex items-center" href={micrositeUrl(venue.slug)}>{t('officialSite')} →</a><a className="site-button text-sm" href={micrositeUrl(venue.slug,true)}>{t('bookPitch')} ↗</a></div></div></article>)}</div>}</section></div>
-  </main>;
+  const copy = useOriginalCopy();
+
+  const query = useServiceQuery(useCallback(signal => directoryService.list(signal), []));
+  const stadiums = useMemo(() => query.data || [], [query.data]);
+  const loading = query.loading;
+  const [search, setSearch] = useState("");
+  const [selectedCity, setSelectedCity] = useState("All Cities");
+  const [selectedSport, setSelectedSport] = useState("All");
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>("recommended");
+
+  const toggleFeature = (featureId: string) => {
+    setSelectedFeatures((prev) =>
+      prev.includes(featureId) ? prev.filter((id) => id !== featureId) : [...prev, featureId]
+    );
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setSelectedCity("All Cities");
+    setSelectedSport("All");
+    setSelectedFeatures([]);
+    setSortBy("recommended");
+  };
+
+  // Comprehensive multi-criteria filtering and sorting algorithm
+  const filteredAndSortedStadiums = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    // 1. FILTERING
+    const filtered = stadiums.filter((s) => {
+      // Search matching (name, address, city, sport, supported sports)
+      const matchesSearch =
+        !query ||
+        s.name.toLowerCase().includes(query) ||
+        s.address.toLowerCase().includes(query) ||
+        s.city.toLowerCase().includes(query) ||
+        s.sport.toLowerCase().includes(query) ||
+        s.sports?.some((sp) => sp.toLowerCase().includes(query));
+
+      // City filter
+      const matchesCity = selectedCity === "All Cities" || s.city.toLowerCase() === selectedCity.toLowerCase();
+
+      // Sport filter (primary sport or multi-sport array)
+      const matchesSport =
+        selectedSport === "All" ||
+        s.sport.toLowerCase() === selectedSport.toLowerCase() ||
+        s.sports?.some((sp) => sp.toLowerCase() === selectedSport.toLowerCase());
+
+      // Feature filters
+      if (selectedFeatures.includes("camera") && !s.has_camera) return false;
+      if (selectedFeatures.includes("referee") && !s.has_referee) return false;
+      if (selectedFeatures.includes("verified") && !s.is_verified) return false;
+      if (selectedFeatures.includes("lighting") && !s.has_lighting) return false;
+      if (selectedFeatures.includes("changing") && !s.has_changing_room) return false;
+      if (selectedFeatures.includes("indoor") && !s.is_indoor) return false;
+
+      return matchesSearch && matchesCity && matchesSport;
+    });
+
+    // 2. SORTING ALGORITHM
+    const sorted = [...filtered].sort((a, b) => {
+      const priceA = Number(a.price_from) || 0;
+      const priceB = Number(b.price_from) || 0;
+      const ratingA = Number(a.rating) || 0;
+      const ratingB = Number(b.rating) || 0;
+      const reviewsA = Number(a.total_reviews) || 0;
+      const reviewsB = Number(b.total_reviews) || 0;
+      const fieldsA = Number(a.fields_count) || 0;
+      const fieldsB = Number(b.fields_count) || 0;
+
+      switch (sortBy) {
+        case "recommended": {
+          const scoreA =
+            (a.featured ? 1000 : 0) +
+            (a.is_verified ? 500 : 0) +
+            (a.has_camera ? 200 : 0) +
+            ratingA * 50 +
+            reviewsA;
+          const scoreB =
+            (b.featured ? 1000 : 0) +
+            (b.is_verified ? 500 : 0) +
+            (b.has_camera ? 200 : 0) +
+            ratingB * 50 +
+            reviewsB;
+          return scoreB - scoreA;
+        }
+        case "rating_desc":
+          if (ratingB !== ratingA) return ratingB - ratingA;
+          return reviewsB - reviewsA;
+        case "price_asc":
+          return priceA - priceB;
+        case "price_desc":
+          return priceB - priceA;
+        case "reviews_desc":
+          return reviewsB - reviewsA;
+        case "fields_desc":
+          return fieldsB - fieldsA;
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [stadiums, search, selectedCity, selectedSport, selectedFeatures, sortBy]);
+
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    selectedCity !== "All Cities" ||
+    selectedSport !== "All" ||
+    selectedFeatures.length > 0 ||
+    sortBy !== "recommended";
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
+      <DemoMarker />
+
+      {/* ── HERO WITH FULL-BLEED PHOTO ── */}
+      <section className="relative min-h-[60vh] flex flex-col justify-end overflow-hidden">
+        <div className="absolute inset-0">
+          <Image
+            src="/hero-sports-field.jpg"
+            alt="Ethiopia Stadiums and Sports Fields"
+            fill
+            className="object-cover object-center"
+            priority
+            quality={90}
+          />
+          <div className="absolute inset-0 photo-overlay-hero" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+        </div>
+
+        <div className="relative z-10 spotnow-container pt-36 pb-20">
+          <div className="max-w-2xl">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="mb-4"
+            >
+              <span className="trust-badge">
+                <Shield size={12} className="text-[#74c69d]" />{copy("50+ Verified Sports Venues in Ethiopia")}</span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="text-white font-black leading-[1.05] mb-5 tracking-tight"
+              style={{ fontSize: "clamp(2.4rem, 5.5vw, 3.8rem)" }}
+            >{copy("Find & Book")}<br />
+              <span style={{ color: "#74c69d" }}>{copy("Sports Fields")}</span>{" "}{copy("in Ethiopia")}</motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-white/85 text-base sm:text-lg leading-relaxed max-w-xl"
+            >{copy("Real-time slot synchronization, certified AI camera tracking, and instant mobile payment via Telebirr or CBE Birr.")}</motion.p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FLOATING SEARCH & FILTER BAR ── */}
+      <section className="relative z-20 -mt-8 pb-4">
+        <div className="spotnow-container">
+          <FadeUp>
+            <div className="search-bar-float flex flex-col lg:flex-row items-stretch lg:items-center p-2 shadow-2xl">
+              {/* Search text input */}
+              <div className="flex-1 flex items-center px-4 py-3 border-b lg:border-b-0 lg:border-r border-black/[0.06]">
+                <Search size={18} className="text-[#8a8a8a] mr-3 flex-shrink-0" />
+                <input
+                  type="text"
+                  aria-label={copy("Search venues")} value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={copy("Search stadium name, Bole, Kirkos, Hawassa...")}
+                  className="w-full text-sm font-semibold text-[#111] placeholder-[#aaa] bg-transparent focus:outline-none"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="text-xs text-[#8a8a8a] hover:text-[#111] font-bold px-2 py-1"
+                  >{copy("Clear")}</button>
+                )}
+              </div>
+
+              {/* City selector */}
+              <div className="flex-1 flex items-center px-4 py-3 border-b lg:border-b-0 lg:border-r border-black/[0.06]">
+                <MapPin size={16} className="text-[#2d6a4f] mr-2.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-[10px] text-[#aaa] font-bold uppercase">{copy("City")}</div>
+                  <select
+                    aria-label={copy("City")} value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    className="w-full text-sm font-bold text-[#111] bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    {cities.map((city) => (
+                      <option key={city} value={city}>{copy(city)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Sport selector */}
+              <div className="flex-1 flex items-center px-4 py-3 border-b lg:border-b-0 lg:border-r border-black/[0.06]">
+                <Activity size={16} className="text-[#2d6a4f] mr-2.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-[10px] text-[#aaa] font-bold uppercase">{copy("Sport")}</div>
+                  <select
+                    aria-label={copy("Sport")} value={selectedSport}
+                    onChange={(e) => setSelectedSport(e.target.value)}
+                    className="w-full text-sm font-bold text-[#111] bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    {sports.map((sp) => (
+                      <option key={sp.id} value={sp.id}>{copy(sp.label)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
+              <div className="p-1 flex-shrink-0">
+                <button
+                  onClick={() => document.getElementById("directory-results")?.scrollIntoView({ behavior: "smooth" })}
+                  className="flex items-center justify-center gap-2 w-full lg:w-auto px-7 py-3.5 rounded-full text-white font-bold text-sm transition-all hover:opacity-90 shadow-md"
+                  style={{ background: "#2d6a4f" }}
+                >{copy("Find Venues")}<ArrowUpRight size={14} />
+                </button>
+              </div>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── SPORT CATEGORY SELECTOR & ADVANCED FEATURE FILTER BAR ── */}
+      <section className="py-6">
+        <div className="spotnow-container space-y-4">
+
+          {/* Row 1: Sport Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {sports.map((sp) => (
+              <button
+                key={sp.id}
+                aria-pressed={selectedSport === sp.id}
+                onClick={() => setSelectedSport(sp.id)}
+                className={`sport-pill flex-shrink-0 ${selectedSport === sp.id ? "active" : "inactive"}`}
+              >
+                {copy(sp.label)}
+              </button>
+            ))}
+          </div>
+
+          {/* Row 2: Feature Filters & Amenities (System Concept Features) */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.05] flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#8a8a8a] mr-1 flex items-center gap-1">
+                <SlidersHorizontal size={13} />{copy("Features:")}</span>
+
+              {featureFilters.map((feat) => {
+                const active = selectedFeatures.includes(feat.id);
+                const Icon = feat.icon;
+                return (
+                  <button
+                    key={feat.id}
+                    aria-pressed={active}
+                    onClick={() => toggleFeature(feat.id)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                      active
+                        ? "bg-[#2d6a4f] text-white border-[#2d6a4f] shadow-sm"
+                        : "bg-[#f4f3ef] text-[#4a4a4a] border-transparent hover:bg-[#e8e6df]"
+                    }`}
+                  >
+                    <Icon size={12} className={active ? "text-white" : "text-[#2d6a4f]"} />
+                    {copy(feat.label)}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Reset All Filters Button */}
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-full transition-all self-start md:self-auto flex-shrink-0"
+              >
+                <RotateCcw size={12} />{copy("Reset Filters")}</button>
+            )}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── VENUE LISTINGS GRID WITH SORTING HEADER ── */}
+      <section id="directory-results" className="py-8 scroll-mt-24">
+        <div className="spotnow-container">
+
+          {/* Sorting & Count Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-black/[0.06]">
+            <div>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-1">
+                {copy(selectedCity)} • {copy(selectedSport === "All" ? "All Sports" : selectedSport)}
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-[#111] tracking-tight">{copy("Available Sports Venues")}</h2>
+            </div>
+
+            {/* Sorting Dropdown & Counter */}
+            <div className="flex items-center gap-3 self-start sm:self-center flex-wrap">
+              <div className="text-xs font-semibold text-[#7a7a7a]">{copy("Showing")}{" "}<span className="text-[#111] font-black">{filteredAndSortedStadiums.length}</span>{" "}{copy("venues")}</div>
+
+              {/* Sort selector */}
+              <div className="relative flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-black/10 shadow-sm">
+                <span className="text-[11px] text-[#7a7a7a] font-bold uppercase tracking-wider">{copy("Sort:")}</span>
+                <select
+                  aria-label={copy("Sort:")} value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="text-xs font-black text-[#111] bg-transparent focus:outline-none cursor-pointer pr-6 appearance-none"
+                >
+                  <option value="recommended" className="bg-white text-[#111] py-1">{copy("Recommended (Best Match)")}</option>
+                  <option value="rating_desc" className="bg-white text-[#111] py-1">{copy("Highest Rated (5.0 → 1.0)")}</option>
+                  <option value="price_asc" className="bg-white text-[#111] py-1">{copy("Price: Low to High")}</option>
+                  <option value="price_desc" className="bg-white text-[#111] py-1">{copy("Price: High to Low")}</option>
+                  <option value="reviews_desc" className="bg-white text-[#111] py-1">{copy("Most Popular (Reviews)")}</option>
+                  <option value="fields_desc" className="bg-white text-[#111] py-1">{copy("Most Available Fields")}</option>
+                </select>
+                <ChevronDown size={14} className="text-[#2d6a4f] absolute right-3 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          {query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : loading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="photo-card p-6 animate-pulse">
+                  <div className="h-48 bg-[#eae8e1] rounded-2xl mb-4" />
+                  <div className="h-5 bg-[#eae8e1] rounded w-3/4 mb-3" />
+                  <div className="h-4 bg-[#eae8e1] rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <StaggerChildren className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
+              {filteredAndSortedStadiums.map((stadium) => (
+                <StaggerItem key={stadium.id}>
+                  <div className="photo-card h-full flex flex-col justify-between group overflow-hidden hover:shadow-2xl transition-all duration-300">
+                    <div>
+                      {/* Photo Thumbnail */}
+                      <div className="relative aspect-[16/10] overflow-hidden">
+                        <Image
+                          src={stadium.image || "/venue-card-1.jpg"}
+                          alt={stadium.name}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-105"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+
+                        {/* Top Badges */}
+                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                          {stadium.is_verified && (
+                            <span className="venue-tag">
+                              <Shield size={11} style={{ color: "#2d6a4f" }} />{copy("ULS Verified")}</span>
+                          )}
+                          {stadium.has_camera && (
+                            <span className="venue-tag" style={{ background: "rgba(13,43,29,0.9)", color: "white" }}>
+                              <Video size={11} style={{ color: "#74c69d" }} />{copy("AI Camera")}</span>
+                          )}
+                        </div>
+
+                        {/* Sport Pill Overlay */}
+                        <div className="absolute top-3 right-3">
+                          <span
+                            className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                            style={{ background: "rgba(26,71,49,0.85)", backdropFilter: "blur(8px)" }}
+                          >
+                            {copy(stadium.sport)}
+                          </span>
+                        </div>
+
+                        {/* Price Overlay */}
+                        <div className="absolute bottom-3 left-4 text-white">
+                          <div className="text-[11px] text-white/70 font-semibold">{copy("Starting from")}</div>
+                          <div className="text-xl font-black">{stadium.price_from}{" "}{copy("ETB")}{" "}<span className="text-xs font-normal text-white/75">{copy("/ hour")}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Card Content */}
+                      <div className="p-6">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Star size={14} fill="#f59e0b" style={{ color: "#f59e0b" }} />
+                            <span className="text-xs font-black text-[#111]">{stadium.rating.toFixed(1)}</span>
+                            <span className="text-xs text-[#8a8a8a]">({stadium.total_reviews}{" "}{copy("reviews)")}</span>
+                          </div>
+                          <span className="text-xs font-bold text-[#2d6a4f] bg-[#f0faf4] px-2.5 py-0.5 rounded-full">
+                            {stadium.fields_count}{" "}{copy("Available Fields")}</span>
+                        </div>
+
+                        <h3 className="text-xl font-black text-[#111] mb-1 group-hover:text-[#2d6a4f] transition-colors">
+                          {stadium.name}
+                        </h3>
+
+                        <div className="flex items-center gap-1.5 text-xs text-[#7a7a7a] mb-4">
+                          <MapPin size={13} style={{ color: "#2d6a4f" }} className="flex-shrink-0" />
+                          <span className="truncate">{stadium.address}, {stadium.city}</span>
+                        </div>
+
+                        {/* Dynamic Feature Chips directly on Card */}
+                        <div className="flex flex-wrap gap-1.5 pt-3 pb-3 border-t border-black/[0.06]">
+                          {stadium.has_camera && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#2d6a4f] bg-[#f0faf4] px-2.5 py-1 rounded-lg">
+                              <Camera size={11} />{copy("AI Replay")}</span>
+                          )}
+                          {stadium.has_referee && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1e6091] bg-blue-50 px-2.5 py-1 rounded-lg">
+                              <Award size={11} />{copy("Referee")}</span>
+                          )}
+                          {stadium.has_lighting && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">
+                              <Lightbulb size={11} />{copy("Floodlights")}</span>
+                          )}
+                          {stadium.has_changing_room && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#3d3d3d] bg-gray-100 px-2.5 py-1 rounded-lg">
+                              <Shirt size={11} />{copy("Lockers")}</span>
+                          )}
+                          {stadium.has_instant_pay && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#2d6a4f] bg-[#f0faf4] px-2.5 py-1 rounded-lg">
+                              <Smartphone size={11} />{copy("Telebirr")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom CTA Bar */}
+                    <div className="px-6 pb-6 pt-2 flex items-center justify-between gap-3">
+                      <Link
+                        href={micrositeUrl(stadium.slug)}
+                        className="text-xs font-bold transition-colors hover:underline flex items-center gap-1"
+                        style={{ color: "#2d6a4f" }}
+                      >{copy("Visit Official Site")}<ArrowRight size={12} />
+                      </Link>
+
+                      <Link
+                        href={micrositeUrl(stadium.slug, true)}
+                        className="flex items-center gap-1.5 px-5 py-2.5 rounded-full text-white text-xs font-bold transition-all hover:opacity-90 hover:-translate-y-0.5 shadow-sm"
+                        style={{ background: "#2d6a4f" }}
+                      >{copy("Book Pitch")}<ArrowUpRight size={12} />
+                      </Link>
+                    </div>
+                  </div>
+                </StaggerItem>
+              ))}
+            </StaggerChildren>
+          )}
+
+          {!loading && !query.error && filteredAndSortedStadiums.length === 0 && (
+            <div className="text-center py-20 photo-card p-12 max-w-xl mx-auto">
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[#f0faf4] text-[#2d6a4f]">
+                <Activity size={32} />
+              </div>
+              <h3 className="text-xl font-black text-[#111] mb-2">{copy("No Stadiums Match Your Filter Criteria")}</h3>
+              <p className="text-[#7a7a7a] text-sm mb-6 leading-relaxed">{copy("We couldn't find any venues matching your selected sport, city, and feature combinations. Try resetting filters to see all available fields.")}</p>
+              <button
+                onClick={resetFilters}
+                className="px-7 py-3 rounded-full text-white text-xs font-bold transition-all shadow-sm"
+                style={{ background: "#2d6a4f" }}
+              >{copy("Reset All Filters")}</button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── GUARANTEE / QUALITY SECTION ── */}
+      <section className="py-20 bg-white border-t border-black/[0.06]">
+        <div className="spotnow-container">
+          <div className="grid lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Shield size={24} style={{ color: "#2d6a4f" }} />,
+                title: "100% Guaranteed Slot Sync",
+                desc: "Our real-time database locks your booked time slot the millisecond payment is confirmed. Zero double-booking risk.",
+              },
+              {
+                icon: <Camera size={24} style={{ color: "#2d6a4f" }} />,
+                title: "Certified AI Cameras",
+                desc: "Look for the camera badge on stadiums equipped with 4K autonomous match tracking and automatic highlight reels.",
+              },
+              {
+                icon: <Smartphone size={24} style={{ color: "#2d6a4f" }} />,
+                title: "Native Ethiopian Payments",
+                desc: "Pay instantly with Telebirr, CBE Birr, or Chapa. Automated digital receipts sent via SMS and WhatsApp.",
+              },
+            ].map((feature) => (
+              <div key={copy(feature.title)} className="photo-card p-8 flex flex-col justify-between">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ background: "#f0faf4" }}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="font-black text-[#111] text-lg mb-2">{copy(feature.title)}</h3>
+                  <p className="text-[#7a7a7a] text-sm leading-relaxed">{copy(feature.desc)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BANNER ── */}
+      <section
+        className="py-20 relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0a1a10 0%, #1a4731 50%, #0d2b1d 100%)" }}
+      >
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
+          <FadeUp>
+            <h2 className="text-white font-black text-3xl sm:text-4xl mb-4">{copy("Are You a Stadium or Field Owner?")}</h2>
+            <p className="text-white/65 text-base sm:text-lg mb-8 max-w-xl mx-auto">{copy("Join Ethiopia's smart sports infrastructure network. Increase your bookings by 40% with real-time scheduling and an official microsite.")}</p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Link
+                href="/auth/register/owner"
+                className="btn-primary btn-primary-lg"
+                style={{ background: "#2d6a4f" }}
+              >{copy("Register Your Stadium Free")}<ArrowRight size={16} />
+              </Link>
+              <Link
+                href="/pricing"
+                className="btn-ghost-white"
+                style={{ paddingTop: "1rem", paddingBottom: "1rem" }}
+              >{copy("View Owner Plans")}</Link>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+    </div>
+  );
 }

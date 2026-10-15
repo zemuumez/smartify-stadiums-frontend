@@ -10,3 +10,10 @@ test('login return paths preserve booking context and reject external redirects'
   assert.equal(safeReturnPath('/bookings/new?field=field-2&date=2099-01-01'), '/bookings/new?field=field-2&date=2099-01-01');
   for (const unsafe of ['https://evil.example', '//evil.example', '/\\evil.example', '/\r\nevil']) assert.equal(safeReturnPath(unsafe), '/bookings');
 });
+test('restored original design copy has Amharic translations', () => {
+  const fs=require('node:fs');const path=require('node:path');const {originalAm}=require('../.test-build/i18n/original-catalog');
+  for(const filename of ['marketplace.tsx','venue-site.tsx']){
+    const source=fs.readFileSync(path.join(__dirname,'../src/components',filename),'utf8');
+    for(const match of source.matchAll(/copy\(("(?:[^"\\]|\\.)*")\)/g)) {const text=JSON.parse(match[1]);assert.ok(originalAm[text],`Missing Amharic: ${text}`);}
+  }
+});

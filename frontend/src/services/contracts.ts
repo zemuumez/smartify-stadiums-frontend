@@ -9,11 +9,12 @@ export interface Venue {
   id: string; ownerId: string; slug: string; name: string; city: string; address: string;
   description: string; phone: string; image: string; sports: Sport[];
   status: 'draft' | 'pending' | 'active' | 'suspended'; verified: boolean;
+  primarySport?: Sport; instantPay?: boolean; publicStats?: { bookings: number; players: number; stream: string };
   referee?: boolean; indoor?: boolean; featured?: boolean;
   rating: number | null; reviewCount: number; timezone: string;
 }
 export interface Field {
-  id: string; venueId: string; name: string; sports: Sport[]; surface: string;
+  id: string; venueId: string; name: string; sports: Sport[]; surface: string; size?: string;
   hourlyRateMinor: number; lighting: boolean; changingRoom: boolean; camera: boolean;
   active: boolean; openHour: number; closeHour: number;
 }
@@ -31,7 +32,7 @@ export interface BookingInput {
 }
 export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
-export interface SiteHighlight { id: string; title: string; teams: string; duration: string; playbackUrl: string | null }
+export interface SiteHighlight { id: string; title: string; teams: string; duration: string; views?: number; playbackUrl: string | null }
 export interface SiteEvent { id: string; title: string; sport: Sport; date: string; time: string; spots: number }
 export interface Microsite {
   venueId: string; tagline: string; description: string; primaryColor: string;
