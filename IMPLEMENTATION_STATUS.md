@@ -99,5 +99,18 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Test 2b and Test 2c in Journey 2 verify dirty tab switching Cancel/Confirm, history length stability across keystrokes, Back → Cancel editor restoration, zero accumulation across repeated edit/save and edit/discard cycles, Back → Confirm navigation to the preceding page (`/stadiums`), and normal Forward traversal back to CMS.
      - All 36 behavioral unit tests pass (`npm test`). Scoped ESLint is 100% clean (0 errors, 0 warnings on all touched files). Next.js production build succeeds with 0 errors (`npm run build`). All 8 journeys in `npm run test:cms` pass cleanly in headless Chrome. UI baseline remains frozen and preserved.
 
-
-
+- Step 12 (Resolution of lifecycle history-trap cleanup across unmount paths):
+  1. Coordinated lifecycle history-trap cleanup:
+     - Exported cleanHistoryTrap() from src/components/microsite-editor.tsx, which inspects window.history.state?.__cmsTrap. If active, sets module-level synchronization flag isCleaningCmsTrap = true, triggers window.history.back(), and awaits the browser popstate event before resolving.
+     - handlePopState inside EditForm intercepts isCleaningCmsTrap and suppresses duplicate discard confirmation prompts during programmatic cleanup.
+  2. Confirmed management-tab switching cleanup before unmount:
+     - In src/components/venue-administration.tsx, handleTabChange awaits cleanHistoryTrap() upon confirmed exit before calling setCmsDirty(false) and setTab(nextTab). Asynchronous history.back() finishes popping the trap entry before the editor unmounts, preventing history queue race conditions.
+  3. Confirmed venue switching cleanup before unmount:
+     - In src/components/microsite-editor.tsx, handleVenueChange awaits cleanHistoryTrap() upon confirmed venue switch before calling setSelectedId(nextId), ensuring the outgoing dirty editor trap entry is removed prior to unmounting.
+  4. Confirmed internal-link navigation cleanup:
+     - In handleCaptureClick inside EditForm, confirmed anchor navigation prevents default click dispatch, sets isConfirmedExitRef.current = true, awaits cleanHistoryTrap(), and then executes client-side routing via router.push(...) (or window.location.assign for external URLs). The intended destination is pushed on top of a clean history entry, preventing in-flight history.back() from undoing navigation.
+  5. Browser test coverage & non-accumulation verification:
+     - In tests/verify-cms-e2e.mjs (Journey 2), added automated tests repeating CMS -> edit -> confirm tab switch -> return -> edit across multiple tabs (bookings, fields), verifying zero history length accumulation and absence of orphan trap entries.
+     - Added repeated CMS -> edit -> confirm venue switch -> return -> edit tests across multiple venue selections, verifying zero history accumulation.
+     - Added dirty internal-link navigation test with confirmed exit, verifying clean transition to destination and subsequent Back navigation returning to the editor without getting trapped.
+     - All 36 behavioral unit tests pass (npm test). Scoped ESLint passes with 0 errors and 0 warnings. Next.js production build (npm run build) succeeds with 0 errors. All 8 browser journeys pass cleanly. Frozen visual baseline preserved.

@@ -435,6 +435,295 @@ export async function runCmsE2ETest() {
       throw new Error(`Journey 2 assertion failed: Tab did not switch to Bookings upon confirmation: ${JSON.stringify(tabConfirmCheck)}`);
     }
 
+    // Verify trap was cleaned up before unmounting
+    const tabTrapCheck = await client.evaluate(`!!window.history.state?.__cmsTrap`);
+    console.log('  Trap state after confirmed tab switch (must be false):', tabTrapCheck);
+    if (tabTrapCheck) {
+      throw new Error('Journey 2 assertion failed: History trap remained active after tab switch!');
+    }
+
+    // Repeated CMS -> edit -> confirm tab switch -> return -> edit lifecycle test
+    console.log('  Testing repeated CMS -> edit -> confirm tab switch -> return -> edit cycles...');
+    // Return to CMS tab
+    await client.evaluate(`
+      (() => {
+        const cmsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('microsite') || b.textContent?.includes('Microsite'));
+        cmsTabBtn?.click();
+      })()
+    `);
+    await sleep(800);
+    await waitForLoading(client);
+
+    // Tab Cycle 1: Edit in CMS
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Tab Cycle Edit 1');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const lenDuringTabCycle1 = await client.evaluate(`window.history.length`);
+    console.log('  History length during dirty tab cycle 1:', lenDuringTabCycle1);
+
+    // Confirm tab switch to Fields
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true;
+        const fieldsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('fields') || b.textContent?.includes('Fields'));
+        fieldsTabBtn?.click();
+      })()
+    `);
+    await sleep(800);
+    await waitForLoading(client);
+
+    const hasTrapAfterFields = await client.evaluate(`!!window.history.state?.__cmsTrap`);
+    if (hasTrapAfterFields) {
+      throw new Error('Journey 2 assertion failed: History trap remained active after switching to Fields tab!');
+    }
+
+    // Return to CMS tab
+    await client.evaluate(`
+      (() => {
+        const cmsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('microsite') || b.textContent?.includes('Microsite'));
+        cmsTabBtn?.click();
+      })()
+    `);
+    await sleep(800);
+    await waitForLoading(client);
+
+    // Tab Cycle 2: Edit in CMS again
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Tab Cycle Edit 2');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const lenDuringTabCycle2 = await client.evaluate(`window.history.length`);
+    console.log('  History length during dirty tab cycle 2:', lenDuringTabCycle2);
+    if (lenDuringTabCycle2 > lenDuringTabCycle1) {
+      throw new Error(`Journey 2 assertion failed: History accumulated entries on repeat tab switch and edit! (${lenDuringTabCycle2} > ${lenDuringTabCycle1})`);
+    }
+
+    // Confirm tab switch to Bookings
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true;
+        const bookingsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('bookings') || b.textContent?.includes('Bookings'));
+        bookingsTabBtn?.click();
+      })()
+    `);
+    await sleep(800);
+    await waitForLoading(client);
+
+    // Return to CMS tab
+    await client.evaluate(`
+      (() => {
+        const cmsTabBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.textContent?.includes('microsite') || b.textContent?.includes('Microsite'));
+        cmsTabBtn?.click();
+      })()
+    `);
+    await sleep(800);
+    await waitForLoading(client);
+
+    // Tab Cycle 3: Edit in CMS third time
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Tab Cycle Edit 3');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const lenDuringTabCycle3 = await client.evaluate(`window.history.length`);
+    console.log('  History length during dirty tab cycle 3:', lenDuringTabCycle3);
+    if (lenDuringTabCycle3 > lenDuringTabCycle1) {
+      throw new Error(`Journey 2 assertion failed: History accumulated entries on 3rd tab switch and edit! (${lenDuringTabCycle3} > ${lenDuringTabCycle1})`);
+    }
+    console.log('  ✓ Tab switches cleanly pop history trap with zero accumulation.');
+
+    // -------------------------------------------------------------------------
+    // Repeated CMS -> edit -> confirm venue switch -> return -> edit
+    // -------------------------------------------------------------------------
+    console.log('  Testing repeated CMS -> edit -> confirm venue switch -> return -> edit cycles...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/microsite' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    // Re-install confirm mock
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true;
+        window.confirm = () => true;
+      })()
+    `);
+
+    // Edit venue 1
+    await client.evaluate(`
+      (() => {
+        const taglineInput = document.querySelector('input[required]');
+        const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        prototypeValue.set.call(taglineInput, 'Venue Cycle Edit 1');
+        taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+        taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    const venueDirtyLen1 = await client.evaluate(`window.history.length`);
+    console.log('  Venue 1 dirty length:', venueDirtyLen1);
+
+    const availableVenuesCount = await client.evaluate(`document.querySelector('select')?.options.length || 0`);
+    if (availableVenuesCount > 1) {
+      // Switch to second venue in dropdown
+      console.log('  Switching to venue 2 in dropdown...');
+      await client.evaluate(`
+        (() => {
+          const sel = document.querySelector('select');
+          const opt = sel.options[1];
+          const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+          proto.set.call(sel, opt.value);
+          sel.dispatchEvent(new Event('input', { bubbles: true }));
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        })()
+      `);
+      await sleep(1500);
+      await waitForLoading(client);
+
+      const hasTrapAfterVenueSwitch = await client.evaluate(`!!window.history.state?.__cmsTrap`);
+      if (hasTrapAfterVenueSwitch) {
+        throw new Error('Journey 2 assertion failed: History trap remained active after venue switch!');
+      }
+
+      // Edit venue 2
+      console.log('  Editing venue 2...');
+      await client.evaluate(`
+        (() => {
+          const taglineInput = document.querySelector('input[required]');
+          const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          prototypeValue.set.call(taglineInput, 'Venue Cycle Edit 2');
+          taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+          taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+        })()
+      `);
+      await sleep(300);
+
+      const venueDirtyLen2 = await client.evaluate(`window.history.length`);
+      console.log('  Venue 2 dirty length:', venueDirtyLen2);
+      if (venueDirtyLen2 > venueDirtyLen1) {
+        throw new Error(`Journey 2 assertion failed: History accumulated entries on venue switch! (${venueDirtyLen2} > ${venueDirtyLen1})`);
+      }
+
+      // Switch back to venue 1
+      console.log('  Switching back to venue 1...');
+      await client.evaluate(`
+        (() => {
+          const sel = document.querySelector('select');
+          const opt = sel.options[0];
+          const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+          proto.set.call(sel, opt.value);
+          sel.dispatchEvent(new Event('input', { bubbles: true }));
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        })()
+      `);
+      await sleep(1500);
+      await waitForLoading(client);
+
+      // Edit venue 1 again
+      console.log('  Editing venue 1 again...');
+      await client.evaluate(`
+        (() => {
+          const taglineInput = document.querySelector('input[required]');
+          const prototypeValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          prototypeValue.set.call(taglineInput, 'Venue Cycle Edit 1 Again');
+          taglineInput.dispatchEvent(new Event('input', { bubbles: true }));
+          taglineInput.dispatchEvent(new Event('change', { bubbles: true }));
+        })()
+      `);
+      await sleep(300);
+
+      const venueDirtyLen3 = await client.evaluate(`window.history.length`);
+      console.log('  Venue 1 again dirty length:', venueDirtyLen3);
+      if (venueDirtyLen3 > venueDirtyLen1) {
+        throw new Error(`Journey 2 assertion failed: History accumulated entries on repeat venue switch! (${venueDirtyLen3} > ${venueDirtyLen1})`);
+      }
+      console.log('  ✓ Venue switches cleanly pop history trap with zero accumulation.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal link navigation with confirmed discard
+    // -------------------------------------------------------------------------
+    console.log('  Testing internal link navigation with dirty CMS...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/bambis-meda/manage?tab=cms' });
+    await sleep(1500);
+    await waitForLoading(client);
+
+    await client.evaluate(`
+      (() => {
+        window.__confirmResponse = true;
+        window.confirm = () => true;
+        const input = document.querySelector('input[required]');
+        const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        proto.set.call(input, 'Internal Link Nav Edit');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+
+    // Click "View public microsite" internal link
+    console.log('  Clicking "View public microsite" internal link while dirty...');
+    await client.evaluate(`
+      (() => {
+        const link = Array.from(document.querySelectorAll('a')).find(a => a.href?.includes('/s/bambis-meda') && !a.href?.includes('/manage'));
+        link?.click();
+      })()
+    `);
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const linkNavCheck = await client.evaluate(`
+      (() => ({
+        currentUrl: window.location.href,
+        hasTrap: !!window.history.state?.__cmsTrap,
+        isPublicMicrosite: window.location.href.includes('/s/bambis-meda') && !window.location.href.includes('/manage')
+      }))()
+    `);
+    console.log('  Internal link navigation check:', linkNavCheck);
+    if (!linkNavCheck.isPublicMicrosite || linkNavCheck.hasTrap) {
+      throw new Error(`Journey 2 assertion failed: Internal link did not navigate cleanly: ${JSON.stringify(linkNavCheck)}`);
+    }
+
+    // Verify Back returns to CMS editor cleanly without orphan trap
+    console.log('  Triggering window.history.back() from public microsite...');
+    await client.evaluate(`window.history.back()`);
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const backFromLinkCheck = await client.evaluate(`
+      (() => ({
+        currentUrl: window.location.href,
+        hasEditor: !!document.querySelector('input[required][maxlength="120"]'),
+        hasTrap: !!window.history.state?.__cmsTrap
+      }))()
+    `);
+    console.log('  Back return from link check:', backFromLinkCheck);
+    if (!backFromLinkCheck.currentUrl.includes('/manage') || !backFromLinkCheck.hasEditor || backFromLinkCheck.hasTrap) {
+      throw new Error(`Journey 2 assertion failed: Back from internal link destination failed: ${JSON.stringify(backFromLinkCheck)}`);
+    }
+    console.log('  ✓ Internal link navigation and Back return are clean without orphan trap.');
+
     // -------------------------------------------------------------------------
     // Test 2c: Browser Back / Forward History Protection Without Corruption
     // -------------------------------------------------------------------------

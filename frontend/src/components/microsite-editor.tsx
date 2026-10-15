@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Field, Microsite, Venue } from '@/services/contracts';
 import { contentService, fieldsService, venuesService } from '@/services';
 import { useServiceQuery } from '@/lib/use-service-query';
@@ -9,6 +10,39 @@ import { isSupportedImageUrl } from '@/services/media-policy';
 import { SiteContentEditor } from './site-content-editor';
 import { VenueSite } from './venue-site';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
+
+let isCleaningCmsTrap = false;
+let cleanHistoryTrapPromise: Promise<void> | null = null;
+
+export async function cleanHistoryTrap(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!window.history.state?.__cmsTrap) {
+    return;
+  }
+  if (cleanHistoryTrapPromise) {
+    return cleanHistoryTrapPromise;
+  }
+  isCleaningCmsTrap = true;
+  cleanHistoryTrapPromise = new Promise<void>((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        window.removeEventListener('popstate', onPop);
+        isCleaningCmsTrap = false;
+        cleanHistoryTrapPromise = null;
+        resolve();
+      }
+    };
+    const onPop = () => {
+      finish();
+    };
+    window.addEventListener('popstate', onPop);
+    window.history.back();
+    setTimeout(finish, 500);
+  });
+  return cleanHistoryTrapPromise;
+}
 
 export function MicrositeEditor({
   venueId,
@@ -36,11 +70,12 @@ export function MicrositeEditor({
 
   const venue = allowed.find(v => v.id === selectedId) || allowed[0];
 
-  function handleVenueChange(nextId: string) {
+  async function handleVenueChange(nextId: string) {
     if (nextId === venue.id) return;
     if (dirty) {
       const proceed = window.confirm(t('switchVenueConfirm'));
       if (!proceed) return;
+      await cleanHistoryTrap();
     }
     setDirty(false);
     onDirtyChange?.(false);
@@ -114,6 +149,7 @@ function EditForm({
   fields: Field[];
   onDirtyChange: (dirty: boolean) => void;
 }) {
+  const router = useRouter();
   const { t } = useLanguage();
   const tRef = useRef(t);
   useEffect(() => {
@@ -153,11 +189,10 @@ function EditForm({
         editorUrlRef.current || window.location.href
       );
       isTrapActiveRef.current = true;
-    } else if (!dirty && isTrapActiveRef.current && !isCleaningUpRef.current) {
+    } else if (!dirty && isTrapActiveRef.current) {
       // Clean up the trap entry on save or discard so duplicate entries never accumulate
-      isCleaningUpRef.current = true;
       isTrapActiveRef.current = false;
-      window.history.back();
+      cleanHistoryTrap();
     }
   }, [dirty, onDirtyChange]);
 
@@ -172,7 +207,7 @@ function EditForm({
     window.addEventListener('beforeunload', warn);
 
     // 2. Client-side navigation clicks (Next.js Links, dashboard management tabs, header links)
-    const handleCaptureClick = (event: MouseEvent) => {
+    const handleCaptureClick = async (event: MouseEvent) => {
       if (!dirty) return;
       const anchor = (event.target as HTMLElement | null)?.closest('a');
       if (!anchor) return;
@@ -191,13 +226,24 @@ function EditForm({
       if (!confirmed) {
         event.preventDefault();
         event.stopPropagation();
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      isConfirmedExitRef.current = true;
+      await cleanHistoryTrap();
+      const targetUrl = new URL(anchor.href, window.location.href);
+      if (targetUrl.origin === window.location.origin) {
+        router.push(targetUrl.pathname + targetUrl.search + targetUrl.hash);
+      } else {
+        window.location.assign(anchor.href);
       }
     };
     document.addEventListener('click', handleCaptureClick, true);
 
     // 3. Browser Back / Forward buttons (popstate)
     const handlePopState = () => {
-      if (isCleaningUpRef.current) {
+      if (isCleaningCmsTrap || isCleaningUpRef.current) {
         isCleaningUpRef.current = false;
         return;
       }
@@ -231,7 +277,7 @@ function EditForm({
       document.removeEventListener('click', handleCaptureClick, true);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [dirty, saved]);
+  }, [dirty, router, saved]);
 
   async function handleSave(publish = false) {
     if (isHeroImageInvalid || isLogoUrlInvalid) return;

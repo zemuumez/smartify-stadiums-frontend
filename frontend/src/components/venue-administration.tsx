@@ -8,7 +8,7 @@ import { useLanguage } from '@/i18n/provider';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Loading, ServiceErrorMessage } from './service-state';
 import { BookingList } from './booking-list';
-import { MicrositeEditor } from './microsite-editor';
+import { cleanHistoryTrap, MicrositeEditor } from './microsite-editor';
 import { OwnerFields } from './owner-panels';
 export function VenueAdministration({slug}:{slug:string}) {return <AccessGate roles={['owner','admin']}><Administration slug={slug}/></AccessGate>;}
 function Administration({slug}:{slug:string}) {
@@ -17,11 +17,12 @@ function Administration({slug}:{slug:string}) {
   const query=useServiceQuery(useCallback(async signal=>{const venues=await venuesService.owned(signal);return venues.find(v=>v.slug===slug);},[slug]));
   if(query.loading)return <Loading/>;if(query.error)return <ServiceErrorMessage error={query.error} retry={query.reload}/>;if(!query.data)return <p className="p-10" role="alert">{t('forbidden')}</p>;
 
-  function handleTabChange(nextTab: 'bookings' | 'fields' | 'cms') {
+  async function handleTabChange(nextTab: 'bookings' | 'fields' | 'cms') {
     if (nextTab === tab) return;
     if (tab === 'cms' && cmsDirty) {
       const proceed = window.confirm(t('discardConfirm'));
       if (!proceed) return;
+      await cleanHistoryTrap();
     }
     setCmsDirty(false);
     setTab(nextTab);
