@@ -215,17 +215,21 @@ test('team bookings visibility enforces member vs public privacy boundaries', as
     teamId: team.id,
   });
 
-  // Captain/member view: includes full financial details
+  // Captain/member view: includes full financial details and booking references
   const memberBookings = await s.teams.listBookings(team.id);
   assert.equal(memberBookings.length, 1);
+  assert.ok(memberBookings[0].matchId);
+  assert.ok(memberBookings[0].bookingId);
   assert.ok(memberBookings[0].totalMinor > 0);
   assert.equal(memberBookings[0].paymentStatus, 'unpaid');
 
-  // Public/non-member view: financial and private fields omitted
+  // Public/non-member view: dedicated PublicTeamMatch DTO, private fields omitted
   s.transport.selectAccount('player-2');
   const publicBookings = await s.teams.listBookings(team.id);
   assert.equal(publicBookings.length, 1);
-  assert.equal(publicBookings[0].id, memberBookings[0].id);
+  assert.ok(publicBookings[0].matchId);
+  assert.equal(publicBookings[0].id, undefined);
+  assert.equal(publicBookings[0].bookingId, undefined);
   assert.equal(publicBookings[0].sport, 'football');
   assert.equal(publicBookings[0].date, '2099-07-01');
   assert.equal(publicBookings[0].startHour, 14);
@@ -400,6 +404,12 @@ test('doubles format requires partner name and enforces duplicate prevention', a
   const event = await s.events.get('venue-2', 'venue-2-event-1');
   assert.equal(event.format, 'doubles');
 
+  // Missing or blank partnerName must reject with validation error
+  await rejects(s.events.register('venue-2', 'venue-2-event-1'), 'validation');
+  await rejects(s.events.register('venue-2', 'venue-2-event-1', {}), 'validation');
+  await rejects(s.events.register('venue-2', 'venue-2-event-1', { partnerName: '' }), 'validation');
+  await rejects(s.events.register('venue-2', 'venue-2-event-1', { partnerName: '   ' }), 'validation');
+
   const reg = await s.events.register('venue-2', 'venue-2-event-1', {
     partnerName: 'Dawit Tadesse',
   });
@@ -464,4 +474,99 @@ test('event registration rejects full capacity and closed events', async () => {
     'conflict'
   );
 });
+
+test('teamsService.myRequest returns pending join request and persists across sessions', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const team = await s.teams.create({
+    name: 'Gerji Hoops',
+    sport: 'basketball',
+    city: 'Addis Ababa',
+  });
+
+  // Initially player-2 has no pending request
+  s.transport.selectAccount('player-2');
+  const noReq = await s.teams.myRequest(team.id);
+  assert.equal(noReq, null);
+
+  // player-2 submits join request
+  await s.teams.join(team.id);
+
+  // myRequest returns the persisted pending request
+  const pendingReq = await s.teams.myRequest(team.id);
+  assert.ok(pendingReq);
+  assert.equal(pendingReq.teamId, team.id);
+  assert.equal(pendingReq.playerId, 'player-2');
+  assert.equal(pendingReq.status, 'pending');
+
+  // Captain approves request
+  s.transport.selectAccount('player-1');
+  await s.teams.approveRequest(team.id, pendingReq.id);
+
+  // Once approved, player-2 is a member, so myRequest returns null
+  s.transport.selectAccount('player-2');
+  const approvedReq = await s.teams.myRequest(team.id);
+  assert.equal(approvedReq, null);
+});
+
+test('publication revalidates event registrations against draft deletions and mutations', async () => {
+  const s = setup();
+  // 1. Owner saves draft deleting venue-1-event-0 (at this point, event has 0 registrations, so draft save succeeds)
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+  const withoutEvent0 = (draft.events || []).filter((e) => e.id !== 'venue-1-event-0');
+  await s.content.save({ ...draft, events: withoutEvent0 });
+
+  // 2. While draft is pending, a player registers against the still-published venue-1-event-0
+  s.transport.selectAccount('player-1');
+  const team = (await s.teams.list()).find((t) => t.id === 'team-1');
+  await s.events.register('venue-1', 'venue-1-event-0', { teamId: team.id });
+
+  // Verify registration exists on live event
+  const detailBefore = await s.events.get('venue-1', 'venue-1-event-0');
+  assert.equal(detailBefore.registeredCount, 1);
+
+  // 3. Owner attempts to publish the draft that deletes venue-1-event-0 -> MUST reject with conflict!
+  s.transport.selectAccount('owner-1');
+  await rejects(s.content.publish('venue-1'), 'conflict');
+
+  // Cancellation remains working because publication was rejected and event was NOT removed!
+  s.transport.selectAccount('player-1');
+  const cancelRes = await s.events.cancel('venue-1', 'venue-1-event-0', detailBefore.myRegistration.id);
+  assert.equal(cancelRes.status, 'cancelled');
+});
+
+test('draft preview reflects unpublished events and public event failures throw honest errors', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+
+  // Add a new draft event
+  const newDraftEvent = {
+    id: 'venue-1-draft-only-event',
+    title: 'Unpublished Draft Tournament',
+    sport: 'football',
+    format: 'team',
+    date: '2028-11-01',
+    time: '15:00',
+    spots: 8,
+  };
+  await s.content.save({
+    ...draft,
+    events: [...draft.events, newDraftEvent],
+  });
+
+  // Live list on venue-1 does NOT contain unpublished event
+  const liveEvents = await s.events.list('venue-1');
+  assert.equal(liveEvents.some((e) => e.id === 'venue-1-draft-only-event'), false);
+
+  // But the draft site content DOES contain it faithfully for preview
+  const previewDraft = await s.content.draft('venue-1');
+  assert.equal(previewDraft.events.some((e) => e.id === 'venue-1-draft-only-event'), true);
+
+  // Failure handling: querying events for nonexistent venue throws not_found instead of inventing zero registrations
+  await rejects(s.events.list('nonexistent-venue'), 'not_found');
+  await rejects(s.events.get('nonexistent-venue', 'some-event'), 'not_found');
+});
+
 

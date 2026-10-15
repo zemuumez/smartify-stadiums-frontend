@@ -112,7 +112,15 @@ export function TeamDetail({ id }: { id: string }) {
           reqs = [];
         }
       }
-      return { me, team: teamData, bookings: bookingsData, requests: reqs };
+      let myReq: TeamJoinRequest | null = null;
+      if (me && !teamData.memberIds.includes(me.id)) {
+        try {
+          myReq = await teamsService.myRequest(id, signal);
+        } catch {
+          myReq = null;
+        }
+      }
+      return { me, team: teamData, bookings: bookingsData, requests: reqs, myRequest: myReq };
     }, [id])
   );
 
@@ -138,10 +146,11 @@ export function TeamDetail({ id }: { id: string }) {
     );
   }
 
-  const { me: currentUser, team, bookings, requests } = query.data;
+  const { me: currentUser, team, bookings, requests, myRequest } = query.data;
 
   const isCaptain = currentUser ? team.captainId === currentUser.id || currentUser.role === 'admin' : false;
   const isMember = currentUser ? team.memberIds.includes(currentUser.id) : false;
+  const isPending = pendingRequested || myRequest?.status === 'pending';
 
   async function handleJoin() {
     setActionBusy(true);
@@ -276,7 +285,7 @@ export function TeamDetail({ id }: { id: string }) {
                   {t('leaveTeam')}
                 </button>
               </div>
-            ) : pendingRequested ? (
+            ) : isPending ? (
               <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
                 {t('joinRequestPending')}
               </span>
@@ -472,7 +481,7 @@ export function TeamDetail({ id }: { id: string }) {
           <div className="space-y-3">
             {bookings.map(b => (
               <article
-                key={b.id}
+                key={b.matchId}
                 className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div>

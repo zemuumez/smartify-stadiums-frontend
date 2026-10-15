@@ -134,6 +134,23 @@ export interface TeamInput {
   city: string;
   description?: string;
 }
+export interface PublicTeamMatch {
+  matchId: string;
+  teamId: string;
+  fieldId: string;
+  sport: Sport;
+  date: string;
+  startHour: number;
+  endHour: number;
+  status: Booking['status'];
+}
+export interface TeamMatchDetail extends PublicTeamMatch {
+  bookingId?: string;
+  venueId?: string;
+  totalMinor?: number;
+  currency?: 'ETB';
+  paymentStatus?: Booking['paymentStatus'];
+}
 export interface MediaAsset {
   id: string; bookingId: string; title: string;
   status: 'scheduled' | 'processing' | 'ready' | 'failed';

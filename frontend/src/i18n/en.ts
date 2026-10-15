@@ -202,5 +202,9 @@ export const en = {
   teamMember: 'Team Member',
   noMatchingTeam: 'You must be the captain of a team in this sport to register.',
   registered: 'Registered',
+  participationFormat: 'Participation format',
+  capacityTeams: 'Capacity (teams)',
+  capacitySingles: 'Capacity (individual players)',
+  capacityDoubles: 'Capacity (pairs)',
 } as const;
 export type MessageKey = keyof typeof en;

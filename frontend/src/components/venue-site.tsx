@@ -38,24 +38,29 @@ export function VenueSite({
     const fields = previewFields !== undefined ? previewFields : await venuesService.fields(venue.id, signal);
     const site = previewSite || await contentService.get(venue.id, signal);
     let eventDetails: EventDetails[] = [];
-    try {
+    if (previewSite || isDraftPreview) {
+      const draftEvents = previewSite?.events || site.events || [];
+      eventDetails = draftEvents.map(e => {
+        const eventFormat = e.format || (['tennis', 'badminton'].includes(e.sport) ? 'singles' : 'team');
+        const isPast = Date.parse(`${e.date}T${e.time}:00+03:00`) <= Date.now();
+        return {
+          ...e,
+          venueId: venue.id,
+          venueName: venue.name,
+          venueSlug: venue.slug,
+          format: eventFormat,
+          registeredCount: 0,
+          availableSpots: e.spots,
+          isFull: e.spots <= 0,
+          isClosed: isPast,
+          myRegistration: null,
+        };
+      });
+    } else {
       eventDetails = await eventsService.list(venue.id, signal);
-    } catch {
-      eventDetails = (site.events || []).map(e => ({
-        ...e,
-        venueId: venue.id,
-        venueName: venue.name,
-        venueSlug: venue.slug,
-        format: e.format || (['tennis', 'badminton'].includes(e.sport) ? 'singles' : 'team'),
-        registeredCount: 0,
-        availableSpots: e.spots,
-        isFull: false,
-        isClosed: false,
-        myRegistration: null,
-      }));
     }
     return { venue, fields, site, eventDetails };
-  }, [slug, previewVenue, previewFields, previewSite]));
+  }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]));
   if (query.loading) return <Loading/>;
   if (query.error || !query.data) {
     const isNotFound = (query.error as { code?: string })?.code === 'not_found' || (query.error as { status?: number })?.status === 404;
@@ -501,14 +506,38 @@ function EventRegistrationDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const { t, date } = useLanguage();
-  const [currentUser, setCurrentUser] = useState<Account | null>(null);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const initialQuery = useServiceQuery(
+    useCallback(async (signal: AbortSignal) => {
+      let u: Account | null = null;
+      try {
+        u = await authService.current();
+      } catch (err: unknown) {
+        if (
+          err &&
+          typeof err === 'object' &&
+          (('code' in err && (err as { code: string }).code === 'unauthorized') ||
+            ('status' in err && (err as { status: number }).status === 401))
+        ) {
+          u = null;
+        } else {
+          throw err;
+        }
+      }
+      let captainTeams: Team[] = [];
+      if (u && event.format === 'team') {
+        const allTeams = await teamsService.list(signal);
+        captainTeams = allTeams.filter(team => team.captainId === u.id && team.sport === event.sport);
+      }
+      return { currentUser: u, teams: captainTeams };
+    }, [event.format, event.sport])
+  );
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -517,42 +546,33 @@ function EventRegistrationDialog({
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    let active = true;
-    void authService.current().then((u: Account | null) => {
-      if (active) setCurrentUser(u);
-      if (u && event.format === 'team') {
-        void teamsService.list().then(allTeams => {
-          if (active) {
-            const captainTeams = allTeams.filter(team => team.captainId === u.id && team.sport === event.sport);
-            setTeams(captainTeams);
-            if (captainTeams[0]) setSelectedTeamId(captainTeams[0].id);
-          }
-        });
-      }
-    }).catch(() => {
-      if (active) setCurrentUser(null);
-    });
-
     return () => {
-      active = false;
       dialog?.close();
       document.body.style.overflow = overflow;
       previous?.focus();
     };
-  }, [event.format, event.sport]);
+  }, []);
+
+  const currentUser = initialQuery.data?.currentUser || null;
+  const teams = initialQuery.data?.teams || [];
+  const effectiveTeamId = selectedTeamId || teams[0]?.id || '';
 
   async function handleRegister(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    setBusy(true);
     setError(undefined);
+    if (event.format === 'doubles' && !partnerName.trim()) {
+      setError(new Error(t('partnerNameRequired')));
+      return;
+    }
+    setBusy(true);
     try {
       const input: { teamId?: string; partnerName?: string } = {};
       if (event.format === 'team') {
-        if (!selectedTeamId) return;
-        input.teamId = selectedTeamId;
+        if (!effectiveTeamId) return;
+        input.teamId = effectiveTeamId;
       } else if (event.format === 'doubles') {
-        input.partnerName = partnerName.trim() || undefined;
+        input.partnerName = partnerName.trim();
       }
       await eventsService.register(venueId, event.id, input);
       setSuccess(t('registrationSuccess'));
@@ -615,7 +635,16 @@ function EventRegistrationDialog({
 
       {error ? <div className="mb-4"><ServiceErrorMessage error={error} /></div> : null}
 
-      {success ? (
+      {initialQuery.loading ? (
+        <div className="py-8"><Loading /></div>
+      ) : initialQuery.error ? (
+        <div className="py-4 space-y-4">
+          <ServiceErrorMessage error={initialQuery.error} retry={initialQuery.reload} />
+          <button type="button" onClick={onClose} className="rounded-xl border border-stone-300 px-4 py-2 text-xs font-semibold text-stone-700 w-full">
+            {t('close')}
+          </button>
+        </div>
+      ) : success ? (
         <div className="space-y-4 py-4 text-center">
           <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 border border-emerald-200">
             {success}
@@ -709,7 +738,7 @@ function EventRegistrationDialog({
                 <select
                   className="form-input mt-1"
                   required
-                  value={selectedTeamId}
+                  value={effectiveTeamId}
                   onChange={e => setSelectedTeamId(e.target.value)}
                 >
                   {teams.map(tm => (
@@ -725,6 +754,7 @@ function EventRegistrationDialog({
               {t('partnerName')}
               <input
                 className="form-input mt-1"
+                required
                 placeholder={t('partnerNamePlaceholder')}
                 value={partnerName}
                 onChange={e => setPartnerName(e.target.value)}
@@ -734,7 +764,7 @@ function EventRegistrationDialog({
 
           <button
             type="submit"
-            disabled={busy || (event.format === 'team' && !selectedTeamId)}
+            disabled={busy || (event.format === 'team' && !effectiveTeamId)}
             className="action w-full"
             style={{ background: brandColor }}
           >

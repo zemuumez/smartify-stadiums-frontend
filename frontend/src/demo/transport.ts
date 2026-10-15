@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingInput, Closure, EventRegistration, EventRegistrationInput, Microsite, RequestOptions, RescheduleBookingInput, Role, SiteEvent, Sport, Team, TeamInput, TeamJoinRequest, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingInput, Closure, EventRegistration, EventRegistrationInput, Microsite, PublicTeamMatch, RequestOptions, RescheduleBookingInput, Role, SiteEvent, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -62,6 +62,29 @@ export function createDemoTransport(storage?: DemoStorage) {
   const field = (id: string) => { const item = state.fields.find(item => item.id === id); if (!item) throw new ServiceError('not_found', 404); return item; };
   const available = (fieldId: string, date: string, start: number, end: number) => !state.bookings.some(b => b.fieldId === fieldId && b.date === date && b.status !== 'cancelled' && b.status !== 'no_show' && overlaps(start, end, b.startHour, b.endHour)) && !state.closures.some(c => c.fieldId === fieldId && c.date === date && overlaps(start, end, c.startHour, c.endHour));
   const audit = (action: string, resourceId: string) => state.audit.push({ id: crypto.randomUUID(), actorId: account().id, action, resourceId, createdAt: new Date().toISOString() });
+  const validateEventRegistrationInvariants = (venueId: string, candidateEvents: SiteEvent[], existingEvents: SiteEvent[]) => {
+    const activeRegs = state.eventRegistrations.filter(r => r.venueId === venueId && r.status === 'registered');
+    const newEventIds = new Set(candidateEvents.map(e => e.id));
+    for (const reg of activeRegs) {
+      if (!newEventIds.has(reg.eventId)) {
+        throw new ServiceError('conflict', 409);
+      }
+    }
+    for (const newEvent of candidateEvents) {
+      const activeForEvent = activeRegs.filter(r => r.eventId === newEvent.id);
+      if (newEvent.spots < activeForEvent.length) {
+        throw new ServiceError('conflict', 409);
+      }
+      const existingEvent = existingEvents.find(e => e.id === newEvent.id);
+      if (existingEvent && activeForEvent.length > 0) {
+        const oldFormat = existingEvent.format || (['tennis', 'badminton'].includes(existingEvent.sport) ? 'singles' : 'team');
+        const nextFormat = newEvent.format || (['tennis', 'badminton'].includes(newEvent.sport) ? 'singles' : 'team');
+        if (existingEvent.sport !== newEvent.sport || oldFormat !== nextFormat) {
+          throw new ServiceError('conflict', 409);
+        }
+      }
+    }
+  };
 
   function execute(path: string, options: RequestOptions): unknown {
     const url = new URL(path, 'https://demo.invalid');
@@ -267,30 +290,11 @@ export function createDemoTransport(storage?: DemoStorage) {
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
             if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
 
-            // Separate CMS content from operational registrations:
-            // Check active registrations for this venue:
-            const activeRegs = state.eventRegistrations.filter(r => r.venueId === venue.id && r.status === 'registered');
-            const newEvents = (input.events || []) as SiteEvent[];
-            const newEventIds = new Set(newEvents.map(e => e.id));
-            for (const reg of activeRegs) {
-              if (!newEventIds.has(reg.eventId)) {
-                throw new ServiceError('conflict', 409); // Cannot delete an event with active registrations
-              }
-            }
-            for (const newEvent of newEvents) {
-              const activeForEvent = activeRegs.filter(r => r.eventId === newEvent.id);
-              if (newEvent.spots < activeForEvent.length) {
-                throw new ServiceError('conflict', 409); // Cannot reduce capacity below registered count
-              }
-              const existingEvent = (draft.events || []).find(e => e.id === newEvent.id);
-              if (existingEvent && activeForEvent.length > 0) {
-                const oldFormat = existingEvent.format || (['tennis', 'badminton'].includes(existingEvent.sport) ? 'singles' : 'team');
-                const nextFormat = newEvent.format || (['tennis', 'badminton'].includes(newEvent.sport) ? 'singles' : 'team');
-                if (existingEvent.sport !== newEvent.sport || oldFormat !== nextFormat) {
-                  throw new ServiceError('conflict', 409); // Cannot change sport or format while registrations exist
-                }
-              }
-            }
+            validateEventRegistrationInvariants(
+              venue.id,
+              (input.events || []) as SiteEvent[],
+              (draft.events || []) as SiteEvent[]
+            );
 
             Object.assign(draft, {
               highlights: structuredClone(input.highlights || []),
@@ -312,6 +316,12 @@ export function createDemoTransport(storage?: DemoStorage) {
           }
           if (parts[4] === 'publish' && method === 'POST') {
             if (venue.status !== 'active') throw new ServiceError('conflict', 409);
+            const currentSite = state.sites.find(item => item.venueId === venue.id);
+            validateEventRegistrationInvariants(
+              venue.id,
+              (draft.events || []) as SiteEvent[],
+              (currentSite?.events || draft.events || []) as SiteEvent[]
+            );
             draft.published = true;
             draft.updatedAt = new Date().toISOString();
             const site = structuredClone(draft);
@@ -476,6 +486,9 @@ export function createDemoTransport(storage?: DemoStorage) {
           }
 
           if (format === 'doubles') {
+            if (!input.partnerName || !input.partnerName.trim()) {
+              throw new ServiceError('validation', 422);
+            }
             if (activeForEvent.some(r => r.playerId === u.id)) throw new ServiceError('conflict', 409);
             const reg: EventRegistration = {
               id: crypto.randomUUID(),
@@ -484,7 +497,7 @@ export function createDemoTransport(storage?: DemoStorage) {
               playerId: u.id,
               playerName: u.full_name,
               format: 'doubles',
-              partnerName: input.partnerName?.trim() || undefined,
+              partnerName: input.partnerName.trim(),
               status: 'registered',
               createdAt: new Date().toISOString(),
             };
@@ -518,12 +531,27 @@ export function createDemoTransport(storage?: DemoStorage) {
         const isMember = user && (team.memberIds.includes(user.id) || team.captainId === user.id || user.role === 'admin');
         const teamBookings = state.bookings.filter(b => b.teamId === team.id && b.status !== 'cancelled');
         if (isMember) {
-          return teamBookings;
+          const detailedMatches: TeamMatchDetail[] = teamBookings.map((b, idx) => ({
+            matchId: `match-${team.id}-${b.date}-${b.startHour}-${idx}`,
+            bookingId: b.id,
+            teamId: team.id,
+            venueId: b.venueId,
+            fieldId: b.fieldId,
+            sport: b.sport,
+            date: b.date,
+            startHour: b.startHour,
+            endHour: b.endHour,
+            totalMinor: b.totalMinor,
+            currency: b.currency,
+            paymentStatus: b.paymentStatus,
+            status: b.status,
+          }));
+          return detailedMatches;
         }
-        // Public visibility: omit private paymentStatus and guest contact details
-        return teamBookings.map(b => ({
-          id: b.id,
-          venueId: b.venueId,
+        // Public visibility: dedicated PublicTeamMatch DTO; strips private booking references, payments, and contacts
+        const publicMatches: PublicTeamMatch[] = teamBookings.map((b, idx) => ({
+          matchId: `match-${team.id}-${b.date}-${b.startHour}-${idx}`,
+          teamId: team.id,
           fieldId: b.fieldId,
           sport: b.sport,
           date: b.date,
@@ -531,6 +559,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           endHour: b.endHour,
           status: b.status,
         }));
+        return publicMatches;
       }
       const hydrateTeam = (t: Team): Team => ({
         ...t,
@@ -590,6 +619,15 @@ export function createDemoTransport(storage?: DemoStorage) {
         audit('team.join_requested', request.id);
         persist();
         return request;
+      }
+      if (parts[2] === 'my-request' && method === 'GET') {
+        const team = state.teams.find(t => t.id === parts[1]);
+        if (!team) throw new ServiceError('not_found', 404);
+        let user: Account | null = null;
+        try { user = account(); } catch { return null; }
+        if (!user) return null;
+        const req = state.teamRequests.find(r => r.teamId === team.id && r.playerId === user!.id && r.status === 'pending');
+        return req || null;
       }
       if (parts[2] === 'requests' && method === 'GET') {
         const user = account();

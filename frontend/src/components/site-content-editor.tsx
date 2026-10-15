@@ -1,5 +1,5 @@
 'use client';
-import type { Microsite, SocialLink } from '@/services/contracts';
+import type { Microsite, ParticipationFormat, SocialLink } from '@/services/contracts';
 import { supportedSports, isSport } from '@/services/sports';
 import { useLanguage } from '@/i18n/provider';
 import { isSupportedImageUrl, isSupportedVideoUrl } from '@/services/media-policy';
@@ -278,9 +278,45 @@ export function SiteContentEditor({draft,onChange}:{draft:Microsite;onChange:(va
               </div>
             </div>
             <label className="form-label">{t('contentTitle')}<input className="form-input" required maxLength={200} value={e.title} onChange={ev=>onChange({...draft,events:events.map(x=>x.id===e.id?{...x,title:ev.target.value}:x)})}/></label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="form-label">{t('sport')}<select className="form-input" value={e.sport} onChange={ev=>{const sport=ev.target.value;if(isSport(sport))onChange({...draft,events:events.map(x=>x.id===e.id?{...x,sport}:x)});}}>{supportedSports.map(s=><option key={s} value={s}>{t(s)}</option>)}</select></label>
-              <label className="form-label">{t('teamSpots')}<input className="form-input" type="number" min={0} max={1000} required value={e.spots} onChange={ev=>onChange({...draft,events:events.map(x=>x.id===e.id?{...x,spots:Number(ev.target.value)}:x)})}/></label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="form-label">
+                {t('sport')}
+                <select className="form-input" value={e.sport} onChange={ev => {
+                  const sport = ev.target.value;
+                  if (isSport(sport)) onChange({ ...draft, events: events.map(x => x.id === e.id ? { ...x, sport } : x) });
+                }}>
+                  {supportedSports.map(s => <option key={s} value={s}>{t(s)}</option>)}
+                </select>
+              </label>
+
+              <label className="form-label">
+                {t('participationFormat')}
+                <select
+                  className="form-input"
+                  value={e.format || (['tennis', 'badminton'].includes(e.sport) ? 'singles' : 'team')}
+                  onChange={ev => {
+                    const format = ev.target.value as ParticipationFormat;
+                    onChange({ ...draft, events: events.map(x => x.id === e.id ? { ...x, format } : x) });
+                  }}
+                >
+                  <option value="team">{t('formatTeam')}</option>
+                  <option value="singles">{t('formatSingles')}</option>
+                  <option value="doubles">{t('formatDoubles')}</option>
+                </select>
+              </label>
+
+              <label className="form-label">
+                {e.format === 'doubles' ? t('capacityDoubles') : e.format === 'singles' ? t('capacitySingles') : t('capacityTeams')}
+                <input
+                  className="form-input"
+                  type="number"
+                  min={0}
+                  max={1000}
+                  required
+                  value={e.spots}
+                  onChange={ev => onChange({ ...draft, events: events.map(x => x.id === e.id ? { ...x, spots: Number(ev.target.value) } : x) })}
+                />
+              </label>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="form-label">{t('date')}<input className="form-input" type="date" required value={e.date} onChange={ev=>onChange({...draft,events:events.map(x=>x.id===e.id?{...x,date:ev.target.value}:x)})}/></label>
@@ -289,7 +325,7 @@ export function SiteContentEditor({draft,onChange}:{draft:Microsite;onChange:(va
             <button type="button" className="text-xs text-red-700 underline hover:text-red-900" onClick={()=>onChange({...draft,events:events.filter(x=>x.id!==e.id)})}>{t('removeItem')}</button>
           </fieldset>
         ))}
-        <button className="filter-pill" type="button" onClick={()=>onChange({...draft,events:[...events,{id:crypto.randomUUID(),title:'',sport:'football',date:'',time:'10:00',spots:0}]})}>{t('addEvent')}</button>
+        <button className="filter-pill" type="button" onClick={()=>onChange({...draft,events:[...events,{id:crypto.randomUUID(),title:'',sport:'football',format:'team',date:'',time:'10:00',spots:0}]})}>{t('addEvent')}</button>
       </section>
     </div>
   );

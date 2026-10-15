@@ -203,4 +203,8 @@ export const am: Record<MessageKey, string> = {
   teamMember: 'የቡድን አባል',
   noMatchingTeam: 'ለውድድሩ ለመመዝገብ የዚህ ስፖርት ቡድን አምበል መሆን አለብዎት።',
   registered: 'ተመዝግቧል',
+  participationFormat: 'የተሳትፎ ቅርጸት',
+  capacityTeams: 'የቡድን አቅም (ቡድኖች)',
+  capacitySingles: 'የተጫዋች አቅም (ተጫዋቾች)',
+  capacityDoubles: 'የጥንድ አቅም (ጥንዶች)',
 };

@@ -1,4 +1,4 @@
-import type { Booking, Team, TeamInput, TeamJoinRequest, Transport } from './contracts';
+import type { Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport } from './contracts';
 
 export function createTeamsService(transport: Transport) {
   return {
@@ -10,6 +10,10 @@ export function createTeamsService(transport: Transport) {
     join: (id: string, signal?: AbortSignal) =>
       transport.request<TeamJoinRequest>(`/teams/${encodeURIComponent(id)}/join`, {
         method: 'POST',
+        signal,
+      }),
+    myRequest: (id: string, signal?: AbortSignal) =>
+      transport.request<TeamJoinRequest | null>(`/teams/${encodeURIComponent(id)}/my-request`, {
         signal,
       }),
     leave: (id: string, signal?: AbortSignal) =>
@@ -37,6 +41,8 @@ export function createTeamsService(transport: Transport) {
         { method: 'DELETE', signal }
       ),
     listBookings: (id: string, signal?: AbortSignal) =>
-      transport.request<Booking[]>(`/teams/${encodeURIComponent(id)}/bookings`, { signal }),
+      transport.request<TeamMatchDetail[]>(`/teams/${encodeURIComponent(id)}/bookings`, { signal }),
+    listMatches: (id: string, signal?: AbortSignal) =>
+      transport.request<TeamMatchDetail[]>(`/teams/${encodeURIComponent(id)}/bookings`, { signal }),
   };
 }
