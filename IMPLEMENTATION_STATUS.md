@@ -415,3 +415,28 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
       - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
 
+- Step 26 (Milestone M5 Step 4: Venue Review and Administration):
+   1. Review lifecycle & state transitions:
+      - Reconciled existing venue review statuses (`'draft' | 'pending' | 'changes_requested' | 'active' | 'suspended'`) without introducing a contradictory secondary status system.
+      - Implemented full review actions: `submit`, `request_changes`, `approve`, `suspend`, `reinstate` with reason tracking and reverse-chronological audit history in `state.venueReviews`.
+      - Enforced mandatory review reason validation for non-approval actions (`request_changes`, `suspend`, `reinstate`).
+      - Preserved backward compatibility on `PATCH /admin/stadiums/:id` while auto-recording audit entries.
+   2. Suspension invariants & data preservation:
+      - Suspended venues are immediately excluded from public directory discovery (`/stadiums`) and return 404 on direct lookup (`/stadiums/:slug`).
+      - New public reservations (`POST /bookings`) and new walk-in reservations (`POST /owner/walk-ins`) reject when a venue is suspended.
+      - Existing reservations, payments, and refunds remain strictly intact; suspension never silently cancels bookings or issues automated refunds.
+      - Venue owners retain authorized access to `/dashboard/stadiums`, `/dashboard/bookings`, and `/dashboard/billing` to inspect records and view admin feedback.
+   3. Camera certification separation:
+      - Camera hardware and FOV certification remains strictly independent of venue operational review.
+      - Suspending or reinstating a venue preserves existing camera certification statuses (`passed`, `failed`, `revoked`).
+      - Added visual separation advisory (`cameraSeparationNotice`) in admin venues panel.
+   4. UI integration & localization:
+      - In `frontend/src/components/admin-panels.tsx` (`AdminVenues`): rendered status pills, approve/request_changes/suspend/reinstate action buttons, mandatory reason inputs, optional internal notes, and review history audit viewer.
+      - In `frontend/src/components/owner-panels.tsx` (`OwnerVenues`): rendered review submission trigger for draft and changes_requested venues, feedback notices, suspension alerts (`venueSuspensionNotice`), and review history viewer.
+      - Added 10+ matching translation keys to `en.ts` and `am.ts` with 100% key parity.
+   5. Verification results:
+      - 94/94 unit tests pass (`npm test`, with comprehensive review lifecycle, suspension invariant, and camera independence tests in `frontend/tests/finance-admin.test.cjs`).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (`npm run build`, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch `codex/finance-platform-admin`; no merge into `main`, push, or deploy.
+

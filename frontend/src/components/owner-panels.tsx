@@ -2,7 +2,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { billingService, fieldsService, venuesService } from '@/services';
-import type { Field, Venue } from '@/services/contracts';
+import type { Field, Venue, VenueReviewRecord } from '@/services/contracts';
 import type { FieldInput } from '@/services/fields.service';
 import { supportedSports, hourLabel } from '@/services/sports';
 import { useServiceQuery } from '@/lib/use-service-query';
@@ -38,15 +38,248 @@ export function OwnerOverview() {
   );
 }
 export function OwnerVenues() {
-  const { t } = useLanguage(); const query = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
-  const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(); const [saved, setSaved] = useState(false);
+  const { t } = useLanguage();
+  const query = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const [saved, setSaved] = useState(false);
+  const [submittingVenueId, setSubmittingVenueId] = useState<string | null>(null);
+  const [submitNotes, setSubmitNotes] = useState('');
+  const [activeHistoryVenueId, setActiveHistoryVenueId] = useState<string | null>(null);
+  const [reviewsHistory, setReviewsHistory] = useState<Record<string, VenueReviewRecord[]>>({});
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); setBusy(true); setError(undefined); setSaved(false);
-    try { await venuesService.create({ name: String(data.get('name')), city: String(data.get('city')), address: String(data.get('address')), description: String(data.get('description')), phone: String(data.get('phone')) }); form.reset(); setSaved(true); query.reload(); } catch (error) { setError(error); } finally { setBusy(false); }
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
+    setError(undefined);
+    setSaved(false);
+    try {
+      await venuesService.create({
+        name: String(data.get('name')),
+        city: String(data.get('city')),
+        address: String(data.get('address')),
+        description: String(data.get('description')),
+        phone: String(data.get('phone')),
+      });
+      form.reset();
+      setSaved(true);
+      query.reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
   }
-  return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('venues')}</h1>{query.loading ? <Loading /> : query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : !query.data?.length ? <Empty /> : <div className="grid gap-4 sm:grid-cols-2">{query.data.map(venue => <article className="panel" key={venue.id}><h2 className="text-xl font-bold">{venue.name}</h2><p className="my-3">{venue.city} · {t(venue.status)}</p>{venue.status === 'active' && <Link href={`/s/${venue.slug}`} className="underline">{t('viewSite')}</Link>}</article>)}</div>}
-    <form className="panel space-y-4" onSubmit={submit}><h2 className="text-xl font-bold">{t('submitVenue')}</h2>{error ? <ServiceErrorMessage error={error} /> : null}{saved && <p role="status">{t('submitted')}</p>}<fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">{(['name', 'city', 'address', 'phone'] as const).map(key => <label className="form-label" key={key}>{t(key === 'name' ? 'venueName' : key)}<input className="form-input" name={key} type={key === 'phone' ? 'tel' : 'text'} required maxLength={200} /></label>)}<label className="form-label sm:col-span-2">{t('description')}<textarea className="form-input" name="description" maxLength={5000} /></label><button className="action" type="submit" disabled={busy}>{t('submitVenue')}</button></fieldset></form>
-  </div>;
+
+  const loadHistory = async (venueId: string) => {
+    if (activeHistoryVenueId === venueId) {
+      setActiveHistoryVenueId(null);
+      return;
+    }
+    setActiveHistoryVenueId(venueId);
+    setLoadingHistory(true);
+    try {
+      const records = await venuesService.reviews(venueId);
+      setReviewsHistory(prev => ({ ...prev, [venueId]: records }));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleSubmitForReview = async (venueId: string) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await venuesService.submitForReview(venueId, submitNotes.trim() || undefined);
+      setSubmittingVenueId(null);
+      setSubmitNotes('');
+      query.reload();
+      if (activeHistoryVenueId === venueId) {
+        const records = await venuesService.reviews(venueId);
+        setReviewsHistory(prev => ({ ...prev, [venueId]: records }));
+      }
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">{t('venues')}</h1>
+      {error ? <ServiceErrorMessage error={error} /> : null}
+
+      {query.loading ? (
+        <Loading />
+      ) : query.error ? (
+        <ServiceErrorMessage error={query.error} retry={query.reload} />
+      ) : !query.data?.length ? (
+        <Empty />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {query.data.map(venue => (
+            <article className="panel space-y-4" key={venue.id}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-bold">{venue.name}</h2>
+                  <p className="mt-1 text-sm text-slate-600">{venue.city}</p>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    venue.status === 'active'
+                      ? 'bg-emerald-100 text-emerald-900'
+                      : venue.status === 'suspended'
+                      ? 'bg-rose-100 text-rose-900'
+                      : venue.status === 'changes_requested'
+                      ? 'bg-purple-100 text-purple-900'
+                      : venue.status === 'pending'
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {t(venue.status)}
+                </span>
+              </div>
+
+              {venue.status === 'suspended' && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                  {t('venueSuspensionNotice')}
+                </div>
+              )}
+
+              {venue.status === 'changes_requested' && (
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-900">
+                  <p className="font-semibold">{t('changes_requested')}</p>
+                  <p className="mt-1 text-slate-700">Check review history below for admin feedback and submit an update when ready.</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                {venue.status === 'active' && (
+                  <Link href={`/s/${venue.slug}`} className="underline text-sm font-semibold">
+                    {t('viewSite')}
+                  </Link>
+                )}
+
+                {(venue.status === 'draft' || venue.status === 'changes_requested') && (
+                  submittingVenueId === venue.id ? (
+                    <div className="w-full space-y-2 pt-2">
+                      <label className="form-label">
+                        {t('notesOptional')}
+                        <input
+                          className="form-input text-xs"
+                          placeholder="e.g. Updated photos and facility address"
+                          value={submitNotes}
+                          onChange={e => setSubmitNotes(e.target.value)}
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="action text-xs"
+                          disabled={busy}
+                          onClick={() => handleSubmitForReview(venue.id)}
+                        >
+                          {t('submitForReview')}
+                        </button>
+                        <button
+                          type="button"
+                          className="min-h-11 rounded-xl border px-3 text-xs"
+                          onClick={() => setSubmittingVenueId(null)}
+                        >
+                          {t('cancel')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="action text-xs"
+                      disabled={busy}
+                      onClick={() => {
+                        setSubmittingVenueId(venue.id);
+                        setSubmitNotes('');
+                      }}
+                    >
+                      {t('submitForReview')}
+                    </button>
+                  )
+                )}
+
+                <button
+                  type="button"
+                  className="min-h-11 rounded-xl border border-slate-300 px-3 text-xs font-semibold hover:bg-slate-50"
+                  onClick={() => loadHistory(venue.id)}
+                >
+                  {t('reviewHistory')}
+                </button>
+              </div>
+
+              {activeHistoryVenueId === venue.id && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <h3 className="text-xs font-bold text-slate-900">{t('reviewHistory')}</h3>
+                  {loadingHistory ? (
+                    <Loading />
+                  ) : !reviewsHistory[venue.id]?.length ? (
+                    <p className="text-xs text-slate-500">{t('noReviewsFound')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {reviewsHistory[venue.id].map(rev => (
+                        <div key={rev.id} className="rounded border border-slate-200 bg-white p-2.5 text-xs space-y-1">
+                          <div className="flex flex-wrap items-center justify-between gap-1 font-semibold text-slate-900">
+                            <span>{rev.action.toUpperCase()}</span>
+                            <time className="text-slate-500 font-normal">{rev.createdAt}</time>
+                          </div>
+                          <p className="text-slate-600">
+                            {t('previousStatus')}: {t(rev.previousStatus)} → {t('newStatus')}: {t(rev.newStatus)}
+                          </p>
+                          <p className="text-slate-800">
+                            <span className="font-semibold">{t('reason')}:</span> {rev.reason}
+                          </p>
+                          {rev.notes && (
+                            <p className="text-slate-600">
+                              <span className="font-semibold">{t('notes')}:</span> {rev.notes}
+                            </p>
+                          )}
+                          <p className="text-slate-500 text-[11px]">{t('reviewer')}: {rev.reviewerName}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+
+      <form className="panel space-y-4" onSubmit={submit}>
+        <h2 className="text-xl font-bold">{t('submitVenue')}</h2>
+        {saved && <p role="status">{t('submitted')}</p>}
+        <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
+          {(['name', 'city', 'address', 'phone'] as const).map(key => (
+            <label className="form-label" key={key}>
+              {t(key === 'name' ? 'venueName' : key)}
+              <input className="form-input" name={key} type={key === 'phone' ? 'tel' : 'text'} required maxLength={200} />
+            </label>
+          ))}
+          <label className="form-label sm:col-span-2">
+            {t('description')}
+            <textarea className="form-input" name="description" maxLength={5000} />
+          </label>
+          <button className="action" type="submit" disabled={busy}>
+            {t('submitVenue')}
+          </button>
+        </fieldset>
+      </form>
+    </div>
+  );
 }
 export function OwnerFields({ venueId }: { venueId?: string }) {
   const { t, money } = useLanguage(); const [editing, setEditing] = useState<Field | null>(null); const [adding, setAdding] = useState(false);

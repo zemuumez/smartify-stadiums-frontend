@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -534,6 +534,7 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!input.guestName?.trim() || !input.venueId || !input.fieldId) throw new ServiceError('validation', 422);
         validateInterval(input.date, input.startHour, input.endHour);
         const venue = owned(input.venueId);
+        if (venue.status === 'suspended') throw new ServiceError('conflict', 409);
         const item = field(input.fieldId);
         if (item.venueId !== venue.id) throw new ServiceError('validation', 422);
         if (!input.idempotencyKey || !item.active || !item.sports.includes(input.sport) || input.startHour < item.openHour || input.endHour > item.closeHour || Date.parse(`${input.date}T${String(input.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('validation', 422);
@@ -603,10 +604,46 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const venue = { ...input, id, ownerId: user.id, slug: `venue-${id}`, sports: [], status: 'pending' as const, verified: false, image: '/venue-card-1.jpg', rating: null, reviewCount: 0, timezone: 'Africa/Addis_Ababa' };
         state.venues.push(venue);
         state.drafts.push({ venueId: id, tagline: input.name, description: input.description, primaryColor: '#2d6a4f', published: false, updatedAt: new Date().toISOString() });
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: id,
+          action: 'submit',
+          previousStatus: 'draft',
+          newStatus: 'pending',
+          reason: 'Initial venue submission',
+          reviewerId: user.id,
+          reviewerName: user.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
         audit('venue.submitted', id); persist(); return venue;
       }
       if (parts[1] === 'stadiums' && parts[2]) {
         const venue = owned(parts[2]);
+        if (parts[3] === 'submit' && method === 'POST') {
+          if (!['draft', 'changes_requested'].includes(venue.status)) throw new ServiceError('conflict', 409);
+          const previousStatus = venue.status;
+          venue.status = 'pending';
+          const body = (options.body || {}) as { notes?: string };
+          const reviewRecord: VenueReviewRecord = {
+            id: `rev-${crypto.randomUUID()}`,
+            venueId: venue.id,
+            action: 'submit',
+            previousStatus,
+            newStatus: 'pending',
+            reason: body.notes?.trim() || 'Submitted by venue owner for review',
+            reviewerId: user.id,
+            reviewerName: user.full_name,
+            createdAt: new Date().toISOString(),
+          };
+          state.venueReviews.push(reviewRecord);
+          audit('venue.submitted_for_review', venue.id);
+          persist();
+          return { venue, review: reviewRecord };
+        }
+        if (parts[3] === 'reviews' && method === 'GET') {
+          return state.venueReviews.filter(r => r.venueId === venue.id).slice().reverse();
+        }
         if (parts[3] === 'closures' && method === 'GET') return state.closures.filter(c => state.fields.some(f => f.id === c.fieldId && f.venueId === venue.id));
         if (parts[3] === 'microsite') {
           const draft = state.drafts.find(item => item.venueId === venue.id);
@@ -1722,11 +1759,66 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         persist();
         return cam;
       }
+      if (parts[1] === 'stadiums' && parts[3] === 'review' && method === 'POST') {
+        const venue = state.venues.find(v => v.id === parts[2]); if (!venue) throw new ServiceError('not_found', 404);
+        const input = options.body as { action: VenueReviewAction; reason: string; notes?: string };
+        if (!['submit', 'request_changes', 'approve', 'suspend', 'reinstate'].includes(input.action)) {
+          throw new ServiceError('validation', 422);
+        }
+        if (!input.reason?.trim() && ['request_changes', 'suspend', 'reinstate'].includes(input.action)) {
+          throw new ServiceError('validation', 422);
+        }
+        const previousStatus = venue.status;
+        let newStatus: VenueReviewStatus = previousStatus;
+        if (input.action === 'approve') newStatus = 'active';
+        else if (input.action === 'request_changes') newStatus = 'changes_requested';
+        else if (input.action === 'suspend') newStatus = 'suspended';
+        else if (input.action === 'reinstate') newStatus = 'active';
+        else if (input.action === 'submit') newStatus = 'pending';
+
+        venue.status = newStatus;
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: venue.id,
+          action: input.action,
+          previousStatus,
+          newStatus,
+          reason: input.reason?.trim() || 'Approved by administrator',
+          notes: input.notes?.trim() || undefined,
+          reviewerId: adminUser.id,
+          reviewerName: adminUser.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
+        audit(`venue.review: ${input.action} -> ${newStatus} (${input.reason})`, venue.id);
+        persist();
+        return { venue, review: reviewRecord };
+      }
+      if (parts[1] === 'stadiums' && parts[3] === 'reviews' && method === 'GET') {
+        return state.venueReviews.filter(r => r.venueId === parts[2]).slice().reverse();
+      }
       if (parts[1] === 'stadiums' && parts[2] && method === 'PATCH') {
         const venue = state.venues.find(v => v.id === parts[2]); if (!venue) throw new ServiceError('not_found', 404);
         const input = options.body as { status: 'active' | 'suspended'; reason: string };
         if (!['active', 'suspended'].includes(input.status) || !input.reason.trim()) throw new ServiceError('validation', 422);
-        venue.status = input.status; audit(`venue.${input.status}: ${input.reason}`, venue.id); persist(); return venue;
+        const previousStatus = venue.status;
+        const action: VenueReviewAction = input.status === 'active' ? (previousStatus === 'suspended' ? 'reinstate' : 'approve') : 'suspend';
+        venue.status = input.status;
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: venue.id,
+          action,
+          previousStatus,
+          newStatus: input.status,
+          reason: input.reason.trim(),
+          reviewerId: adminUser.id,
+          reviewerName: adminUser.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
+        audit(`venue.${input.status}: ${input.reason}`, venue.id);
+        persist();
+        return venue;
       }
       if (path.startsWith('/admin/analytics') && method === 'GET') {
         const venueParam = url.searchParams.get('venueId') || undefined;

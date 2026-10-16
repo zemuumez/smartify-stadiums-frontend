@@ -406,4 +406,187 @@ test('admin analytics aggregates platform-wide metrics and denies unauthorized u
   await rejects(s.admin.analytics(), 'forbidden');
 });
 
+test('venue review lifecycle: submit -> request_changes -> resubmit -> approve -> suspend -> reinstate', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+
+  // Create a new venue (starts in pending status submitted for review)
+  const venue = await s.venues.create({
+    name: 'Bole Champions Arena',
+    city: 'Addis Ababa',
+    address: 'Bole Subcity, Woreda 03',
+    phone: '+251911223344',
+    description: 'Modern sports facility',
+  });
+  assert.equal(venue.status, 'pending');
+
+  // Review history visible to owner
+  let ownerHistory = await s.venues.reviews(venue.id);
+  assert.equal(ownerHistory.length, 1);
+  assert.equal(ownerHistory[0].action, 'submit');
+
+  // Admin inspects and requests changes
+  s.transport.selectAccount('admin-1');
+
+  // Missing reason on request_changes should fail validation
+  await rejects(
+    s.admin.reviewAction(venue.id, { action: 'request_changes', reason: '   ' }),
+    'validation'
+  );
+
+  const reqChangesRes = await s.admin.reviewAction(venue.id, {
+    action: 'request_changes',
+    reason: 'Please upload commercial operating license and fire inspection certificate',
+    notes: 'Internal flag: contact safety division',
+  });
+  assert.equal(reqChangesRes.venue.status, 'changes_requested');
+  assert.equal(reqChangesRes.review.action, 'request_changes');
+
+  // Owner resubmits
+  s.transport.selectAccount('owner-1');
+  const resubmitRes = await s.venues.submitForReview(venue.id, 'Attached certificate #9921');
+  assert.equal(resubmitRes.venue.status, 'pending');
+
+  // Admin approves venue
+  s.transport.selectAccount('admin-1');
+  const approveRes = await s.admin.reviewAction(venue.id, {
+    action: 'approve',
+    reason: 'All documentation verified',
+  });
+  assert.equal(approveRes.venue.status, 'active');
+
+  // Admin suspends venue for noise violation
+  const suspendRes = await s.admin.reviewAction(venue.id, {
+    action: 'suspend',
+    reason: 'Subcity environmental compliance suspension pending decibel test',
+  });
+  assert.equal(suspendRes.venue.status, 'suspended');
+
+  // Admin reinstates venue
+  const reinstateRes = await s.admin.reviewAction(venue.id, {
+    action: 'reinstate',
+    reason: 'Acoustic baffling installed and approved',
+  });
+  assert.equal(reinstateRes.venue.status, 'active');
+
+  // Admin review history contains all transitions
+  const adminHistory = await s.admin.reviews(venue.id);
+  assert.equal(adminHistory.length, 6);
+  assert.equal(adminHistory[0].action, 'reinstate'); // reverse chronological
+  assert.equal(adminHistory[1].action, 'suspend');
+  assert.equal(adminHistory[2].action, 'approve');
+});
+
+test('venue suspension stops new public discovery and bookings while preserving existing bookings and ledger', async () => {
+  const s = setup();
+
+  // Create booking while venue-1 is active
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input({ date: '2026-10-25' }));
+  assert.equal(booking.status, 'confirmed');
+
+  // Settle booking
+  s.transport.selectAccount('owner-1');
+  const settlement = await s.billing.settleBooking(booking.id, {
+    amountMinor: 100000,
+    method: 'cash',
+  });
+  assert.equal(settlement.transaction.status, 'recorded');
+
+  // Admin suspends venue-1
+  s.transport.selectAccount('admin-1');
+  await s.admin.reviewAction('venue-1', {
+    action: 'suspend',
+    reason: 'Emergency turf maintenance required',
+  });
+
+  // Invariant 1: Suspended venue is hidden from public directory
+  s.transport.selectAccount('player-1');
+  const publicVenues = await s.venues.list();
+  assert.ok(!publicVenues.some(v => v.id === 'venue-1'), 'Suspended venue must not appear in directory');
+
+  // Invariant 2: Direct public lookup fails with not_found (404)
+  await rejects(s.venues.get('bambis-super-sport'), 'not_found');
+
+  // Invariant 3: Attempting new public booking fails
+  await rejects(s.bookings.create(input({ date: '2026-10-26' })), 'not_found');
+
+  // Invariant 4: Walk-ins at suspended venue are rejected with conflict
+  s.transport.selectAccount('owner-1');
+  await rejects(
+    s.bookings.createWalkIn({
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      guestName: 'Walk-in Guest',
+      sport: 'basketball',
+      date: '2026-10-26',
+      startHour: 10,
+      endHour: 11,
+      idempotencyKey: 'walkin-suspended-attempt',
+    }),
+    'conflict'
+  );
+
+  // Invariant 5: Existing booking and financial records are NOT cancelled or erased
+  const existingBooking = (await s.bookings.list()).find(b => b.id === booking.id);
+  assert.ok(existingBooking, 'Existing booking must remain accessible');
+  assert.equal(existingBooking.status, 'confirmed', 'Existing booking must NOT be silently cancelled');
+
+  const financials = await s.billing.bookingFinancials(booking.id);
+  assert.equal(financials.collectedMinor, 100000, 'Existing payment records must be preserved');
+  assert.equal(financials.refundedMinor, 0, 'No automatic refunds on suspension');
+
+  // Invariant 6: Owner retains authorized resolution access to dashboard and review history
+  const ownedVenues = await s.venues.owned();
+  const v1 = ownedVenues.find(v => v.id === 'venue-1');
+  assert.ok(v1);
+  assert.equal(v1.status, 'suspended');
+
+  const v1Reviews = await s.venues.reviews('venue-1');
+  assert.ok(v1Reviews.length > 0);
+  assert.equal(v1Reviews[0].action, 'suspend');
+});
+
+test('camera certification is independent of venue review and suspension', async () => {
+  const s = setup();
+
+  // Inspect existing camera at venue-1
+  s.transport.selectAccount('owner-1');
+  const cameras = await s.media.cameras('venue-1');
+  const cam = cameras[0];
+  assert.ok(cam);
+
+  // Admin certifies camera
+  s.transport.selectAccount('admin-1');
+  const certRes = await s.media.certifyCamera(cam.id, {
+    certificationStatus: 'passed',
+    notes: 'Mount and FOV verified',
+  });
+  assert.equal(certRes.certificationStatus, 'passed');
+
+  // Suspend the venue
+  await s.admin.reviewAction('venue-1', {
+    action: 'suspend',
+    reason: 'Administrative inspection',
+  });
+
+  // Verify camera certification remains 'passed', NOT revoked
+  s.transport.selectAccount('owner-1');
+  const camAfterSuspend = (await s.media.cameras('venue-1')).find(c => c.id === cam.id);
+  assert.equal(camAfterSuspend.certificationStatus, 'passed', 'Camera certification must be independent of venue suspension');
+
+  // Reinstate venue
+  s.transport.selectAccount('admin-1');
+  await s.admin.reviewAction('venue-1', {
+    action: 'reinstate',
+    reason: 'Inspection complete',
+  });
+
+  // Camera certification still 'passed'
+  s.transport.selectAccount('owner-1');
+  const camAfterReinstate = (await s.media.cameras('venue-1')).find(c => c.id === cam.id);
+  assert.equal(camAfterReinstate.certificationStatus, 'passed');
+});
+
+
 
