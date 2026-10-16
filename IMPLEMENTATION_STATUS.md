@@ -440,3 +440,29 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Next.js 16.3.1 production build compiles with 0 errors (`npm run build`, 41/41 routes).
       - Preserved frozen UI baseline. Working strictly on local branch `codex/finance-platform-admin`; no merge into `main`, push, or deploy.
 
+- Step 27 (Milestone M5 Step 5: Support Cases, Account Moderation, and Admin Lockout Protection):
+   1. Support cases & role boundaries:
+      - Implemented SupportCase contract in frontend/src/services/contracts.ts and frontend/src/services/support.service.ts with list, get, create, addMessage, and update.
+      - Integrated supportService into frontend/src/services/create-services.ts and frontend/src/services/index.ts.
+      - Implemented /support/cases REST simulator endpoints in frontend/src/demo/transport.ts with strict role-based access:
+        - Regular players view cases authored by themselves.
+        - Owners view cases authored by themselves or associated with their owned venues.
+        - Administrators view all platform cases.
+      - Enforced isInternal message restrictions: non-admin users attempting to send internal staff notes are rejected with 403 forbidden. When non-admins fetch cases or case details, messages with isInternal: true are stripped before delivery.
+   2. Account moderation & suspension invariants:
+      - Modeled status?: 'active' | 'suspended' on Account.
+      - Implemented requireActiveAccount() in frontend/src/demo/transport.ts, denying service-layer write mutations (creating bookings, cancelling, rescheduling, creating teams, joining teams, creating support cases) with 403 forbidden when an account is suspended.
+      - Added /admin/users/:id/status endpoint and adminService.moderateUser(userId, input) supporting user status transitions (active vs suspended) with mandatory reason tracking and audit logging.
+      - Protected against admin self-lockout: an admin attempting to suspend their own account is rejected with 409 conflict.
+      - Protected against last-admin suspension: attempting to suspend the sole remaining active administrator is rejected with 409 conflict.
+   3. UI integration & localization:
+      - In frontend/src/components/admin-panels.tsx:
+        - Enhanced AdminUsers panel with user status badges (active, suspended), action buttons to suspend or reinstate users with mandatory reason prompt, and inline warnings for self-lockout and last-admin protections.
+        - Added AdminSupport panel with status filter tabs, priority pills, case details modal, public message thread, internal staff notes input (with distinct internal badge), and case status resolution selector.
+      - Added dedicated route frontend/src/app/admin/support/page.tsx and navigation item in frontend/src/components/workspace-shell.tsx.
+      - Added 30+ translation keys for support cases, message types, and moderation actions to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts with 100% key parity.
+   4. Verification results:
+      - 97/97 unit tests pass (npm test, including admin self-lockout, last-admin protection, service-layer mutation denial, role-scoped case access, and internal staff note stripping in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all modified files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 42/42 routes including /admin/support).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.

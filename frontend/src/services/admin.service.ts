@@ -22,5 +22,7 @@ export function createAdminService(transport: Transport) {
       const query = sp.toString() ? `?${sp.toString()}` : '';
       return transport.request<FinancialAnalytics>(`/admin/analytics${query}`, { signal });
     },
+    moderateUser: (id: string, input: { status: 'active' | 'suspended'; reason: string }) =>
+      transport.request<Account>(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: input }),
   };
 }

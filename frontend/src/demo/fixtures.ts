@@ -3,12 +3,13 @@ import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPol
 
 /** All operational demo records live here. Amounts are illustrative minor ETB units. */
 export const accounts: Account[] = [
-  { id: 'player-1', phone: '+251911234567', full_name: 'Abebe Kebede', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'player-2', phone: '+251911998877', full_name: 'Sara Mengistu', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'player-3', phone: '+251911445566', full_name: 'Yonas Abebe', role: 'player', is_verified: true, is_minor: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'owner-1', phone: '+251922345678', full_name: 'Fatima Hassan', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'owner-2', phone: '+251933456789', full_name: 'Dawit Tadesse', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'admin-1', phone: '+251944567890', full_name: 'Demo Administrator', role: 'admin', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'player-1', phone: '+251911234567', full_name: 'Abebe Kebede', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'player-2', phone: '+251911998877', full_name: 'Sara Mengistu', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'player-3', phone: '+251911445566', full_name: 'Yonas Abebe', role: 'player', is_verified: true, is_minor: true, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'owner-1', phone: '+251922345678', full_name: 'Fatima Hassan', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'owner-2', phone: '+251933456789', full_name: 'Dawit Tadesse', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'admin-1', phone: '+251944567890', full_name: 'Demo Administrator', role: 'admin', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
+  { id: 'admin-2', phone: '+251944567891', full_name: 'Demo Supervisor', role: 'admin', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z', status: 'active' },
 ];
 export const demoOTP = '123456';
 const venues: Venue[] = directoryFixtures.map((v, i) => ({
@@ -394,6 +395,55 @@ export function createFixtures(): DemoState {
     { id: 'ent-unity-1', recordingId: 'rec-unity-1', userId: 'player-2', grantedBy: 'system', grantedAt: '2026-10-12T16:00:00Z' },
   ];
 
+  const initialSupportCases: SupportCase[] = [
+    {
+      id: 'case-1',
+      caseNumber: 'CASE-100234',
+      authorId: 'player-1',
+      authorName: 'Abebe Kebede',
+      authorRole: 'player',
+      venueId: 'venue-1',
+      category: 'booking_inquiry',
+      subject: 'Inquiry regarding Pitch 1 floodlights for night session',
+      status: 'in_progress',
+      priority: 'medium',
+      createdAt: '2026-10-14T08:00:00Z',
+      updatedAt: '2026-10-14T09:30:00Z',
+      messages: [
+        {
+          id: 'msg-1',
+          caseId: 'case-1',
+          senderId: 'player-1',
+          senderName: 'Abebe Kebede',
+          senderRole: 'player',
+          message: 'Hello, are the floodlights operating normally for 20:00 bookings on Pitch 1?',
+          isInternal: false,
+          createdAt: '2026-10-14T08:00:00Z',
+        },
+        {
+          id: 'msg-2',
+          caseId: 'case-1',
+          senderId: 'admin-1',
+          senderName: 'Demo Administrator',
+          senderRole: 'admin',
+          message: 'Internal note: Venue 1 verified backup generator is active.',
+          isInternal: true,
+          createdAt: '2026-10-14T09:00:00Z',
+        },
+        {
+          id: 'msg-3',
+          caseId: 'case-1',
+          senderId: 'admin-1',
+          senderName: 'Demo Administrator',
+          senderRole: 'admin',
+          message: 'Hi Abebe, yes, all floodlights on Pitch 1 are tested and operating with secondary backup power.',
+          isInternal: false,
+          createdAt: '2026-10-14T09:30:00Z',
+        },
+      ],
+    },
+  ];
+
   return structuredClone({
     accounts,
     venues,
@@ -413,7 +463,7 @@ export function createFixtures(): DemoState {
     audit: [],
     transactions: [],
     venueReviews: [],
-    supportCases: [],
+    supportCases: initialSupportCases,
     idempotency: {},
   });
 }

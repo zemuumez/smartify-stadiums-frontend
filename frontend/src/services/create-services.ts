@@ -9,6 +9,7 @@ import { createMediaService } from './media.service';
 import { createBillingService } from './billing.service';
 import { createAdminService } from './admin.service';
 import { createFieldsService } from './fields.service';
+import { createSupportService } from './support.service';
 
 export function createServices(transport: Transport) {
   return {
@@ -22,5 +23,6 @@ export function createServices(transport: Transport) {
     media: createMediaService(transport),
     billing: createBillingService(transport),
     admin: createAdminService(transport),
+    support: createSupportService(transport),
   };
 }

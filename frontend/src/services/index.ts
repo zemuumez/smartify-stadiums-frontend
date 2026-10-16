@@ -28,6 +28,7 @@ export const {
   media: mediaService,
   billing: billingService,
   admin: adminService,
+  support: supportService,
 } = services;
 export async function selectDemoAccount(id: string) { return (await getDemo()).selectAccount(id); }
 export * from './history-trap';

@@ -588,5 +588,185 @@ test('camera certification is independent of venue review and suspension', async
   assert.equal(camAfterReinstate.certificationStatus, 'passed');
 });
 
+test('account moderation enforces admin self-lockout and last-admin protections', async () => {
+  const s = setup();
+  s.transport.selectAccount('admin-1');
+
+  // Moderate player-2 to suspended
+  await rejects(
+    s.admin.moderateUser('player-2', { status: 'suspended', reason: '   ' }),
+    'validation'
+  );
+
+  const modRes = await s.admin.moderateUser('player-2', {
+    status: 'suspended',
+    reason: 'Chargeback dispute investigation',
+  });
+  assert.equal(modRes.status, 'suspended');
+
+  // Invariant 1: Admin self-lockout protection
+  await rejects(
+    s.admin.moderateUser('admin-1', { status: 'suspended', reason: 'Self suspension attempt' }),
+    'conflict'
+  );
+
+  // Invariant 2: Suspend second admin (admin-2)
+  const suspendAdmin2 = await s.admin.moderateUser('admin-2', {
+    status: 'suspended',
+    reason: 'Temporary leave',
+  });
+  assert.equal(suspendAdmin2.status, 'suspended');
+
+  // Now admin-1 is the only active admin remaining
+  // Attempting to suspend the last active admin is blocked
+  await rejects(
+    s.admin.moderateUser('admin-1', { status: 'suspended', reason: 'Suspend last admin' }),
+    'conflict'
+  );
+
+  // Reinstate admin-2
+  const reinstateAdmin2 = await s.admin.moderateUser('admin-2', {
+    status: 'active',
+    reason: 'Returned from leave',
+  });
+  assert.equal(reinstateAdmin2.status, 'active');
+
+  // Non-admins cannot moderate accounts
+  s.transport.selectAccount('player-1');
+  await rejects(
+    s.admin.moderateUser('player-3', { status: 'suspended', reason: 'Unauthorized' }),
+    'forbidden'
+  );
+});
+
+test('account suspension denies operations at the service layer, not just hidden UI', async () => {
+  const s = setup();
+
+  // Admin suspends player-2
+  s.transport.selectAccount('admin-1');
+  await s.admin.moderateUser('player-2', {
+    status: 'suspended',
+    reason: 'Suspension for operational test',
+  });
+
+  // Switch to suspended player-2
+  s.transport.selectAccount('player-2');
+
+  // Attempting to create booking is rejected with forbidden
+  await rejects(s.bookings.create(input()), 'forbidden');
+
+  // Attempting to create team is rejected with forbidden
+  await rejects(
+    s.teams.create({
+      name: 'Forbidden Squad',
+      sport: 'football',
+      city: 'Addis Ababa',
+    }),
+    'forbidden'
+  );
+
+  // Attempting to join team is rejected with forbidden
+  await rejects(s.teams.join('team-1'), 'forbidden');
+
+  // Attempting to submit a support case is rejected with forbidden
+  await rejects(
+    s.support.create({
+      category: 'general',
+      subject: 'Suspended inquiry',
+      message: 'Can I play?',
+    }),
+    'forbidden'
+  );
+
+  // Admin reinstates player-2
+  s.transport.selectAccount('admin-1');
+  await s.admin.moderateUser('player-2', {
+    status: 'active',
+    reason: 'Account reinstated after review',
+  });
+
+  // Player-2 can now perform operations normally
+  s.transport.selectAccount('player-2');
+  const validBooking = await s.bookings.create(input());
+  assert.ok(validBooking.id);
+  assert.equal(validBooking.playerId, 'player-2');
+});
+
+test('support cases enforce role boundaries and strip internal staff notes for non-admins', async () => {
+  const s = setup();
+
+  // Test seeded case-1 (linked to player-1 and venue-1)
+  // Admin-1 views case-1: sees all 3 messages including msg-2 (internal staff note)
+  s.transport.selectAccount('admin-1');
+  const adminCase = await s.support.get('case-1');
+  assert.equal(adminCase.messages.length, 3);
+  assert.ok(adminCase.messages.some(m => m.isInternal === true), 'Admin must see internal notes');
+
+  // Player-1 (author) views case-1: sees only 2 messages, internal staff note is stripped
+  s.transport.selectAccount('player-1');
+  const playerCase = await s.support.get('case-1');
+  assert.equal(playerCase.messages.length, 2);
+  assert.ok(!playerCase.messages.some(m => m.isInternal === true), 'Player must NOT see internal staff notes');
+
+  // Owner-1 (owner of venue-1) views case-1: permitted, sees only 2 messages, internal staff note stripped
+  s.transport.selectAccount('owner-1');
+  const ownerCase = await s.support.get('case-1');
+  assert.equal(ownerCase.messages.length, 2);
+  assert.ok(!ownerCase.messages.some(m => m.isInternal === true), 'Owner must NOT see internal staff notes');
+
+  // Player-2 (unrelated) views case-1: rejected with forbidden
+  s.transport.selectAccount('player-2');
+  await rejects(s.support.get('case-1'), 'forbidden');
+
+  // Non-admins cannot post internal notes
+  s.transport.selectAccount('player-1');
+  await rejects(
+    s.support.addMessage('case-1', {
+      message: 'Sneaking an internal note',
+      isInternal: true,
+    }),
+    'forbidden'
+  );
+
+  // Player-1 posts regular reply
+  const playerMsg = await s.support.addMessage('case-1', {
+    message: 'Thank you for confirming the floodlights.',
+  });
+  assert.equal(playerMsg.isInternal, false);
+
+  // Admin posts a new internal staff note
+  s.transport.selectAccount('admin-1');
+  const adminInternalNote = await s.support.addMessage('case-1', {
+    message: 'Staff check: generator fuel level verified at 95%.',
+    isInternal: true,
+  });
+  assert.equal(adminInternalNote.isInternal, true);
+
+  // Admin updates case status to resolved
+  const resolvedCase = await s.support.update('case-1', { status: 'resolved' });
+  assert.equal(resolvedCase.status, 'resolved');
+  assert.ok(resolvedCase.resolvedAt);
+
+  // Player-1 creates a new case linked to their booking
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input({ date: '2026-10-30' }));
+  const newCase = await s.support.create({
+    bookingId: booking.id,
+    category: 'refund_request',
+    subject: 'Request refund for rained out session',
+    message: 'Heavy rain flooded outdoor court.',
+    priority: 'high',
+  });
+  assert.equal(newCase.status, 'open');
+  assert.equal(newCase.authorId, 'player-1');
+  assert.equal(newCase.messages.length, 1);
+
+  // Author closes their own case
+  const closedCase = await s.support.update(newCase.id, { status: 'closed' });
+  assert.equal(closedCase.status, 'closed');
+  assert.ok(closedCase.resolvedAt);
+});
+
+
 
 

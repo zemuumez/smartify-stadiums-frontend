@@ -8,7 +8,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useLanguage } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/en';
 const ownerLinks: [string, MessageKey][] = [['/dashboard', 'overview'], ['/dashboard/bookings', 'ownerBookings'], ['/dashboard/stadiums', 'venues'], ['/dashboard/fields', 'fields'], ['/dashboard/microsite', 'microsite'], ['/dashboard/cameras', 'cameras'], ['/dashboard/analytics', 'analytics'], ['/dashboard/billing', 'billing'], ['/dashboard/settings', 'settings']];
-const adminLinks: [string, MessageKey][] = [['/admin', 'overview'], ['/admin/stadiums', 'venues'], ['/admin/users', 'users'], ['/admin/cameras', 'cameras'], ['/admin/analytics', 'analytics'], ['/admin/settings', 'settings']];
+const adminLinks: [string, MessageKey][] = [['/admin', 'overview'], ['/admin/stadiums', 'venues'], ['/admin/users', 'users'], ['/admin/cameras', 'cameras'], ['/admin/analytics', 'analytics'], ['/admin/support', 'supportCases'], ['/admin/settings', 'settings']];
 export function WorkspaceShell({ admin = false, children }: { admin?: boolean; children: ReactNode }) {
   const { t } = useLanguage(); const pathname = usePathname(); const { user, logout } = useAuthStore();
   const [error, setError] = useState<unknown>();

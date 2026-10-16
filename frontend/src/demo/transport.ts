@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, SupportCase, SupportCaseCreateInput, SupportCasePriority, SupportCaseStatus, SupportMessage, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -210,9 +210,14 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     if (!user) throw new ServiceError('unauthorized', 401);
     return user;
   };
-  const requireRole = (role: Role) => { const user = account(); if (user.role !== role) throw new ServiceError('forbidden', 403); return user; };
-  const owned = (venueId: string) => {
+  const requireActiveAccount = (): Account => {
     const user = account();
+    if (user.status === 'suspended') throw new ServiceError('forbidden', 403);
+    return user;
+  };
+  const requireRole = (role: Role) => { const user = requireActiveAccount(); if (user.role !== role) throw new ServiceError('forbidden', 403); return user; };
+  const owned = (venueId: string) => {
+    const user = requireActiveAccount();
     const venue = state.venues.find(item => item.id === venueId);
     if (!venue) throw new ServiceError('not_found', 404);
     if (user.role !== 'admin' && (user.role !== 'owner' || venue.ownerId !== user.id)) throw new ServiceError('forbidden', 403);
@@ -384,7 +389,7 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
-      const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
+      const user = requireActiveAccount(); const booking = state.bookings.find(item => item.id === parts[1]);
       if (!booking) throw new ServiceError('not_found', 404);
       if (booking.playerId !== user.id) owned(booking.venueId);
       if (!['confirmed', 'pending', 'cancelled'].includes(booking.status)) throw new ServiceError('conflict', 409);
@@ -400,7 +405,7 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'reschedule' && method === 'POST') {
-      const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
+      const user = requireActiveAccount(); const booking = state.bookings.find(item => item.id === parts[1]);
       if (!booking) throw new ServiceError('not_found', 404);
       if (user.role === 'player') {
         if (booking.playerId !== user.id) throw new ServiceError('forbidden', 403);
@@ -1739,6 +1744,27 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     if (parts[0] === 'admin') {
       const adminUser = requireRole('admin');
       if (path === '/admin/users' && method === 'GET') return state.accounts;
+      if (parts[1] === 'users' && parts[3] === 'status' && method === 'PATCH') {
+        const targetUser = state.accounts.find(a => a.id === parts[2]);
+        if (!targetUser) throw new ServiceError('not_found', 404);
+        const input = options.body as { status: 'active' | 'suspended'; reason: string };
+        if (!['active', 'suspended'].includes(input.status) || !input.reason?.trim()) {
+          throw new ServiceError('validation', 422);
+        }
+        if (targetUser.id === adminUser.id && input.status === 'suspended') {
+          throw new ServiceError('conflict', 409);
+        }
+        if (targetUser.role === 'admin' && input.status === 'suspended') {
+          const activeAdmins = state.accounts.filter(a => a.role === 'admin' && a.status !== 'suspended');
+          if (activeAdmins.length <= 1) {
+            throw new ServiceError('conflict', 409);
+          }
+        }
+        targetUser.status = input.status;
+        audit(`user.status: ${input.status} (${input.reason.trim()})`, targetUser.id);
+        persist();
+        return targetUser;
+      }
       if (path === '/admin/audit' && method === 'GET') return state.audit;
       if (path === '/admin/stadiums' && method === 'GET') return state.venues;
       if (path === '/admin/cameras' && method === 'GET') return state.cameras;
@@ -1834,6 +1860,150 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           dateTo,
           metricDateType,
         });
+      }
+    }
+    if (parts[0] === 'support') {
+      if (parts[1] === 'cases') {
+        if (parts.length === 2 && method === 'GET') {
+          const user = account();
+          const venueParam = url.searchParams.get('venueId');
+          const statusParam = url.searchParams.get('status') as SupportCaseStatus | null;
+          let cases = state.supportCases;
+          if (user.role === 'player') {
+            cases = cases.filter(c => c.authorId === user.id);
+          } else if (user.role === 'owner') {
+            const ownedVenueIds = state.venues.filter(v => v.ownerId === user.id).map(v => v.id);
+            cases = cases.filter(c => c.authorId === user.id || (c.venueId && ownedVenueIds.includes(c.venueId)) || (c.bookingId && state.bookings.some(b => b.id === c.bookingId && ownedVenueIds.includes(b.venueId))));
+          }
+          if (venueParam) cases = cases.filter(c => c.venueId === venueParam);
+          if (statusParam) cases = cases.filter(c => c.status === statusParam);
+          return cases
+            .map(c => ({
+              ...c,
+              messages: user.role === 'admin' ? c.messages : c.messages.filter(m => !m.isInternal),
+            }))
+            .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+        }
+        if (parts.length === 3 && method === 'GET') {
+          const user = account();
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isOwner = user.role === 'owner' && (sc.authorId === user.id || (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)));
+          const isPlayer = user.role === 'player' && sc.authorId === user.id;
+          const isAdmin = user.role === 'admin';
+          if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
+          return {
+            ...sc,
+            messages: isAdmin ? sc.messages : sc.messages.filter(m => !m.isInternal),
+          };
+        }
+        if (parts.length === 2 && method === 'POST') {
+          const user = requireActiveAccount();
+          const input = options.body as SupportCaseCreateInput;
+          if (!input.subject?.trim() || !input.message?.trim() || !input.category) {
+            throw new ServiceError('validation', 422);
+          }
+          if (input.venueId && !state.venues.some(v => v.id === input.venueId)) {
+            throw new ServiceError('not_found', 404);
+          }
+          if (input.bookingId && !state.bookings.some(b => b.id === input.bookingId)) {
+            throw new ServiceError('not_found', 404);
+          }
+          if (input.transactionId && !state.transactions.some(t => t.id === input.transactionId)) {
+            throw new ServiceError('not_found', 404);
+          }
+          const caseId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const newCase: SupportCase = {
+            id: caseId,
+            caseNumber: `CASE-${100000 + state.supportCases.length + 1}`,
+            authorId: user.id,
+            authorName: user.full_name,
+            authorRole: user.role,
+            venueId: input.venueId || undefined,
+            bookingId: input.bookingId || undefined,
+            transactionId: input.transactionId || undefined,
+            category: input.category,
+            subject: input.subject.trim(),
+            status: 'open',
+            priority: input.priority || 'medium',
+            createdAt: now,
+            updatedAt: now,
+            messages: [
+              {
+                id: `msg-${crypto.randomUUID()}`,
+                caseId,
+                senderId: user.id,
+                senderName: user.full_name,
+                senderRole: user.role,
+                message: input.message.trim(),
+                isInternal: false,
+                createdAt: now,
+              },
+            ],
+          };
+          state.supportCases.push(newCase);
+          audit(`support.case_created: ${newCase.caseNumber}`, newCase.id);
+          persist();
+          return newCase;
+        }
+        if (parts.length === 4 && parts[3] === 'messages' && method === 'POST') {
+          const user = requireActiveAccount();
+          const sc = state.supportCases.find(c => c.id === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isOwner = user.role === 'owner' && (sc.authorId === user.id || (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)));
+          const isPlayer = user.role === 'player' && sc.authorId === user.id;
+          const isAdmin = user.role === 'admin';
+          if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
+          const input = options.body as { message: string; isInternal?: boolean };
+          if (!input.message?.trim()) throw new ServiceError('validation', 422);
+          if (input.isInternal && !isAdmin) throw new ServiceError('forbidden', 403);
+          const isInternal = isAdmin && !!input.isInternal;
+          const now = new Date().toISOString();
+          const msg: SupportMessage = {
+            id: `msg-${crypto.randomUUID()}`,
+            caseId: sc.id,
+            senderId: user.id,
+            senderName: user.full_name,
+            senderRole: user.role,
+            message: input.message.trim(),
+            isInternal,
+            createdAt: now,
+          };
+          sc.messages.push(msg);
+          sc.updatedAt = now;
+          if (isAdmin && !isInternal && sc.status === 'open') {
+            sc.status = 'in_progress';
+          }
+          audit(`support.message_added: ${sc.caseNumber}`, msg.id);
+          persist();
+          return msg;
+        }
+        if (parts.length === 3 && method === 'PATCH') {
+          const user = requireActiveAccount();
+          const sc = state.supportCases.find(c => c.id === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isAdmin = user.role === 'admin';
+          const isAuthor = sc.authorId === user.id;
+          const input = options.body as { status?: SupportCaseStatus; priority?: SupportCasePriority };
+          if (input.priority && !isAdmin) throw new ServiceError('forbidden', 403);
+          if (input.status) {
+            if (!isAdmin && (!isAuthor || input.status !== 'closed')) {
+              throw new ServiceError('forbidden', 403);
+            }
+            sc.status = input.status;
+            if (['resolved', 'closed'].includes(input.status)) {
+              sc.resolvedAt = new Date().toISOString();
+            }
+          }
+          if (input.priority && isAdmin) {
+            sc.priority = input.priority;
+          }
+          sc.updatedAt = new Date().toISOString();
+          audit(`support.case_updated: ${sc.caseNumber}`, sc.id);
+          persist();
+          return sc;
+        }
       }
     }
     throw new ServiceError('unavailable', 501);

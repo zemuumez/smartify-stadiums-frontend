@@ -4,6 +4,7 @@ export type Sport = 'football' | 'basketball' | 'volleyball' | 'badminton' | 'te
 export interface Account {
   id: string; phone: string; full_name: string; role: Role; email?: string;
   is_verified: boolean; is_minor: boolean; created_at: string;
+  status?: 'active' | 'suspended';
 }
 export interface Venue {
   id: string; ownerId: string; slug: string; name: string; city: string; address: string;
