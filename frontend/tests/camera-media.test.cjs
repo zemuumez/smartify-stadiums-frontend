@@ -462,6 +462,7 @@ test('expired recordings are excluded from public highlights and CMS cannot bypa
         id: 'hl-bypass',
         title: 'Bypass Highlight',
         teams: 'Bambis Match',
+        recordingId: 'rec-expired-1',
         playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ExpiredMatch.mp4',
         duration: '10:00',
       },
@@ -613,5 +614,113 @@ test('Amharic status and reason code rendering preserves user-authored notes', a
   const replay = await s.media.bookingReplay('booking-rec-1');
   assert.equal(replay.failureReason, customReason, 'Replay preserves custom user failure note');
   assert.equal(replay.reasonCode, 'recording_failed');
+});
+
+test('CMS highlight linked recording is authoritative: prevents mismatched URLs, cross-venue leaks, and previously stored mismatches', async () => {
+  const { createFixtures } = require('../.test-build/demo/fixtures');
+  const s = setup();
+
+  // 1. Mismatched URL: Owner 1 links highlight to rec-1 (BigBuckBunny.mp4), but passes private rec-2 URL (ForBiggerBlazes.mp4)
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+  await s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-mismatch',
+        title: 'Bambis Final Goal',
+        teams: 'Bambis vs Arada',
+        recordingId: 'rec-1',
+        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        duration: '1:45',
+      },
+    ],
+  });
+
+  // Saved draft authoritatively derived rec-1 playback URL, discarding the caller-supplied override
+  const savedDraft = await s.content.draft('venue-1');
+  const draftHl = savedDraft.highlights?.find(h => h.id === 'hl-mismatch');
+  assert.ok(draftHl);
+  assert.equal(draftHl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+  assert.notEqual(draftHl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+
+  // Published public site returns authoritative rec-1 URL, never private rec-2 URL
+  await s.content.publish('venue-1');
+  const pubSite = await s.content.get('venue-1');
+  const pubHl = pubSite.highlights?.find(h => h.id === 'hl-mismatch');
+  assert.ok(pubHl);
+  assert.equal(pubHl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+  assert.notEqual(pubHl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+
+  // 2. Cross-venue link: Owner 1 attempts to link highlight to rec-2 (belongs to venue-2)
+  await rejects(s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-cross-venue',
+        title: 'Cross Venue Leaker',
+        recordingId: 'rec-2',
+        duration: '1:00',
+      },
+    ],
+  }), 'validation');
+
+  // 3. Invalid recording ID: Owner 1 attempts to link non-existent recording
+  await rejects(s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-invalid-id',
+        title: 'Non-existent Recording',
+        recordingId: 'rec-ghost-999',
+        duration: '1:00',
+      },
+    ],
+  }), 'validation');
+
+  // 4. Previously stored mismatches in storage must not leak on public reads
+  const map = new Map();
+  const mockStorage = {
+    getItem: k => map.get(k) || null,
+    setItem: (k, v) => map.set(k, String(v)),
+    removeItem: k => map.delete(k),
+  };
+  const fixtures = createFixtures();
+  const site1 = fixtures.sites.find(item => item.venueId === 'venue-1');
+  assert.ok(site1);
+  site1.highlights = [
+    {
+      id: 'stored-mismatch-1',
+      title: 'Previously Mismatched URL',
+      recordingId: 'rec-1',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    },
+    {
+      id: 'stored-cross-venue-1',
+      title: 'Previously Stored Cross-Venue',
+      recordingId: 'rec-2',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    },
+    {
+      id: 'stored-invalid-1',
+      title: 'Previously Stored Missing Rec',
+      recordingId: 'rec-invalid-404',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    },
+  ];
+  map.set('etsf-demo-v2', JSON.stringify(fixtures));
+
+  const tStorage = createDemoTransport(mockStorage);
+  const sStorage = { ...createServices(tStorage), transport: tStorage };
+  const readSite = await sStorage.content.get('venue-1');
+
+  const hl1 = readSite.highlights?.find(h => h.id === 'stored-mismatch-1');
+  assert.equal(hl1?.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'Authoritative derivation must replace stored mismatched URL with rec-1 URL');
+
+  const hl2 = readSite.highlights?.find(h => h.id === 'stored-cross-venue-1');
+  assert.equal(hl2?.playbackUrl, null, 'Cross-venue stored highlight must suppress playbackUrl to null');
+
+  const hl3 = readSite.highlights?.find(h => h.id === 'stored-invalid-1');
+  assert.equal(hl3?.playbackUrl, null, 'Invalid recordingId stored highlight must suppress playbackUrl to null');
 });
 
