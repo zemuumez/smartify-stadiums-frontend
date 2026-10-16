@@ -91,8 +91,8 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
     useCallback(async signal => {
       const [ownedVenues, cameras, recordings] = await Promise.all([
         venuesService.owned(signal),
-        mediaService.cameras(signal),
-        mediaService.recordings(signal),
+        mediaService.cameras(venueId, signal),
+        mediaService.recordings(venueId, signal),
       ]);
       const activeVenues = ownedVenues.filter(v => v.status === 'active' && (!venueId || v.id === venueId));
       const fields = await Promise.all(
@@ -260,7 +260,7 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
                           {court?.name || rec.fieldId} · {t(rec.sport)}
                         </h2>
                         <p className="text-xs text-slate-500">
-                          {rec.date} · {rec.startTime}–{rec.endTime}
+                          {rec.createdAt ? new Date(rec.createdAt).toLocaleDateString() : ''} · {rec.duration}
                         </p>
                         {rec.teamName && (
                           <span className="inline-block mt-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">
@@ -270,18 +270,18 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         <RecordingStatusBadge status={rec.status} />
-                        <VisibilityBadge visibility={rec.visibility} />
+                        <VisibilityBadge visibility={rec.publication.visibility} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
                       <div>
                         <span className="font-semibold block">{t('participantConsent')}:</span>
-                        <ConsentStatusBadge status={rec.consent.participantStatus} />
+                        <ConsentStatusBadge status={rec.consent.status} />
                       </div>
                       <div>
                         <span className="font-semibold block">{t('faceBlurStatus')}:</span>
-                        <BlurStatusBadge status={rec.privacy.blurStatus} />
+                        <BlurStatusBadge status={rec.privacy.faceBlurStatus} />
                       </div>
                     </div>
 
@@ -495,16 +495,15 @@ function CameraFormModal({
         await mediaService.updateCamera(camera.id, {
           name,
           model,
-          serialNumber,
-          fieldId: fieldId || undefined,
+          fieldId: fieldId || (fields[0]?.id || ''),
         });
       } else {
         await mediaService.registerCamera({
           venueId,
           name,
           model,
-          serialNumber,
-          fieldId: fieldId || undefined,
+          serialNumber: serialNumber || undefined,
+          fieldId: fieldId || (fields[0]?.id || ''),
         });
       }
       onSaved();
@@ -618,7 +617,11 @@ function AdminCertificationModal({
 }) {
   const { t } = useLanguage();
   const modalRef = useModalKeyboard(true, onClose);
-  const [decision, setDecision] = useState<CameraCertificationStatus>(camera.certificationStatus);
+  const [decision, setDecision] = useState<'passed' | 'failed' | 'revoked'>(
+    camera.certificationStatus === 'failed' || camera.certificationStatus === 'revoked'
+      ? camera.certificationStatus
+      : 'passed'
+  );
   const [failureReason, setFailureReason] = useState(camera.failureReason || '');
   const [recoveryGuidance, setRecoveryGuidance] = useState(camera.recoveryGuidance || '');
   const [busy, setBusy] = useState(false);
@@ -678,10 +681,9 @@ function AdminCertificationModal({
               <select
                 className="form-input mt-1"
                 value={decision}
-                onChange={e => setDecision(e.target.value as CameraCertificationStatus)}
+                onChange={e => setDecision(e.target.value as 'passed' | 'failed' | 'revoked')}
               >
                 <option value="passed">{t('certPassed')} (Passed)</option>
-                <option value="pending">{t('certPending')} (Pending)</option>
                 <option value="failed">{t('certFailed')} (Failed)</option>
                 <option value="revoked">{t('certRevoked')} (Revoked)</option>
               </select>
@@ -747,7 +749,7 @@ function RecordingDetailModal({
   const modalRef = useModalKeyboard(true, onClose);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
-  const [targetVisibility, setTargetVisibility] = useState<MediaVisibility>(recording.visibility);
+  const [targetVisibility, setTargetVisibility] = useState<MediaVisibility>(recording.publication.visibility);
 
   return (
     <div
@@ -783,7 +785,7 @@ function RecordingDetailModal({
                 controls
                 className="w-full aspect-video rounded-xl object-contain bg-black"
                 src={recording.playbackUrl}
-                poster={recording.thumbnailUrl}
+                poster={recording.thumbnailUrl || undefined}
               />
               <p className="px-3 pb-2 text-[11px] text-slate-400">
                 {t('replayProvenance')}
@@ -826,11 +828,11 @@ function RecordingDetailModal({
           </div>
           <div className="panel p-3">
             <span className="text-xs text-slate-500 block">{t('playbackDuration')}</span>
-            <span className="font-semibold">{recording.durationLabel}</span>
+            <span className="font-semibold">{recording.duration}</span>
           </div>
           <div className="panel p-3">
             <span className="text-xs text-slate-500 block">{t('publicationStatus')}</span>
-            <VisibilityBadge visibility={recording.visibility} />
+            <VisibilityBadge visibility={recording.publication.visibility} />
           </div>
         </div>
 
@@ -880,17 +882,17 @@ function RecordingDetailModal({
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
             <div>
               <span className="text-xs text-slate-500 block">{t('participantConsent')}</span>
-              <ConsentStatusBadge status={recording.consent.participantStatus} />
+              <ConsentStatusBadge status={recording.consent.status} />
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={busy || recording.consent.participantStatus === 'granted'}
+                disabled={busy || recording.consent.status === 'granted'}
                 onClick={async () => {
                   setBusy(true);
                   setError(undefined);
                   try {
-                    await mediaService.updateConsent(recording.id, { participantStatus: 'granted' });
+                    await mediaService.updateConsent(recording.id, { status: 'granted' });
                     onUpdated();
                   } catch (err) {
                     setError(err);
@@ -904,12 +906,12 @@ function RecordingDetailModal({
               </button>
               <button
                 type="button"
-                disabled={busy || recording.consent.participantStatus === 'denied'}
+                disabled={busy || recording.consent.status === 'denied'}
                 onClick={async () => {
                   setBusy(true);
                   setError(undefined);
                   try {
-                    await mediaService.updateConsent(recording.id, { participantStatus: 'denied' });
+                    await mediaService.updateConsent(recording.id, { status: 'denied' });
                     onUpdated();
                   } catch (err) {
                     setError(err);
@@ -923,12 +925,12 @@ function RecordingDetailModal({
               </button>
               <button
                 type="button"
-                disabled={busy || recording.consent.participantStatus === 'revoked'}
+                disabled={busy || recording.consent.status === 'revoked'}
                 onClick={async () => {
                   setBusy(true);
                   setError(undefined);
                   try {
-                    await mediaService.updateConsent(recording.id, { participantStatus: 'revoked' });
+                    await mediaService.updateConsent(recording.id, { status: 'revoked' });
                     onUpdated();
                   } catch (err) {
                     setError(err);
@@ -950,14 +952,14 @@ function RecordingDetailModal({
                 <input
                   type="checkbox"
                   disabled={busy}
-                  checked={recording.consent.minorParticipant}
+                  checked={recording.consent.requiresGuardian}
                   onChange={async e => {
                     setBusy(true);
                     setError(undefined);
                     try {
                       await mediaService.updateConsent(recording.id, {
                         minorParticipant: e.target.checked,
-                        guardianStatus: e.target.checked ? (recording.consent.guardianStatus || 'pending') : undefined,
+                        guardianStatus: e.target.checked ? (recording.consent.guardianConsentStatus || 'pending') : undefined,
                       });
                       onUpdated();
                     } catch (err) {
@@ -969,19 +971,19 @@ function RecordingDetailModal({
                 />
                 Minor participants present
               </label>
-              {recording.consent.minorParticipant && (
+              {recording.consent.requiresGuardian && (
                 <div className="mt-1">
                   <span className="text-xs text-slate-500 block">{t('guardianConsent')}:</span>
-                  <ConsentStatusBadge status={recording.consent.guardianStatus || 'pending'} />
+                  <ConsentStatusBadge status={recording.consent.guardianConsentStatus || 'pending'} />
                 </div>
               )}
             </div>
 
-            {recording.consent.minorParticipant && (
+            {recording.consent.requiresGuardian && (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || recording.consent.guardianStatus === 'granted'}
+                  disabled={busy || recording.consent.guardianConsentStatus === 'granted'}
                   onClick={async () => {
                     setBusy(true);
                     setError(undefined);
@@ -1003,7 +1005,7 @@ function RecordingDetailModal({
                 </button>
                 <button
                   type="button"
-                  disabled={busy || recording.consent.guardianStatus === 'denied'}
+                  disabled={busy || recording.consent.guardianConsentStatus === 'denied'}
                   onClick={async () => {
                     setBusy(true);
                     setError(undefined);
@@ -1031,11 +1033,11 @@ function RecordingDetailModal({
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
             <div>
               <span className="text-xs text-slate-500 block">{t('faceBlurStatus')}</span>
-              <BlurStatusBadge status={recording.privacy.blurStatus} />
+              <BlurStatusBadge status={recording.privacy.faceBlurStatus} />
             </div>
             <button
               type="button"
-              disabled={busy || recording.privacy.blurStatus === 'completed'}
+              disabled={busy || recording.privacy.faceBlurStatus === 'completed'}
               onClick={async () => {
                 setBusy(true);
                 setError(undefined);
@@ -1043,7 +1045,7 @@ function RecordingDetailModal({
                   await mediaService.completePrivacyBlur(recording.id);
                   onUpdated();
                 } catch (err) {
-                  setActionError(err);
+                  setError(err);
                 } finally {
                   setBusy(false);
                 }
@@ -1064,7 +1066,7 @@ function RecordingDetailModal({
                 Conservative privacy invariant: Public exposure requires granted consent and completed face blur.
               </p>
             </div>
-            <VisibilityBadge visibility={recording.visibility} />
+            <VisibilityBadge visibility={recording.publication.visibility} />
           </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -1080,7 +1082,7 @@ function RecordingDetailModal({
 
             <button
               type="button"
-              disabled={busy || targetVisibility === recording.visibility}
+              disabled={busy || targetVisibility === recording.publication.visibility}
               onClick={async () => {
                 setBusy(true);
                 setError(undefined);
@@ -1098,7 +1100,7 @@ function RecordingDetailModal({
               {t('save')}
             </button>
 
-            {recording.visibility !== 'private' && (
+            {recording.publication.visibility !== 'private' && (
               <button
                 type="button"
                 disabled={busy}

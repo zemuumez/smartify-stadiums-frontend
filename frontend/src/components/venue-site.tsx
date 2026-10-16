@@ -90,11 +90,11 @@ export function VenueSite({
   const mediaHighlights = (query.data.publishedHighlights || []).map(h => ({
     id: h.id,
     title: h.title,
-    teams: `${t(h.sport)} · ${h.date}`,
-    duration: h.durationLabel,
-    dur: h.durationLabel,
+    teams: h.teams || `${t(h.sport)}`,
+    duration: h.duration,
+    dur: h.duration,
     playbackUrl: h.playbackUrl,
-    views: 0,
+    views: h.views || 0,
   }));
   const matchHighlights = [...mediaHighlights, ...editorialHighlights];
   const headingLead = site.tagline.split(' ').slice(0,2).join(' '); const headingAccent = site.tagline.split(' ').slice(2).join(' ');

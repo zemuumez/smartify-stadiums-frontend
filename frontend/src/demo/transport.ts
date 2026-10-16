@@ -39,7 +39,8 @@ export function createDemoTransport(storage?: DemoStorage) {
     try { if (id) storage?.setItem(SESSION_KEY, id); else storage?.removeItem(SESSION_KEY); } catch { /* No real credentials are stored. */ }
   };
   const account = (): Account => {
-    const user = state.accounts.find(item => item.id === currentId);
+    const activeId = storage?.getItem(SESSION_KEY) || currentId;
+    const user = state.accounts.find(item => item.id === activeId);
     if (!user) throw new ServiceError('unauthorized', 401);
     return user;
   };
@@ -521,11 +522,25 @@ export function createDemoTransport(storage?: DemoStorage) {
           const rec = state.recordings.find(r => r.id === parts[2]);
           if (!rec) throw new ServiceError('not_found', 404);
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
-          const body = options.body as { status: PrivacyConsentStatus; guardianConsentStatus?: 'pending' | 'granted' | 'denied'; notes?: string };
-          if (!['pending', 'granted', 'denied', 'revoked'].includes(body.status)) throw new ServiceError('validation', 422);
-          rec.consent.status = body.status;
-          if (body.guardianConsentStatus) {
-            rec.consent.guardianConsentStatus = body.guardianConsentStatus;
+          const body = options.body as {
+            status?: PrivacyConsentStatus;
+            participantStatus?: PrivacyConsentStatus;
+            guardianStatus?: 'pending' | 'granted' | 'denied';
+            guardianConsentStatus?: 'pending' | 'granted' | 'denied';
+            minorParticipant?: boolean;
+            notes?: string;
+          };
+          const pStatus = body.participantStatus || body.status;
+          if (pStatus) {
+            if (!['pending', 'granted', 'denied', 'revoked'].includes(pStatus)) throw new ServiceError('validation', 422);
+            rec.consent.status = pStatus;
+          }
+          const gStatus = body.guardianStatus || body.guardianConsentStatus;
+          if (gStatus) {
+            rec.consent.guardianConsentStatus = gStatus;
+          }
+          if (body.minorParticipant !== undefined) {
+            rec.consent.requiresGuardian = body.minorParticipant;
           }
           if (body.notes !== undefined) {
             rec.consent.notes = body.notes;
@@ -538,7 +553,7 @@ export function createDemoTransport(storage?: DemoStorage) {
               rec.publication.unpublishReason = 'Consent revoked or denied';
             }
           }
-          audit(`recording.consent_updated: ${body.status}`, rec.id);
+          audit(`recording.consent_updated: ${pStatus || 'details'}`, rec.id);
           persist();
           return rec;
         }
@@ -556,14 +571,15 @@ export function createDemoTransport(storage?: DemoStorage) {
           const rec = state.recordings.find(r => r.id === parts[2]);
           if (!rec) throw new ServiceError('not_found', 404);
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
-          const body = options.body as { visibility: MediaVisibility; ownerApproved: boolean };
+          const body = options.body as { visibility: MediaVisibility; ownerApproved?: boolean };
           if (!['private', 'unlisted', 'public'].includes(body.visibility)) throw new ServiceError('validation', 422);
 
+          const ownerApproved = body.ownerApproved !== false;
           if (body.visibility === 'public') {
             if (rec.status !== 'ready' || !rec.playbackUrl) {
               throw new ServiceError('validation', 422);
             }
-            if (!body.ownerApproved) {
+            if (!ownerApproved) {
               throw new ServiceError('validation', 422);
             }
             if (rec.consent.status !== 'granted') {
@@ -578,7 +594,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           }
 
           rec.publication.visibility = body.visibility;
-          rec.publication.ownerApproved = body.ownerApproved;
+          rec.publication.ownerApproved = ownerApproved;
           if (body.visibility === 'public') {
             rec.publication.publishedAt = new Date().toISOString();
             rec.publication.unpublishReason = undefined;

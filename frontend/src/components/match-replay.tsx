@@ -145,7 +145,7 @@ function ReplayContent({
             playsInline
             className="w-full aspect-video object-contain"
             src={playback.playbackUrl}
-            poster={playback.thumbnailUrl}
+            poster={playback.thumbnailUrl || undefined}
           />
         </div>
 
@@ -153,7 +153,7 @@ function ReplayContent({
           <div>
             <h3 className="text-lg font-bold text-slate-900">{playback.title}</h3>
             <p className="text-sm text-slate-500">
-              {playback.date} · {playback.durationLabel} · {t(playback.sport)}
+              {playback.duration} · {playback.teamName ? `${playback.teamName} · ` : ''}{t(playback.sport)}
             </p>
           </div>
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">

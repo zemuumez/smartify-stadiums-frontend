@@ -334,7 +334,7 @@ export async function runTeamsEventsE2ETest() {
     await client.send('Page.navigate', { url: 'http://localhost:3000/teams/team-2' });
     const immediateSwitchCheck = await client.evaluate(`
       (() => {
-        const text = document.body.innerText;
+        const text = document.body?.innerText || '';
         // Old resource (Bole Lions FC) must NOT be displayed while team-2 is loading
         const showsOldResource = text.includes('Bole Lions FC');
         return { showsOldResource };

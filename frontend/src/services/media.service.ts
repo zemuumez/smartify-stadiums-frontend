@@ -15,8 +15,11 @@ import type {
 export function createMediaService(transport: Transport) {
   return {
     // Owner camera operations
-    cameras: (venueId?: string, signal?: AbortSignal) =>
-      transport.request<CameraDevice[]>(venueId ? `/owner/cameras?venueId=${encodeURIComponent(venueId)}` : '/owner/cameras', { signal }),
+    cameras: (venueId?: string | AbortSignal, signal?: AbortSignal) => {
+      const vid = typeof venueId === 'string' ? venueId : undefined;
+      const sig = venueId instanceof AbortSignal ? venueId : signal;
+      return transport.request<CameraDevice[]>(vid ? `/owner/cameras?venueId=${encodeURIComponent(vid)}` : '/owner/cameras', { signal: sig });
+    },
     registerCamera: (input: CameraRegisterInput) =>
       transport.request<CameraDevice>('/owner/cameras', { method: 'POST', body: input }),
     updateCamera: (id: string, input: CameraUpdateInput) =>
@@ -27,19 +30,22 @@ export function createMediaService(transport: Transport) {
       transport.request<CameraDevice>(`/admin/cameras/${id}/certify`, { method: 'POST', body: input }),
 
     // Owner recording operations
-    recordings: (venueId?: string, signal?: AbortSignal) =>
-      transport.request<MatchRecording[]>(venueId ? `/owner/recordings?venueId=${encodeURIComponent(venueId)}` : '/owner/recordings', { signal }),
+    recordings: (venueId?: string | AbortSignal, signal?: AbortSignal) => {
+      const vid = typeof venueId === 'string' ? venueId : undefined;
+      const sig = venueId instanceof AbortSignal ? venueId : signal;
+      return transport.request<MatchRecording[]>(vid ? `/owner/recordings?venueId=${encodeURIComponent(vid)}` : '/owner/recordings', { signal: sig });
+    },
     recordingDetail: (id: string, signal?: AbortSignal) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}`, { signal }),
     retryRecording: (id: string) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}/retry`, { method: 'POST' }),
-    advanceRecordingDemoState: (id: string, nextStatus: RecordingStatus) =>
-      transport.request<MatchRecording>(`/owner/recordings/${id}/advance`, { method: 'POST', body: { status: nextStatus } }),
-    updateConsent: (id: string, input: { status: PrivacyConsentStatus; guardianConsentStatus?: 'pending' | 'granted' | 'denied'; notes?: string }) =>
+    advanceRecordingDemoState: (id: string, nextStatus: RecordingStatus, failureReason?: string) =>
+      transport.request<MatchRecording>(`/owner/recordings/${id}/advance`, { method: 'POST', body: { status: nextStatus, failureReason } }),
+    updateConsent: (id: string, input: { status?: PrivacyConsentStatus; participantStatus?: PrivacyConsentStatus; guardianStatus?: 'pending' | 'granted' | 'denied'; guardianConsentStatus?: 'pending' | 'granted' | 'denied'; minorParticipant?: boolean; notes?: string }) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}/consent`, { method: 'POST', body: input }),
     completePrivacyBlur: (id: string) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}/privacy-blur`, { method: 'POST' }),
-    updatePublication: (id: string, input: { visibility: MediaVisibility; ownerApproved: boolean }) =>
+    updatePublication: (id: string, input: { visibility: MediaVisibility; ownerApproved?: boolean }) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}/publication`, { method: 'POST', body: input }),
     unpublishRecording: (id: string, reason?: string) =>
       transport.request<MatchRecording>(`/owner/recordings/${id}/unpublish`, { method: 'POST', body: { reason } }),
