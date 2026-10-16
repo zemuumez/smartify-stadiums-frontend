@@ -8,7 +8,7 @@ export interface Account {
 export interface Venue {
   id: string; ownerId: string; slug: string; name: string; city: string; address: string;
   description: string; phone: string; image: string; sports: Sport[];
-  status: 'draft' | 'pending' | 'active' | 'suspended'; verified: boolean;
+  status: 'draft' | 'pending' | 'changes_requested' | 'active' | 'suspended'; verified: boolean;
   primarySport?: Sport; instantPay?: boolean; publicStats?: { bookings: number; players: number; stream: string };
   referee?: boolean; indoor?: boolean; featured?: boolean;
   rating: number | null; reviewCount: number; timezone: string;
@@ -23,7 +23,7 @@ export interface Booking {
   id: string; venueId: string; fieldId: string; playerId: string; sport: Sport;
   date: string; startHour: number; endHour: number; totalMinor: number; currency: 'ETB';
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  paymentStatus: 'unpaid' | 'processing' | 'paid' | 'failed' | 'refunded';
+  paymentStatus: 'unpaid' | 'processing' | 'partially_paid' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
   createdAt: string;
   source?: 'online' | 'walk_in';
   guestName?: string;
@@ -289,12 +289,185 @@ export interface MediaAsset {
   status: 'scheduled' | 'processing' | 'ready' | 'failed';
   visibility: 'private' | 'unlisted' | 'public'; playbackUrl: string | null;
 }
-export interface Invoice { id: string; venueId: string; totalMinor: number; currency: 'ETB'; status: 'unpaid' | 'paid' | 'cancelled' }
-export interface CommercialPolicy { subscriptionPriceMinor: number | null; bookingCommissionPercent: number | null; replayRetentionDays?: number | null; currency: 'ETB' }
-export interface AuditEntry { id: string; actorId: string; action: string; resourceId: string; createdAt: string }
-export interface Analytics { bookings: number; collectedMinor: number; outstandingMinor: number; cancelled: number }
+export type PaymentMethod = 'cash' | 'pos' | 'telebirr_manual' | 'telebirr_gateway' | 'cbe_birr' | 'bank_transfer';
+export type TransactionType = 'collection' | 'refund' | 'payout' | 'adjustment';
+export type TransactionStatus = 'recorded' | 'initiated' | 'processing' | 'succeeded' | 'failed' | 'reversed';
+
+export interface PaymentTransaction {
+  id: string;
+  bookingId?: string;
+  venueId: string;
+  payerId?: string;
+  amountMinor: number;
+  currency: 'ETB';
+  type: TransactionType;
+  method: PaymentMethod;
+  status: TransactionStatus;
+  reference?: string;
+  notes?: string;
+  recordedBy: string;
+  createdAt: string;
+  originalTransactionId?: string;
+}
+
+export interface BookingFinancialSummary {
+  bookingId: string;
+  totalPriceMinor: number;
+  collectedMinor: number;
+  refundedMinor: number;
+  netCollectedMinor: number;
+  outstandingMinor: number;
+  paymentStatus: 'unpaid' | 'processing' | 'partially_paid' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
+  transactions: PaymentTransaction[];
+}
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitPriceMinor: number | null;
+  totalMinor: number | null;
+}
+
+export interface Invoice {
+  id: string;
+  venueId: string;
+  venueName?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  totalMinor: number | null;
+  currency: 'ETB';
+  status: 'unpaid' | 'paid' | 'cancelled' | 'not_configured';
+  lineItems?: InvoiceLineItem[];
+  issuedAt?: string;
+  paidAt?: string;
+  notes?: string;
+}
+
+export interface CommercialPolicy {
+  subscriptionPriceMinor: number | null;
+  bookingCommissionPercent: number | null;
+  replayRetentionDays?: number | null;
+  currency: 'ETB';
+}
+
+export interface AuditEntry {
+  id: string;
+  actorId: string;
+  action: string;
+  resourceId: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface FinancialAnalytics {
+  venueId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  metricDateType: 'booking_date' | 'transaction_date';
+  grossBookingValueMinor: number;
+  totalBookingsCount: number;
+  completedBookingsCount: number;
+  cancelledBookingsCount: number;
+  recordedCollectionsMinor: number;
+  completedRefundsMinor: number;
+  netRevenueMinor: number;
+  outstandingBalanceMinor: number;
+  provisionalCommissionPercent: number | null;
+  provisionalCommissionAmountMinor: number | null;
+  currency: 'ETB';
+  sportBreakdown: Record<Sport, { bookings: number; grossMinor: number; collectedMinor: number }>;
+}
+
+export interface Analytics {
+  bookings: number;
+  collectedMinor: number;
+  outstandingMinor: number;
+  cancelled: number;
+  detailed?: FinancialAnalytics;
+}
+
+export interface SettleBookingInput {
+  amountMinor: number;
+  method: PaymentMethod;
+  notes?: string;
+  reference?: string;
+}
+
+export interface RefundBookingInput {
+  amountMinor: number;
+  reason: string;
+  originalTransactionId?: string;
+}
+
+export interface GatewaySimulationInput {
+  method: 'telebirr_gateway' | 'cbe_birr';
+  simulateOutcome: 'success' | 'failure';
+  notes?: string;
+}
+
+export type VenueReviewStatus = 'draft' | 'pending' | 'changes_requested' | 'active' | 'suspended';
+export type VenueReviewAction = 'submit' | 'request_changes' | 'approve' | 'suspend' | 'reinstate';
+
+export interface VenueReviewRecord {
+  id: string;
+  venueId: string;
+  action: VenueReviewAction;
+  previousStatus: VenueReviewStatus;
+  newStatus: VenueReviewStatus;
+  reason: string;
+  notes?: string;
+  reviewerId: string;
+  reviewerName: string;
+  createdAt: string;
+}
+
+export type SupportCaseCategory = 'booking_inquiry' | 'refund_request' | 'payment_issue' | 'facility_issue' | 'general';
+export type SupportCaseStatus = 'open' | 'in_progress' | 'escalated' | 'resolved' | 'closed';
+export type SupportCasePriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface SupportMessage {
+  id: string;
+  caseId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: Role;
+  message: string;
+  isInternal: boolean;
+  createdAt: string;
+}
+
+export interface SupportCase {
+  id: string;
+  caseNumber: string;
+  authorId: string;
+  authorName: string;
+  authorRole: Role;
+  venueId?: string;
+  bookingId?: string;
+  transactionId?: string;
+  category: SupportCaseCategory;
+  subject: string;
+  status: SupportCaseStatus;
+  priority: SupportCasePriority;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  messages: SupportMessage[];
+}
+
+export interface SupportCaseCreateInput {
+  venueId?: string;
+  bookingId?: string;
+  transactionId?: string;
+  category: SupportCaseCategory;
+  subject: string;
+  message: string;
+  priority?: SupportCasePriority;
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown; signal?: AbortSignal;
   idempotencyKey?: string;
 }
 export interface Transport { request<T>(path: string, options?: RequestOptions): Promise<T> }
+

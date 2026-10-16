@@ -352,3 +352,26 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
         - CMS publishing suite: 8/8 journeys pass (node tests/verify-cms-e2e.mjs).
         - Teams & events suite: 4/4 journeys pass (node tests/verify-teams-events-e2e.mjs).
       - Preserved frozen UI baseline. Working strictly on branch codex/camera-media-privacy; no merge into main, push, or deploy.
+
+- Step 23 (Milestone M5 Initiation & Step 1: Finance Contracts & Shared Transaction Records):
+   1. Created FINANCE_ADMIN_HANDOFF.md:
+      - Documented audit baseline, architectural gaps, role/permission matrix across Visitor/Player/Owner/Admin, state transition diagrams for settlement/venue-review/support, proposed REST API contracts, backend integration requirements (atomic transactions, double-entry/correction records, idempotency, server-side authorization), and unresolved commercial decisions.
+   2. Decoupled settlement transactions and payment states from bookings:
+      - Modeled PaymentTransaction with integer minor units (ETB), explicit transaction type ('collection' | 'refund'), payment method, status ('recorded' | 'initiated' | 'processing' | 'succeeded' | 'failed'), notes, reference, recordedBy, and originalTransactionId.
+      - Modeled BookingFinancialSummary deriving collectedMinor, refundedMinor, netCollectedMinor, outstandingMinor, and paymentStatus authoritatively from transaction history.
+      - Expanded Booking.paymentStatus to support 'partially_paid' and 'partially_refunded'.
+   3. Atomic settlement & refund mutations with idempotency and limits:
+      - Implemented /owner/bookings/:id/settle rejecting overpayment (amountMinor > outstandingMinor) and repeated submissions with identical Idempotency-Key.
+      - Implemented /owner/bookings/:id/refund rejecting refunds exceeding net collected funds (amountMinor > netCollectedMinor) and preserving audit/reversal history.
+      - Enforced cross-tenant security: only the venue owner or platform administrator can settle or refund bookings; other tenants and players are denied (HTTP 403).
+   4. Decoupled cancellation from refund execution:
+      - Booking cancellation frees slots (status: 'cancelled') without automatically issuing refunds; collected money remains intact in transaction ledger until explicit refund action.
+   5. Provisional commercial policy & subscription invoices:
+      - Commercial policy remains explicitly unset (subscriptionPriceMinor: null, bookingCommissionPercent: null), displaying 'Not configured' rather than defaulting to zero.
+      - Generated honest platform subscription invoices (/owner/invoices) with status: 'not_configured' and totalMinor: null.
+   6. Internationalization & full verification:
+      - Added partially_paid, partially_refunded, not_configured, and changes_requested to English and Amharic dictionaries with 100% key parity.
+      - 87/87 unit tests pass (npm test, including 7 new regression tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Working strictly on local branch codex/finance-platform-admin; no merge, push, or deploy.

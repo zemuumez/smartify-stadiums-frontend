@@ -1,5 +1,5 @@
 import { directoryFixtures } from './directory';
-import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MatchRecording, MediaAsset, Microsite, ParticipationFormat, ReplayEntitlement, Team, TeamJoinRequest, Venue } from '../services/contracts';
+import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MatchRecording, MediaAsset, Microsite, ParticipationFormat, PaymentTransaction, ReplayEntitlement, SupportCase, Team, TeamJoinRequest, Venue, VenueReviewRecord } from '../services/contracts';
 
 /** All operational demo records live here. Amounts are illustrative minor ETB units. */
 export const accounts: Account[] = [
@@ -62,6 +62,7 @@ export interface DemoState {
   sites: Microsite[]; drafts: Microsite[]; teams: Team[]; teamRequests: TeamJoinRequest[];
   eventRegistrations: EventRegistration[]; cameras: CameraDevice[];
   media: MediaAsset[]; recordings: MatchRecording[]; entitlements: ReplayEntitlement[]; invoices: Invoice[]; audit: AuditEntry[];
+  transactions: PaymentTransaction[]; venueReviews: VenueReviewRecord[]; supportCases: SupportCase[];
   idempotency: Record<string, { fingerprint: string; bookingId: string }>;
 }
 export const commercialPolicy: CommercialPolicy = { subscriptionPriceMinor: null, bookingCommissionPercent: null, currency: 'ETB' };
@@ -410,6 +411,9 @@ export function createFixtures(): DemoState {
     media: [],
     invoices: [],
     audit: [],
+    transactions: [],
+    venueReviews: [],
+    supportCases: [],
     idempotency: {},
   });
 }

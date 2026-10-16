@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -22,6 +22,153 @@ export function isRecordingPubliclyEligible(rec: MatchRecording): boolean {
   return isNotExpired && isReady && isPublic && isConsentGranted && isGuardianGranted && isBlurCompleted;
 }
 
+export function deriveBookingFinancialSummary(booking: Booking, transactions: PaymentTransaction[]): BookingFinancialSummary {
+  const txs = transactions.filter(t => t.bookingId === booking.id);
+  const collectedMinor = txs
+    .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+  const refundedMinor = txs
+    .filter(t => t.type === 'refund' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+  const netCollectedMinor = Math.max(0, collectedMinor - refundedMinor);
+  const outstandingMinor = Math.max(0, booking.totalMinor - netCollectedMinor);
+
+  let paymentStatus: Booking['paymentStatus'] = 'unpaid';
+  if (booking.status === 'cancelled') {
+    if (netCollectedMinor === 0 && refundedMinor > 0) {
+      paymentStatus = 'refunded';
+    } else if (netCollectedMinor > 0 && refundedMinor > 0) {
+      paymentStatus = 'partially_refunded';
+    } else if (netCollectedMinor >= booking.totalMinor) {
+      paymentStatus = 'paid';
+    } else if (netCollectedMinor > 0) {
+      paymentStatus = 'partially_paid';
+    } else {
+      paymentStatus = 'unpaid';
+    }
+  } else {
+    if (netCollectedMinor >= booking.totalMinor) {
+      paymentStatus = 'paid';
+    } else if (netCollectedMinor > 0 && refundedMinor > 0) {
+      paymentStatus = 'partially_refunded';
+    } else if (netCollectedMinor > 0) {
+      paymentStatus = 'partially_paid';
+    } else if (refundedMinor > 0 && netCollectedMinor === 0) {
+      paymentStatus = 'refunded';
+    } else {
+      paymentStatus = 'unpaid';
+    }
+  }
+
+  return {
+    bookingId: booking.id,
+    totalPriceMinor: booking.totalMinor,
+    collectedMinor,
+    refundedMinor,
+    netCollectedMinor,
+    outstandingMinor,
+    paymentStatus,
+    transactions: txs,
+  };
+}
+
+export function computeFinancialAnalytics(
+  bookings: Booking[],
+  transactions: PaymentTransaction[],
+  options?: {
+    venueId?: string;
+    sport?: Sport;
+    dateFrom?: string;
+    dateTo?: string;
+    metricDateType?: 'booking_date' | 'transaction_date';
+  }
+): FinancialAnalytics {
+  const metricDateType = options?.metricDateType || 'booking_date';
+  const allSports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
+
+  const filteredBookings = bookings.filter(b => {
+    if (options?.venueId && b.venueId !== options.venueId) return false;
+    if (options?.sport && b.sport !== options.sport) return false;
+    if (options?.dateFrom && b.date < options.dateFrom) return false;
+    if (options?.dateTo && b.date > options.dateTo) return false;
+    return true;
+  });
+
+  const filteredTransactions = transactions.filter(t => {
+    if (options?.venueId && t.venueId !== options.venueId) return false;
+    const booking = bookings.find(b => b.id === t.bookingId);
+    if (options?.sport && booking && booking.sport !== options.sport) return false;
+    if (metricDateType === 'transaction_date') {
+      const txDate = t.createdAt.slice(0, 10);
+      if (options?.dateFrom && txDate < options.dateFrom) return false;
+      if (options?.dateTo && txDate > options.dateTo) return false;
+    } else {
+      if (booking) {
+        if (options?.dateFrom && booking.date < options.dateFrom) return false;
+        if (options?.dateTo && booking.date > options.dateTo) return false;
+      }
+    }
+    return true;
+  });
+
+  const grossBookingValueMinor = filteredBookings.reduce((sum, b) => sum + b.totalMinor, 0);
+  const totalBookingsCount = filteredBookings.length;
+  const completedBookingsCount = filteredBookings.filter(b => b.status === 'completed' || (b.status === 'confirmed' && Date.parse(`${b.date}T${String(b.endHour).padStart(2, '0')}:00:00+03:00`) <= Date.now())).length;
+  const cancelledBookingsCount = filteredBookings.filter(b => b.status === 'cancelled').length;
+
+  const recordedCollectionsMinor = filteredTransactions
+    .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+
+  const completedRefundsMinor = filteredTransactions
+    .filter(t => t.type === 'refund' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+
+  const netRevenueMinor = Math.max(0, recordedCollectionsMinor - completedRefundsMinor);
+
+  let outstandingBalanceMinor = 0;
+  for (const b of filteredBookings) {
+    if (b.status !== 'cancelled') {
+      const summary = deriveBookingFinancialSummary(b, transactions);
+      outstandingBalanceMinor += summary.outstandingMinor;
+    }
+  }
+
+  const sportBreakdown = allSports.reduce((acc, sport) => {
+    const sBookings = filteredBookings.filter(b => b.sport === sport);
+    const sGross = sBookings.reduce((sum, b) => sum + b.totalMinor, 0);
+    const sBookingIds = new Set(sBookings.map(b => b.id));
+    const sCollections = filteredTransactions
+      .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded') && t.bookingId && sBookingIds.has(t.bookingId))
+      .reduce((sum, t) => sum + t.amountMinor, 0);
+    acc[sport] = {
+      bookings: sBookings.length,
+      grossMinor: sGross,
+      collectedMinor: sCollections,
+    };
+    return acc;
+  }, {} as Record<Sport, { bookings: number; grossMinor: number; collectedMinor: number }>);
+
+  return {
+    venueId: options?.venueId,
+    dateFrom: options?.dateFrom,
+    dateTo: options?.dateTo,
+    metricDateType,
+    grossBookingValueMinor,
+    totalBookingsCount,
+    completedBookingsCount,
+    cancelledBookingsCount,
+    recordedCollectionsMinor,
+    completedRefundsMinor,
+    netRevenueMinor,
+    outstandingBalanceMinor,
+    provisionalCommissionPercent: null,
+    provisionalCommissionAmountMinor: null,
+    currency: 'ETB',
+    sportBreakdown,
+  };
+}
+
 /** Simulator only: browser data and role checks are not a security boundary. */
 export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: boolean }) {
   const isLive = Boolean(config?.isLive);
@@ -40,6 +187,10 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!Array.isArray(state.cameras)) state.cameras = createFixtures().cameras;
         if (!Array.isArray(state.recordings)) state.recordings = createFixtures().recordings;
         if (!Array.isArray(state.entitlements)) state.entitlements = createFixtures().entitlements;
+        if (!Array.isArray(state.transactions)) state.transactions = [];
+        if (!Array.isArray(state.venueReviews)) state.venueReviews = [];
+        if (!Array.isArray(state.supportCases)) state.supportCases = [];
+        if (!Array.isArray(state.invoices)) state.invoices = [];
       }
     }
     currentId = storage?.getItem(SESSION_KEY) || null;
@@ -163,7 +314,12 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     }
     if (path === '/bookings' && method === 'GET') {
       const user = account();
-      return state.bookings.filter(b => user.role === 'admin' || b.playerId === user.id || (user.role === 'owner' && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)));
+      return state.bookings
+        .filter(b => user.role === 'admin' || b.playerId === user.id || (user.role === 'owner' && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+        .map(b => {
+          const summary = deriveBookingFinancialSummary(b, state.transactions);
+          return { ...b, paymentStatus: summary.paymentStatus };
+        });
     }
     if (path === '/bookings' && method === 'POST') {
       const user = requireRole('player'); const input = options.body as BookingInput;
@@ -230,9 +386,15 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       if (!booking) throw new ServiceError('not_found', 404);
       if (booking.playerId !== user.id) owned(booking.venueId);
       if (!['confirmed', 'pending', 'cancelled'].includes(booking.status)) throw new ServiceError('conflict', 409);
-      // Demo policy: future unpaid bookings only; real cancellation/refund policy remains open.
-      if (booking.paymentStatus !== 'unpaid' || Date.parse(`${booking.date}T${String(booking.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('conflict', 409);
-      if (booking.status !== 'cancelled') { booking.status = 'cancelled'; audit('booking.cancelled', booking.id); persist(); }
+      // Demo policy: future bookings only; cancellation frees slot without automatically executing refund.
+      if (Date.parse(`${booking.date}T${String(booking.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('conflict', 409);
+      if (booking.status !== 'cancelled') {
+        booking.status = 'cancelled';
+        const summary = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summary.paymentStatus;
+        audit('booking.cancelled', booking.id);
+        persist();
+      }
       return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'reschedule' && method === 'POST') {
@@ -282,6 +444,86 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       audit('booking.rescheduled', booking.id);
       persist();
       return booking;
+    }
+    if (parts[0] === 'bookings' && parts[2] === 'financials' && method === 'GET') {
+      const user = account();
+      const booking = state.bookings.find(item => item.id === parts[1]);
+      if (!booking) throw new ServiceError('not_found', 404);
+      if (booking.playerId !== user.id && user.role !== 'admin' && !state.venues.some(v => v.id === booking.venueId && v.ownerId === user.id)) {
+        throw new ServiceError('forbidden', 403);
+      }
+      return deriveBookingFinancialSummary(booking, state.transactions);
+    }
+    if (parts[0] === 'bookings' && parts[2] === 'simulate-gateway' && method === 'POST') {
+      const user = account();
+      const booking = state.bookings.find(item => item.id === parts[1]);
+      if (!booking) throw new ServiceError('not_found', 404);
+      if (booking.playerId !== user.id && user.role !== 'admin' && !state.venues.some(v => v.id === booking.venueId && v.ownerId === user.id)) {
+        throw new ServiceError('forbidden', 403);
+      }
+      const input = options.body as GatewaySimulationInput;
+      if (!['telebirr_gateway', 'cbe_birr'].includes(input.method)) throw new ServiceError('validation', 422);
+
+      const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+      if (summaryBefore.outstandingMinor <= 0) throw new ServiceError('conflict', 409);
+
+      if (options.idempotencyKey) {
+        const key = `${user.id}:gw:${options.idempotencyKey}`;
+        const previous = state.idempotency[key];
+        if (previous) {
+          const prevTx = state.transactions.find(t => t.id === previous.bookingId);
+          if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+        }
+      }
+
+      if (input.simulateOutcome === 'failure') {
+        const tx: PaymentTransaction = {
+          id: `tx-gw-fail-${crypto.randomUUID().slice(0, 8)}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: user.id,
+          amountMinor: summaryBefore.outstandingMinor,
+          currency: 'ETB',
+          type: 'collection',
+          method: input.method,
+          status: 'failed',
+          notes: 'Simulated domestic payment gateway decline / timeout',
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+        };
+        state.transactions.push(tx);
+        booking.paymentStatus = 'failed';
+        if (options.idempotencyKey) {
+          state.idempotency[`${user.id}:gw:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        }
+        audit(`gateway.payment_failed: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+        persist();
+        return { transaction: tx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+      }
+
+      const tx: PaymentTransaction = {
+        id: `tx-gw-${crypto.randomUUID().slice(0, 8)}`,
+        bookingId: booking.id,
+        venueId: booking.venueId,
+        payerId: user.id,
+        amountMinor: summaryBefore.outstandingMinor,
+        currency: 'ETB',
+        type: 'collection',
+        method: input.method,
+        status: 'succeeded',
+        reference: `GW-${Date.now().toString(36).toUpperCase()}`,
+        notes: 'Simulated domestic mobile payment callback',
+        recordedBy: user.id,
+        createdAt: new Date().toISOString(),
+      };
+      state.transactions.push(tx);
+      booking.paymentStatus = deriveBookingFinancialSummary(booking, state.transactions).paymentStatus;
+      if (options.idempotencyKey) {
+        state.idempotency[`${user.id}:gw:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+      }
+      audit(`gateway.payment_succeeded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+      persist();
+      return { transaction: tx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
     }
     if (parts[0] === 'owner') {
       const user = account(); if (!['owner', 'admin'].includes(user.role)) throw new ServiceError('forbidden', 403);
@@ -780,10 +1022,164 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           return entitlement;
         }
       }
-      if (path === '/owner/invoices' && method === 'GET') return state.invoices.filter(item => venueIds.includes(item.venueId));
-      if (path === '/owner/analytics' && method === 'GET') {
-        const bookings = state.bookings.filter(item => venueIds.includes(item.venueId));
-        return { bookings: bookings.length, collectedMinor: bookings.filter(b => b.paymentStatus === 'paid').reduce((sum, b) => sum + b.totalMinor, 0), outstandingMinor: bookings.filter(b => b.status === 'confirmed' && b.paymentStatus === 'unpaid').reduce((sum, b) => sum + b.totalMinor, 0), cancelled: bookings.filter(b => b.status === 'cancelled').length };
+      if (parts[1] === 'bookings' && parts[3] === 'settle' && method === 'POST') {
+        const booking = state.bookings.find(item => item.id === parts[2]);
+        if (!booking) throw new ServiceError('not_found', 404);
+        owned(booking.venueId);
+        const input = options.body as SettleBookingInput;
+        if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
+          throw new ServiceError('validation', 422);
+        }
+        if (!['cash', 'pos', 'telebirr_manual', 'telebirr_gateway', 'cbe_birr', 'bank_transfer'].includes(input.method)) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+        if (input.amountMinor > summaryBefore.outstandingMinor) {
+          throw new ServiceError('validation', 422);
+        }
+
+        if (options.idempotencyKey) {
+          const key = `${user.id}:settle:${options.idempotencyKey}`;
+          const previous = state.idempotency[key];
+          if (previous) {
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
+        const tx: PaymentTransaction = {
+          id: `tx-${crypto.randomUUID()}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: booking.playerId || undefined,
+          amountMinor: input.amountMinor,
+          currency: 'ETB',
+          type: 'collection',
+          method: input.method,
+          status: 'recorded',
+          reference: input.reference?.trim() || undefined,
+          notes: input.notes?.trim() || undefined,
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+        };
+        state.transactions.push(tx);
+        const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summaryAfter.paymentStatus;
+        if (options.idempotencyKey) {
+          state.idempotency[`${user.id}:settle:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        }
+        audit(`settlement.recorded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+        persist();
+        return { transaction: tx, summary: summaryAfter };
+      }
+
+      if (parts[1] === 'bookings' && parts[3] === 'refund' && method === 'POST') {
+        const booking = state.bookings.find(item => item.id === parts[2]);
+        if (!booking) throw new ServiceError('not_found', 404);
+        owned(booking.venueId);
+        const input = options.body as RefundBookingInput;
+        if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !input.reason?.trim()) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+        if (input.amountMinor > summaryBefore.netCollectedMinor) {
+          throw new ServiceError('validation', 422);
+        }
+
+        if (options.idempotencyKey) {
+          const key = `${user.id}:refund:${options.idempotencyKey}`;
+          const previous = state.idempotency[key];
+          if (previous) {
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
+        const tx: PaymentTransaction = {
+          id: `tx-ref-${crypto.randomUUID()}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: booking.playerId || undefined,
+          amountMinor: input.amountMinor,
+          currency: 'ETB',
+          type: 'refund',
+          method: 'cash',
+          status: 'recorded',
+          notes: input.reason.trim(),
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+          originalTransactionId: input.originalTransactionId,
+        };
+        state.transactions.push(tx);
+        const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summaryAfter.paymentStatus;
+        if (options.idempotencyKey) {
+          state.idempotency[`${user.id}:refund:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        }
+        audit(`refund.recorded: ${tx.amountMinor} ETB reason: ${input.reason}`, tx.id);
+        persist();
+        return { transaction: tx, summary: summaryAfter };
+      }
+
+      if (parts[1] === 'venues' && parts[3] === 'transactions' && method === 'GET') {
+        owned(parts[2]);
+        return state.transactions.filter(t => t.venueId === parts[2]).slice().reverse();
+      }
+
+      if (path.startsWith('/owner/invoices') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId');
+        const targetVenueIds = venueParam ? [venueParam] : venueIds;
+        const matchingVenues = state.venues.filter(v => targetVenueIds.includes(v.id) && venueIds.includes(v.id));
+
+        const stored = state.invoices.filter(i => targetVenueIds.includes(i.venueId));
+        if (stored.length > 0) return stored;
+
+        return matchingVenues.map(venue => ({
+          id: `INV-${venue.slug.toUpperCase()}-2026-10`,
+          venueId: venue.id,
+          venueName: venue.name,
+          periodStart: '2026-10-01',
+          periodEnd: '2026-10-31',
+          totalMinor: null,
+          currency: 'ETB' as const,
+          status: 'not_configured' as const,
+          lineItems: [
+            { description: 'Platform Operating License (Provisional)', quantity: 1, unitPriceMinor: null, totalMinor: null },
+            { description: 'Autonomous Camera Network Ingestion', quantity: state.cameras.filter(c => c.venueId === venue.id).length || 1, unitPriceMinor: null, totalMinor: null },
+          ],
+          issuedAt: '2026-10-01T00:00:00Z',
+          notes: 'Commercial policy is provisional and unset. No platform subscription fees are currently charged.',
+        }));
+      }
+
+      if (path.startsWith('/owner/analytics') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId');
+        const sportParam = url.searchParams.get('sport') as Sport | undefined;
+        const dateFrom = url.searchParams.get('dateFrom') || undefined;
+        const dateTo = url.searchParams.get('dateTo') || undefined;
+        const metricDateType = (url.searchParams.get('metricDateType') as 'booking_date' | 'transaction_date') || 'booking_date';
+
+        const targetVenueIds = venueParam ? (venueIds.includes(venueParam) ? [venueParam] : []) : venueIds;
+        const ownerBookings = state.bookings.filter(b => targetVenueIds.includes(b.venueId));
+        const ownerTransactions = state.transactions.filter(t => targetVenueIds.includes(t.venueId));
+
+        const detailed = computeFinancialAnalytics(ownerBookings, ownerTransactions, {
+          venueId: venueParam || undefined,
+          sport: sportParam,
+          dateFrom,
+          dateTo,
+          metricDateType,
+        });
+
+        return {
+          bookings: detailed.totalBookingsCount,
+          collectedMinor: detailed.recordedCollectionsMinor,
+          outstandingMinor: detailed.outstandingBalanceMinor,
+          cancelled: detailed.cancelledBookingsCount,
+          detailed,
+        };
       }
     }
     if ((parts[0] === 'venues' || parts[0] === 'stadiums') && parts[2] === 'events') {
@@ -1329,6 +1725,21 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const input = options.body as { status: 'active' | 'suspended'; reason: string };
         if (!['active', 'suspended'].includes(input.status) || !input.reason.trim()) throw new ServiceError('validation', 422);
         venue.status = input.status; audit(`venue.${input.status}: ${input.reason}`, venue.id); persist(); return venue;
+      }
+      if (path.startsWith('/admin/analytics') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId') || undefined;
+        const sportParam = url.searchParams.get('sport') as Sport | undefined;
+        const dateFrom = url.searchParams.get('dateFrom') || undefined;
+        const dateTo = url.searchParams.get('dateTo') || undefined;
+        const metricDateType = (url.searchParams.get('metricDateType') as 'booking_date' | 'transaction_date') || 'booking_date';
+
+        return computeFinancialAnalytics(state.bookings, state.transactions, {
+          venueId: venueParam,
+          sport: sportParam,
+          dateFrom,
+          dateTo,
+          metricDateType,
+        });
       }
     }
     throw new ServiceError('unavailable', 501);

@@ -44,7 +44,7 @@ function FieldForm({ initial, venues, onSaved, onCancel }: { initial: Field | nu
 export { OwnerCameras } from './camera-admin';
 export function OwnerBilling() {
   const { t, money } = useLanguage(); const query = useServiceQuery(useCallback(() => billingService.invoices(), []));
-  return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('billing')}</h1><p>{t('pricingOpen')}</p>{query.loading ? <Loading /> : query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : !query.data?.length ? <Empty /> : query.data.map(invoice => <article className="panel" key={invoice.id}><h2>{invoice.id}</h2><p>{money(invoice.totalMinor)} · {t(invoice.status)}</p></article>)}</div>;
+  return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('billing')}</h1><p>{t('pricingOpen')}</p>{query.loading ? <Loading /> : query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : !query.data?.length ? <Empty /> : query.data.map(invoice => <article className="panel" key={invoice.id}><h2>{invoice.id}</h2><p>{invoice.totalMinor !== null ? money(invoice.totalMinor) : t('not_configured')} · {t(invoice.status)}</p></article>)}</div>;
 }
 export function AccountSettings() {
   const { t } = useLanguage(); const { user } = useAuthStore();
