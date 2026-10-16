@@ -395,3 +395,23 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
       - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
 
+- Step 25 (Milestone M5 Step 3: Booking-Derived Financial and Operational Analytics):
+   1. Multi-dimensional reporting & filter engine:
+      - In frontend/src/components/analytics-dashboard.tsx, implemented reusable AnalyticsDashboard supporting venue, sport, date-from, date-to, and metric date basis (booking_date vs transaction_date) filters.
+      - Documented metric calculation methodology and Addis Ababa timezone (UTC+3, EAT): Gross Booking Value and Outstanding Balance derive on scheduled booking dates; Collections and Refunds derive on transaction processing dates.
+      - Separately rendered Gross Booking Value, Actual Recorded Collections, Completed Refunds, Net Revenue, and Outstanding Balances.
+      - Displayed Platform Commission Fee as "Not configured" with an explicit advisory that commercial pricing is provisional and unset.
+      - Integrated per-sport breakdown cards and honest zero-activity empty state (t('zeroActivity')).
+   2. Owner & administrator views:
+      - In frontend/src/components/owner-panels.tsx, updated OwnerOverview to render AnalyticsDashboard scoped to owned venues with direct link to the booking ledger.
+      - In frontend/src/components/admin-panels.tsx and frontend/src/app/admin/analytics/page.tsx, implemented AdminAnalytics providing platform-wide aggregation across all venues with admin authorization.
+   3. Service & transport integration:
+      - In frontend/src/services/admin.service.ts, added typed analytics(params, signal) method calling /admin/analytics.
+      - In frontend/src/demo/transport.ts, verified /owner/analytics and /admin/analytics endpoints backed by computeFinancialAnalytics.
+   4. Internationalization & full verification:
+      - Added analytics filter, timezone, and commission advisory keys to both en.ts and am.ts with 100% key parity.
+      - 91/91 unit tests pass (npm test, with owner and admin analytics tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+

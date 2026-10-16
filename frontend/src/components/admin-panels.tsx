@@ -6,6 +6,7 @@ import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
 import { AdminCertificationModal } from './camera-admin';
+import { AnalyticsDashboard } from './analytics-dashboard';
 
 export function AdminVenues() {
   const { t } = useLanguage(); const query = useServiceQuery(useCallback(() => adminService.venues(), []));
@@ -21,6 +22,23 @@ export function AdminUsers() {
 export function AdminOverview() {
   const { t } = useLanguage(); const query = useServiceQuery(useCallback(() => adminService.audit(), []));
   return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('audit')}</h1>{query.loading ? <Loading /> : query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : !query.data?.length ? <Empty /> : query.data.slice().reverse().map(entry => <article key={entry.id} className="panel break-words"><p className="font-semibold">{entry.action}</p><p className="text-sm">{entry.resourceId}</p><time className="text-xs text-slate-600">{entry.createdAt}</time></article>)}</div>;
+}
+
+export function AdminAnalytics() {
+  const { t } = useLanguage();
+  const venuesQuery = useServiceQuery(useCallback(signal => adminService.venues(signal), []));
+  const fetchAnalytics = useCallback(async (params: Parameters<typeof adminService.analytics>[0], signal?: AbortSignal) => {
+    return adminService.analytics(params, signal);
+  }, []);
+
+  return (
+    <AnalyticsDashboard
+      title={t('adminAnalyticsTitle')}
+      venues={venuesQuery.data || []}
+      fetchAnalytics={fetchAnalytics}
+      isAdmin={true}
+    />
+  );
 }
 
 export function AdminCameras() {

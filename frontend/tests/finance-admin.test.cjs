@@ -342,3 +342,68 @@ test('subscription invoices are distinct from booking receipts and reflect unset
   assert.equal(owner2Invoices.length, 0);
 });
 
+test('owner analytics derives booking value, collections, refunds, and supports venue/sport/date filters', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input({ date: '2026-10-25' }));
+
+  s.transport.selectAccount('owner-1');
+  // Settle half the booking
+  await s.billing.settleBooking(booking.id, {
+    amountMinor: 150000,
+    method: 'pos',
+  });
+
+  // Query analytics for owner-1
+  const res = await s.billing.analytics({ venueId: 'venue-1' });
+  assert.ok(res.detailed);
+  const d = res.detailed;
+  assert.ok(d.grossBookingValueMinor >= 300000);
+  assert.ok(d.recordedCollectionsMinor >= 150000);
+  assert.equal(d.provisionalCommissionPercent, null, 'Commission must remain unset');
+  assert.equal(d.provisionalCommissionAmountMinor, null, 'Commission amount must remain unset');
+
+  // Sport filter: basketball has bookings, football has 0
+  const basketballAnalytics = await s.billing.analytics({ sport: 'basketball' });
+  assert.ok(basketballAnalytics.detailed.grossBookingValueMinor > 0);
+  assert.equal(basketballAnalytics.detailed.sportBreakdown.basketball.bookings, 1);
+
+  const footballAnalytics = await s.billing.analytics({ sport: 'football' });
+  assert.equal(footballAnalytics.detailed.grossBookingValueMinor, 0);
+
+  // Zero activity filter for future far-out date
+  const zeroAnalytics = await s.billing.analytics({ dateFrom: '2099-01-01', dateTo: '2099-01-02' });
+  assert.equal(zeroAnalytics.bookings, 0);
+  assert.equal(zeroAnalytics.collectedMinor, 0);
+  assert.equal(zeroAnalytics.detailed.grossBookingValueMinor, 0);
+
+  // Metric date basis: transaction date vs booking date
+  const txDateAnalytics = await s.billing.analytics({ metricDateType: 'transaction_date' });
+  assert.ok(txDateAnalytics.detailed.recordedCollectionsMinor >= 150000);
+});
+
+test('admin analytics aggregates platform-wide metrics and denies unauthorized users', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  await s.bookings.create(input());
+
+  s.transport.selectAccount('admin-1');
+
+  const adminReport = await s.admin.analytics();
+  assert.ok(adminReport.grossBookingValueMinor > 0);
+  assert.ok(adminReport.sportBreakdown);
+  assert.equal(adminReport.provisionalCommissionPercent, null);
+
+  // Filter platform report by venue
+  const venue1Report = await s.admin.analytics({ venueId: 'venue-1' });
+  assert.equal(venue1Report.venueId, 'venue-1');
+
+  // Non-admin denial
+  s.transport.selectAccount('owner-1');
+  await rejects(s.admin.analytics(), 'forbidden');
+
+  s.transport.selectAccount('player-1');
+  await rejects(s.admin.analytics(), 'forbidden');
+});
+
+

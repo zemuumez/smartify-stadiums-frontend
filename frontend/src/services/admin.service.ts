@@ -1,9 +1,22 @@
-import type { Account, AuditEntry, Transport, Venue } from './contracts';
+import type { Account, AuditEntry, FinancialAnalytics, Transport, Venue } from './contracts';
+import type { OwnerAnalyticsParams } from './billing.service';
+
 export function createAdminService(transport: Transport) {
   return {
-    users: () => transport.request<Account[]>('/admin/users'),
-    venues: () => transport.request<Venue[]>('/admin/stadiums'),
-    audit: () => transport.request<AuditEntry[]>('/admin/audit'),
-    review: (id: string, status: 'active' | 'suspended', reason: string) => transport.request<Venue>(`/admin/stadiums/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status, reason } }),
+    users: (signal?: AbortSignal) => transport.request<Account[]>('/admin/users', { signal }),
+    venues: (signal?: AbortSignal) => transport.request<Venue[]>('/admin/stadiums', { signal }),
+    audit: (signal?: AbortSignal) => transport.request<AuditEntry[]>('/admin/audit', { signal }),
+    review: (id: string, status: 'active' | 'suspended', reason: string) =>
+      transport.request<Venue>(`/admin/stadiums/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status, reason } }),
+    analytics: (params?: OwnerAnalyticsParams, signal?: AbortSignal) => {
+      const sp = new URLSearchParams();
+      if (params?.venueId) sp.set('venueId', params.venueId);
+      if (params?.sport) sp.set('sport', params.sport);
+      if (params?.dateFrom) sp.set('dateFrom', params.dateFrom);
+      if (params?.dateTo) sp.set('dateTo', params.dateTo);
+      if (params?.metricDateType) sp.set('metricDateType', params.metricDateType);
+      const query = sp.toString() ? `?${sp.toString()}` : '';
+      return transport.request<FinancialAnalytics>(`/admin/analytics${query}`, { signal });
+    },
   };
 }

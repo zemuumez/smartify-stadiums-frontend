@@ -10,11 +10,32 @@ import { useLanguage } from '@/i18n/provider';
 import { useAuthStore } from '@/lib/auth-store';
 import { Empty, Loading, ServiceErrorMessage } from './service-state';
 
+import { AnalyticsDashboard } from './analytics-dashboard';
+import type { OwnerAnalyticsParams } from '@/services/billing.service';
+
 export function OwnerOverview() {
-  const { t, money } = useLanguage(); const query = useServiceQuery(useCallback(() => billingService.analytics(), []));
-  if (query.loading) return <Loading />; if (query.error || !query.data) return <ServiceErrorMessage error={query.error} retry={query.reload} />;
-  const data = query.data;
-  return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('overview')}</h1><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[{ title: t('booking'), value: data.bookings }, { title: t('collected'), value: money(data.collectedMinor) }, { title: t('outstanding'), value: money(data.outstandingMinor) }, { title: t('cancelled'), value: data.cancelled }].map(item => <article className="panel" key={item.title}><p className="text-sm text-slate-600">{item.title}</p><p className="mt-3 break-words text-2xl font-bold">{item.value}</p></article>)}</div><Link className="action" href="/dashboard/bookings">{t('ownerBookings')}</Link></div>;
+  const { t } = useLanguage();
+  const venuesQuery = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
+  const fetchAnalytics = useCallback(async (params: OwnerAnalyticsParams, signal?: AbortSignal) => {
+    const res = await billingService.analytics(params, signal);
+    return res.detailed!;
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Link className="action" href="/dashboard/bookings">
+          {t('ownerBookings')}
+        </Link>
+      </div>
+      <AnalyticsDashboard
+        title={t('overview')}
+        venues={venuesQuery.data || []}
+        fetchAnalytics={fetchAnalytics}
+        isAdmin={false}
+      />
+    </div>
+  );
 }
 export function OwnerVenues() {
   const { t } = useLanguage(); const query = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
