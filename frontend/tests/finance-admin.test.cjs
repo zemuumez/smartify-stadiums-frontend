@@ -288,3 +288,57 @@ test('cross-tenant and unauthorized actors cannot settle, refund, or view other 
   s.transport.selectAccount('player-2');
   await rejects(s.billing.bookingFinancials(booking.id), 'forbidden');
 });
+
+test('simulated gateway payments support telebirr and cbe_birr with explicit success and failure simulation', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input());
+
+  // Simulate payment decline/timeout
+  const failRes = await s.billing.simulateGateway(booking.id, {
+    method: 'telebirr_gateway',
+    simulateOutcome: 'failure',
+  });
+  assert.equal(failRes.transaction.status, 'failed');
+  assert.equal(failRes.summary.outstandingMinor, 300000);
+  assert.equal(failRes.summary.paymentStatus, 'failed');
+
+  // Retry with success
+  const successRes = await s.billing.simulateGateway(booking.id, {
+    method: 'cbe_birr',
+    simulateOutcome: 'success',
+  });
+  assert.equal(successRes.transaction.status, 'succeeded');
+  assert.equal(successRes.summary.outstandingMinor, 0);
+  assert.equal(successRes.summary.netCollectedMinor, 300000);
+  assert.equal(successRes.summary.paymentStatus, 'paid');
+
+  // Attempting gateway simulation when balance is 0 is rejected with conflict
+  await rejects(
+    s.billing.simulateGateway(booking.id, { method: 'telebirr_gateway', simulateOutcome: 'success' }),
+    'conflict'
+  );
+});
+
+test('subscription invoices are distinct from booking receipts and reflect unset provisional policy', async () => {
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+
+  const invoices = await s.billing.invoices();
+  assert.ok(invoices.length > 0, 'Owner should see invoices for their venues');
+  for (const inv of invoices) {
+    assert.equal(inv.venueId, 'venue-1');
+    assert.equal(inv.status, 'not_configured');
+    assert.equal(inv.totalMinor, null, 'Unapproved fees must remain unset, not zero');
+    assert.ok(inv.lineItems && inv.lineItems.length > 0);
+    for (const line of inv.lineItems) {
+      assert.equal(line.totalMinor, null);
+    }
+  }
+
+  // Cross-tenant invoice isolation: owner-2 cannot request owner-1's invoices
+  s.transport.selectAccount('owner-2');
+  const owner2Invoices = await s.billing.invoices({ venueId: 'venue-1' });
+  assert.equal(owner2Invoices.length, 0);
+});
+

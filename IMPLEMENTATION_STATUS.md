@@ -375,3 +375,23 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
       - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
       - Working strictly on local branch codex/finance-platform-admin; no merge, push, or deploy.
+
+- Step 24 (Milestone M5 Step 2: Owner Settlement, Receipts, and Invoices Workflow):
+   1. Interactive financial modals & accessible keyboard navigation:
+      - In frontend/src/components/booking-financial-modals.tsx, created SettlementModal, ReceiptModal, and SimulateGatewayModal with useModalKeyboard focus trapping, Escape handling, accessible ARIA roles, loading skeletons, and ServiceErrorMessage retry handling.
+      - SettlementModal: enables owners to record manual payments (cash at counter, POS card terminal, Telebirr manual, bank transfer), supporting partial collections, a "Pay full balance" shortcut, overpayment rejection (amountMinor > outstandingMinor), duplicate submission prevention via Idempotency-Key, and live feedback.
+      - ReceiptModal: accessible to both owners and players to inspect booking financial summaries (gross booking value, net collected, total refunds, outstanding balance) and itemized transaction history table with timestamps, transaction types, methods, signed amounts, status pills, and reference numbers. Enables owners to issue refunds bounded by net collected funds with mandatory reason tracking.
+      - SimulateGatewayModal: provides a clearly labeled domestic mobile payment simulator (Telebirr and CBE Birr) with a prominent demo disclaimer, explicit success vs failure/decline simulation, idempotency guards, and honest failure state presentation.
+   2. BookingCard integration & UI baseline preservation:
+      - In frontend/src/components/booking-list.tsx, integrated financial triggers into BookingCard: owners can trigger "Record payment" (when balance > 0) and "Receipts"; players can trigger "Receipts" and "Pay online (Simulated)" (when balance > 0). Preserved existing cancel, reschedule, and match replay buttons in their approved positions.
+   3. Owner billing & subscription invoices separation:
+      - In frontend/src/components/owner-panels.tsx, updated OwnerBilling to clearly separate platform subscription licenses from customer booking receipts, providing direct navigation to the booking ledger.
+      - Rendered subscription invoices referencing venue ID, period dates, provisional status ("Not configured"), and itemized line items (Platform Operating License, Autonomous Camera Ingestion) with unapproved pricing left unset rather than defaulted to zero.
+   4. Internationalization & key parity:
+      - Added 35+ localization keys to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts with 100% key parity.
+   5. Verification results:
+      - 89/89 unit tests pass (npm test, with new simulated gateway and subscription invoice tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+

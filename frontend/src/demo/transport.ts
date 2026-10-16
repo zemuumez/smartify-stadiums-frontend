@@ -55,6 +55,8 @@ export function deriveBookingFinancialSummary(booking: Booking, transactions: Pa
       paymentStatus = 'partially_paid';
     } else if (refundedMinor > 0 && netCollectedMinor === 0) {
       paymentStatus = 'refunded';
+    } else if (txs.length > 0 && txs[txs.length - 1].status === 'failed') {
+      paymentStatus = 'failed';
     } else {
       paymentStatus = 'unpaid';
     }

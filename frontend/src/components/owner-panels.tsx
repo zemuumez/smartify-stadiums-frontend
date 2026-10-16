@@ -43,8 +43,89 @@ function FieldForm({ initial, venues, onSaved, onCancel }: { initial: Field | nu
 }
 export { OwnerCameras } from './camera-admin';
 export function OwnerBilling() {
-  const { t, money } = useLanguage(); const query = useServiceQuery(useCallback(() => billingService.invoices(), []));
-  return <div className="space-y-6"><h1 className="text-3xl font-bold">{t('billing')}</h1><p>{t('pricingOpen')}</p>{query.loading ? <Loading /> : query.error ? <ServiceErrorMessage error={query.error} retry={query.reload} /> : !query.data?.length ? <Empty /> : query.data.map(invoice => <article className="panel" key={invoice.id}><h2>{invoice.id}</h2><p>{invoice.totalMinor !== null ? money(invoice.totalMinor) : t('not_configured')} · {t(invoice.status)}</p></article>)}</div>;
+  const { t, money } = useLanguage();
+  const query = useServiceQuery(useCallback(() => billingService.invoices(), []));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">{t('billing')}</h1>
+          <p className="mt-1 text-slate-600">{t('pricingOpen')}</p>
+        </div>
+        <Link href="/dashboard/bookings" className="action">
+          {t('viewLedger')}
+        </Link>
+      </div>
+
+      <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm text-sky-950 space-y-1">
+        <p className="font-semibold">{t('paymentReceipts')}</p>
+        <p>{t('subscriptionInvoicesNotice')}</p>
+      </div>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold text-slate-800">{t('subscriptionInvoices')}</h2>
+
+        {query.loading ? (
+          <Loading />
+        ) : query.error ? (
+          <ServiceErrorMessage error={query.error} retry={query.reload} />
+        ) : !query.data?.length ? (
+          <Empty />
+        ) : (
+          <div className="grid gap-4">
+            {query.data.map(invoice => (
+              <article className="panel space-y-3" key={invoice.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                  <div>
+                    <h3 className="font-bold text-slate-900">{invoice.id}</h3>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {invoice.periodStart} – {invoice.periodEnd}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                    {t(invoice.status)}
+                  </span>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-1">
+                  <p>
+                    <span className="font-semibold text-slate-700">{t('venue')}:</span> {invoice.venueId}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-700">{t('referenceNumber')}:</span> {invoice.id}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-2">
+                  <div className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    {t('features')}
+                  </div>
+                  <div className="divide-y divide-slate-200/60 text-xs">
+                    {(invoice.lineItems || []).map((line, idx) => (
+                      <div key={idx} className="py-1.5 flex justify-between items-center text-slate-700">
+                        <span>{line.description} (x{line.quantity})</span>
+                        <span className="font-medium text-slate-500">
+                          {line.totalMinor !== null ? money(line.totalMinor) : t('not_configured')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 font-bold text-sm">
+                  <span>{t('invoice')}</span>
+                  <span className="text-amber-800">
+                    {invoice.totalMinor !== null ? money(invoice.totalMinor) : t('not_configured')}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 export function AccountSettings() {
   const { t } = useLanguage(); const { user } = useAuthStore();
