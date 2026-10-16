@@ -5,12 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Building2, Calendar, Shield, MapPin, Star, Camera, Lightbulb, CheckCircle2, Play, Trophy, X, ArrowUpRight } from 'lucide-react';
-import { authService, contentService, eventsService, teamsService, venuesService } from '@/services';
+import { authService, contentService, eventsService, mediaService, teamsService, venuesService } from '@/services';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import { DemoMarker, Loading, ServiceErrorMessage } from './service-state';
 import { Reservation } from './booking-form';
-import type { Account, EventDetails, Field, Microsite, SiteHighlight, Team, Venue } from '@/services/contracts';
+import type { Account, EventDetails, Field, Microsite, PublicHighlight, SiteHighlight, Team, Venue } from '@/services/contracts';
 import { isSupportedImageUrl } from '@/services/media-policy';
 import { resolveVenueSiteEvents, resolveEffectiveEvent } from '@/services/events.service';
 export function VenueSite({
@@ -45,7 +45,15 @@ export function VenueSite({
       const liveEvents = await eventsService.list(venue.id, signal);
       eventDetails = resolveVenueSiteEvents(venue, site, { liveEvents });
     }
-    return { venue, fields, site, eventDetails };
+    let publishedHighlights: PublicHighlight[] = [];
+    if (!previewSite && !isDraftPreview) {
+      try {
+        publishedHighlights = await mediaService.venueHighlights(venue.id, signal);
+      } catch {
+        publishedHighlights = [];
+      }
+    }
+    return { venue, fields, site, eventDetails, publishedHighlights };
   }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]), ['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id]);
   if (query.loading && !query.data) return <Loading/>;
   if (query.error || !query.data) {
@@ -78,7 +86,17 @@ export function VenueSite({
   const heroImageSrc = (site.heroImage && isSupportedImageUrl(site.heroImage)) ? site.heroImage : venue.image;
   const logoImageSrc = (site.logoUrl && isSupportedImageUrl(site.logoUrl)) ? site.logoUrl : null;
   const fields = rawFields.map(f => ({ ...f, sport: f.sports.map(s => t(s)).join(' / '), price: (f.hourlyRateMinor / 100).toLocaleString(locale === 'am' ? 'am-ET' : 'en-ET') }));
-  const matchHighlights = (site.highlights || []).map(h => ({...h, dur: h.duration, views: h.views || 0}));
+  const editorialHighlights = (site.highlights || []).map(h => ({ ...h, dur: h.duration, views: h.views || 0 }));
+  const mediaHighlights = (query.data.publishedHighlights || []).map(h => ({
+    id: h.id,
+    title: h.title,
+    teams: `${t(h.sport)} · ${h.date}`,
+    duration: h.durationLabel,
+    dur: h.durationLabel,
+    playbackUrl: h.playbackUrl,
+    views: 0,
+  }));
+  const matchHighlights = [...mediaHighlights, ...editorialHighlights];
   const headingLead = site.tagline.split(' ').slice(0,2).join(' '); const headingAccent = site.tagline.split(' ').slice(2).join(' ');
   const handleOpenBooking = (field?: Field) => { if(field) setSelected(field); };
   const bookingField = selected || (!dismissed && params.get('book') === '1' ? rawFields.find(f=>f.id===params.get('field')) || rawFields[0] : null);

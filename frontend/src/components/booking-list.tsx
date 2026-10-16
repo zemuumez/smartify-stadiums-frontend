@@ -17,6 +17,7 @@ import {
 } from '@/services/sports';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
+import { ReplayModal } from './match-replay';
 
 function isFutureBooking(b: Booking): boolean {
   return Date.parse(`${b.date}T${String(b.startHour).padStart(2, '0')}:00:00+03:00`) > Date.now();
@@ -93,6 +94,7 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
   const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [replayBookingId, setReplayBookingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
 
@@ -343,6 +345,7 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
                   setError={setError}
                   onCancelSuccess={() => query.reload()}
                   onRescheduleClick={b => setRescheduleBooking(b)}
+                  onReplayClick={id => setReplayBookingId(id)}
                 />
               ))}
             </div>
@@ -374,6 +377,13 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
           onRescheduled={query.reload}
         />
       )}
+
+      {replayBookingId && (
+        <ReplayModal
+          bookingId={replayBookingId}
+          onClose={() => setReplayBookingId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -400,6 +410,7 @@ function BookingCard({
   setError: (err: unknown) => void;
   onCancelSuccess: () => void;
   onRescheduleClick: (booking: Booking) => void;
+  onReplayClick: (id: string) => void;
 }) {
   const { t, money, date: displayDate } = useLanguage();
   const fieldName = queryData?.fields.find(f => f.id === booking.fieldId)?.name || booking.fieldId;
@@ -484,9 +495,19 @@ function BookingCard({
         {t('bookingReference')}: {booking.id}
       </p>
 
-      {canModify && (
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {confirmId === booking.id ? (
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {booking.status !== 'cancelled' && (
+          <button
+            type="button"
+            className="min-h-11 rounded-xl border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-100 flex items-center gap-1.5"
+            onClick={() => onReplayClick(booking.id)}
+          >
+            ▶ {t('matchReplay')}
+          </button>
+        )}
+
+        {canModify && (
+          confirmId === booking.id ? (
             <div className="w-full rounded-xl border border-amber-200 bg-amber-50/50 p-3">
               <p className="text-sm text-amber-900">{t('confirmCancel')}</p>
               <div className="mt-3 flex flex-wrap gap-3">
@@ -537,9 +558,9 @@ function BookingCard({
                 {t('cancelBooking')}
               </button>
             </>
-          )}
-        </div>
-      )}
+          )
+        )}
+      </div>
     </article>
   );
 }
