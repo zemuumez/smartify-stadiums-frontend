@@ -1,8 +1,8 @@
-import type { Account, Booking, BookingInput, Closure, EventRegistration, EventRegistrationInput, Microsite, PublicTeamMatch, RequestOptions, RescheduleBookingInput, Role, SiteEvent, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
-import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
+import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
-import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fixtures';
+import { commercialPolicy, createFixtures, demoOTP, SAMPLE_MEDIA_CONFIG, type DemoState } from './fixtures';
 import type { FieldInput } from '../services/fields.service';
 
 export interface DemoStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
@@ -11,8 +11,20 @@ const SESSION_KEY = 'etsf-demo-session-v1';
 const overlaps = (start: number, end: number, otherStart: number, otherEnd: number) => start < otherEnd && end > otherStart;
 const sports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
 
+export function isRecordingPubliclyEligible(rec: MatchRecording): boolean {
+  const isNotExpired = !rec.retentionExpiresAt || Date.parse(rec.retentionExpiresAt) > Date.now();
+  const isReady = rec.status === 'ready' && !!rec.playbackUrl;
+  const isPublic = rec.publication.visibility === 'public' && rec.publication.ownerApproved;
+  const isConsentGranted = rec.consent.status === 'granted';
+  const isGuardianGranted = !rec.consent.requiresGuardian || rec.consent.guardianConsentStatus === 'granted';
+  const isBlurCompleted = rec.privacy.faceBlurStatus === 'completed';
+
+  return isNotExpired && isReady && isPublic && isConsentGranted && isGuardianGranted && isBlurCompleted;
+}
+
 /** Simulator only: browser data and role checks are not a security boundary. */
-export function createDemoTransport(storage?: DemoStorage) {
+export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: boolean }) {
+  const isLive = Boolean(config?.isLive);
   let state: DemoState = createFixtures();
   let currentId: string | null = null;
   const issuedOTPs = new Map<string, number>();
@@ -25,6 +37,9 @@ export function createDemoTransport(storage?: DemoStorage) {
         if (!Array.isArray(state.teams)) state.teams = createFixtures().teams;
         if (!Array.isArray(state.teamRequests)) state.teamRequests = [];
         if (!Array.isArray(state.eventRegistrations)) state.eventRegistrations = [];
+        if (!Array.isArray(state.cameras)) state.cameras = createFixtures().cameras;
+        if (!Array.isArray(state.recordings)) state.recordings = createFixtures().recordings;
+        if (!Array.isArray(state.entitlements)) state.entitlements = createFixtures().entitlements;
       }
     }
     currentId = storage?.getItem(SESSION_KEY) || null;
@@ -37,7 +52,8 @@ export function createDemoTransport(storage?: DemoStorage) {
     try { if (id) storage?.setItem(SESSION_KEY, id); else storage?.removeItem(SESSION_KEY); } catch { /* No real credentials are stored. */ }
   };
   const account = (): Account => {
-    const user = state.accounts.find(item => item.id === currentId);
+    const activeId = storage?.getItem(SESSION_KEY) || currentId;
+    const user = state.accounts.find(item => item.id === activeId);
     if (!user) throw new ServiceError('unauthorized', 401);
     return user;
   };
@@ -116,7 +132,28 @@ export function createDemoTransport(storage?: DemoStorage) {
       const venue = publicVenue(parts[1]);
       if (parts.length === 2) return venue;
       if (parts[2] === 'fields') return state.fields.filter(item => item.venueId === venue.id && item.active);
-      if (parts[2] === 'microsite') { const site = state.sites.find(item => item.venueId === venue.id && item.published); if (!site) throw new ServiceError('not_found', 404); return site; }
+      if (parts[2] === 'microsite') {
+        const site = state.sites.find(item => item.venueId === venue.id && item.published);
+        if (!site) throw new ServiceError('not_found', 404);
+        const sanitizedSite = structuredClone(site);
+        if (sanitizedSite.highlights) {
+          sanitizedSite.highlights = sanitizedSite.highlights.map(h => {
+            const rawRecId = h.recordingId;
+            if (rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '') {
+              const recId = String(rawRecId).trim();
+              const linkedRec = state.recordings.find(r => r.id === recId && r.venueId === venue.id);
+              if (!linkedRec || !isRecordingPubliclyEligible(linkedRec)) {
+                return { ...h, recordingId: recId, playbackUrl: null };
+              }
+              // Authoritatively derive playbackUrl from the linked recording—never trust stored overrides
+              return { ...h, recordingId: linkedRec.id, playbackUrl: linkedRec.playbackUrl };
+            }
+            // Unlinked editorial cards (omitted, null, or blank ID) remain strictly preview-only with no playback URL
+            return { ...h, recordingId: null, playbackUrl: null };
+          });
+        }
+        return sanitizedSite;
+      }
     }
     if (parts[0] === 'fields' && parts[2] === 'availability' && method === 'GET') {
       const item = field(parts[1]); publicVenue(item.venueId);
@@ -153,7 +190,40 @@ export function createDemoTransport(storage?: DemoStorage) {
       }
       if (!available(item.id, input.date, input.startHour, input.endHour)) throw new ServiceError('conflict', 409);
       const booking: Booking = { id: crypto.randomUUID(), venueId: item.venueId, fieldId: item.id, playerId: user.id, sport: input.sport, date: input.date, startHour: input.startHour, endHour: input.endHour, totalMinor: quoteMinor(item.hourlyRateMinor, input.startHour, input.endHour), currency: 'ETB' as const, status: 'confirmed' as const, paymentStatus: 'unpaid' as const, createdAt: new Date().toISOString(), source: 'online' as const, teamId, teamName };
-      state.bookings.push(booking); state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
+      state.bookings.push(booking);
+      const cam = state.cameras.find(c => c.fieldId === item.id);
+      const rec: MatchRecording = {
+        id: `rec-${booking.id}`,
+        venueId: item.venueId,
+        fieldId: item.id,
+        bookingId: booking.id,
+        cameraId: cam?.id,
+        sport: booking.sport,
+        teamId: booking.teamId,
+        teamName: booking.teamName,
+        status: 'scheduled',
+        retryEligible: false,
+        duration: `${(booking.endHour - booking.startHour) * 45}:00`,
+        title: `${state.venues.find(v => v.id === item.venueId)?.name || 'Match'} — ${item.name}`,
+        playbackUrl: null,
+        thumbnailUrl: null,
+        consent: { status: 'pending', requiresGuardian: user.is_minor || false, updatedAt: new Date().toISOString() },
+        privacy: { faceBlurStatus: 'pending' },
+        publication: { visibility: 'private', ownerApproved: false },
+        retentionExpiresAt: new Date(Date.now() + (commercialPolicy.replayRetentionDays || SAMPLE_MEDIA_CONFIG.defaultRetentionDays) * 86400000).toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      if (item.camera && cam) {
+        state.recordings.push(rec);
+        state.entitlements.push({
+          id: `ent-${crypto.randomUUID()}`,
+          recordingId: rec.id,
+          userId: booking.playerId,
+          grantedBy: 'booking_player',
+          grantedAt: new Date().toISOString(),
+        });
+      }
+      state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
       const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
@@ -252,6 +322,29 @@ export function createDemoTransport(storage?: DemoStorage) {
           guestPhone: input.guestPhone?.trim() || undefined,
         };
         state.bookings.push(booking);
+        const cam = state.cameras.find(c => c.fieldId === item.id);
+        const rec: MatchRecording = {
+          id: `rec-${booking.id}`,
+          venueId: venue.id,
+          fieldId: item.id,
+          bookingId: booking.id,
+          cameraId: cam?.id,
+          sport: booking.sport,
+          status: 'scheduled',
+          retryEligible: false,
+          duration: `${(booking.endHour - booking.startHour) * 45}:00`,
+          title: `${venue.name} — ${item.name} (${input.guestName})`,
+          playbackUrl: null,
+          thumbnailUrl: null,
+          consent: { status: 'pending', requiresGuardian: false, updatedAt: new Date().toISOString() },
+          privacy: { faceBlurStatus: 'pending' },
+          publication: { visibility: 'private', ownerApproved: false },
+          retentionExpiresAt: new Date(Date.now() + (commercialPolicy.replayRetentionDays || SAMPLE_MEDIA_CONFIG.defaultRetentionDays) * 86400000).toISOString(),
+          createdAt: new Date().toISOString(),
+        };
+        if (item.camera && cam) {
+          state.recordings.push(rec);
+        }
         state.idempotency[key] = { fingerprint, bookingId: booking.id };
         audit('booking.walk_in', booking.id);
         persist();
@@ -274,7 +367,24 @@ export function createDemoTransport(storage?: DemoStorage) {
         if (parts[3] === 'microsite') {
           const draft = state.drafts.find(item => item.venueId === venue.id);
           if (!draft) throw new ServiceError('not_found', 404);
-          if (method === 'GET') return draft;
+          if (method === 'GET') {
+            const sanitizedDraft = structuredClone(draft);
+            if (sanitizedDraft.highlights) {
+              sanitizedDraft.highlights = sanitizedDraft.highlights.map(h => {
+                const rawRecId = h.recordingId;
+                if (rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '') {
+                  const recId = String(rawRecId).trim();
+                  const linkedRec = state.recordings.find(r => r.id === recId && r.venueId === venue.id);
+                  if (linkedRec && isRecordingPubliclyEligible(linkedRec)) {
+                    return { ...h, recordingId: linkedRec.id, playbackUrl: linkedRec.playbackUrl };
+                  }
+                  return { ...h, recordingId: recId, playbackUrl: null };
+                }
+                return { ...h, recordingId: null, playbackUrl: null };
+              });
+            }
+            return sanitizedDraft;
+          }
           if (method === 'PATCH') {
             const input = options.body as Microsite;
             if (!/^#[\da-f]{6}$/i.test(input.primaryColor) || !input.tagline.trim() || input.tagline.length > 120 || input.description.length > 5000) throw new ServiceError('validation', 422);
@@ -288,7 +398,14 @@ export function createDemoTransport(storage?: DemoStorage) {
             if ((input.gallery || []).length > 30) throw new ServiceError('validation', 422);
             if ((input.gallery || []).some(g => !isSupportedImageUrl(g.url) || (g.caption && g.caption.length > 200))) throw new ServiceError('validation', 422);
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
-            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
+            if ((input.highlights || []).some(h => {
+              if (!h.title.trim() || h.title.length > 200) return true;
+              const hasRecId = h.recordingId !== undefined && h.recordingId !== null && String(h.recordingId).trim() !== '';
+              const callerUrl = h.playbackUrl || (h as { videoUrl?: string }).videoUrl || null;
+              const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+              if (!hasRecId && hasCallerUrl) return true;
+              return false;
+            }) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
 
             validateEventRegistrationInvariants(
               venue.id,
@@ -296,8 +413,53 @@ export function createDemoTransport(storage?: DemoStorage) {
               (draft.events || []) as SiteEvent[]
             );
 
+            const validatedHighlights: SiteHighlight[] = [];
+            for (const rawH of (input.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string | null })[]) {
+              const rawRecId = rawH.recordingId;
+              const hasRecId = rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '';
+              const callerUrl = rawH.playbackUrl || rawH.videoUrl || null;
+              const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+
+              let recId: string | null = null;
+              let pUrl: string | null = null;
+
+              if (hasRecId) {
+                recId = String(rawRecId).trim();
+                const linkedRec = state.recordings.find(r => r.id === recId);
+                if (!linkedRec) {
+                  throw new ServiceError('validation', 422);
+                }
+                if (linkedRec.venueId !== venue.id) {
+                  throw new ServiceError('validation', 422);
+                }
+                if (!isRecordingPubliclyEligible(linkedRec)) {
+                  throw new ServiceError('validation', 422);
+                }
+                // Authoritatively derive URL from linked recording—never retain caller-supplied override
+                pUrl = linkedRec.playbackUrl;
+                recId = linkedRec.id;
+              } else {
+                if (hasCallerUrl) {
+                  // Playable highlights strictly require an eligible, venue-owned recording ID
+                  throw new ServiceError('validation', 422);
+                }
+                recId = null;
+                pUrl = null;
+              }
+
+              validatedHighlights.push({
+                id: rawH.id || crypto.randomUUID(),
+                title: rawH.title.trim(),
+                teams: rawH.teams || '',
+                duration: rawH.duration || '0:00',
+                views: rawH.views || 0,
+                playbackUrl: pUrl,
+                recordingId: recId,
+              });
+            }
+
             Object.assign(draft, {
-              highlights: structuredClone(input.highlights || []),
+              highlights: validatedHighlights,
               events: structuredClone(input.events || []),
               gallery: structuredClone(input.gallery || []),
               socialLinks: structuredClone(input.socialLinks || []),
@@ -322,6 +484,30 @@ export function createDemoTransport(storage?: DemoStorage) {
               (draft.events || []) as SiteEvent[],
               (currentSite?.events || draft.events || []) as SiteEvent[]
             );
+            if (draft.highlights) {
+              for (const rawH of draft.highlights as (SiteHighlight & { videoUrl?: string; recordingId?: string | null })[]) {
+                const rawRecId = rawH.recordingId;
+                const hasRecId = rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '';
+                const callerUrl = rawH.playbackUrl || rawH.videoUrl || null;
+                const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+
+                if (hasRecId) {
+                  const recId = String(rawRecId).trim();
+                  const linkedRec = state.recordings.find(r => r.id === recId);
+                  if (!linkedRec || linkedRec.venueId !== venue.id || !isRecordingPubliclyEligible(linkedRec)) {
+                    throw new ServiceError('validation', 422);
+                  }
+                  rawH.playbackUrl = linkedRec.playbackUrl;
+                  rawH.recordingId = linkedRec.id;
+                } else {
+                  if (hasCallerUrl) {
+                    throw new ServiceError('validation', 422);
+                  }
+                  rawH.recordingId = null;
+                  rawH.playbackUrl = null;
+                }
+              }
+            }
             draft.published = true;
             draft.updatedAt = new Date().toISOString();
             const site = structuredClone(draft);
@@ -358,7 +544,242 @@ export function createDemoTransport(storage?: DemoStorage) {
         }
         const created = { ...input, id: crypto.randomUUID() }; state.fields.push(created); venue.sports = [...new Set(state.fields.filter(f => f.venueId === venue.id && f.active).flatMap(f => f.sports))]; audit('field.created', created.id); persist(); return created;
       }
-      if (path === '/owner/cameras' && method === 'GET') return state.cameras.filter(item => venueIds.includes(item.venueId));
+      if (parts[1] === 'cameras') {
+        if (parts.length === 2 && method === 'GET') {
+          const venueFilter = url.searchParams.get('venueId');
+          if (venueFilter) {
+            if (!venueIds.includes(venueFilter)) throw new ServiceError('forbidden', 403);
+            return state.cameras.filter(item => item.venueId === venueFilter);
+          }
+          return state.cameras.filter(item => venueIds.includes(item.venueId));
+        }
+        if (parts.length === 2 && method === 'POST') {
+          const input = options.body as CameraRegisterInput;
+          if (!input.name?.trim() || !input.model?.trim() || !input.venueId || !input.fieldId) {
+            throw new ServiceError('validation', 422);
+          }
+          if (!venueIds.includes(input.venueId)) throw new ServiceError('forbidden', 403);
+          const f = field(input.fieldId);
+          if (f.venueId !== input.venueId) throw new ServiceError('validation', 422);
+
+          const newCam: CameraDevice = {
+            id: crypto.randomUUID(),
+            venueId: input.venueId,
+            fieldId: input.fieldId,
+            name: input.name.trim(),
+            model: input.model.trim(),
+            serialNumber: input.serialNumber?.trim() || undefined,
+            certificationStatus: 'pending',
+            connectivityStatus: 'online',
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+          };
+          state.cameras.push(newCam);
+          audit('camera.registered', newCam.id);
+          persist();
+          return newCam;
+        }
+        if (parts.length === 3 && method === 'PATCH') {
+          const cam = state.cameras.find(c => c.id === parts[2]);
+          if (!cam) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(cam.venueId)) throw new ServiceError('forbidden', 403);
+          const input = options.body as CameraUpdateInput;
+          if (input.fieldId) {
+            const f = field(input.fieldId);
+            if (f.venueId !== cam.venueId) throw new ServiceError('validation', 422);
+            cam.fieldId = input.fieldId;
+          }
+          if (input.name?.trim()) cam.name = input.name.trim();
+          if (input.model?.trim()) cam.model = input.model.trim();
+          audit('camera.updated', cam.id);
+          persist();
+          return cam;
+        }
+      }
+      if (parts[1] === 'recordings') {
+        if (parts.length === 2 && method === 'GET') {
+          const venueFilter = url.searchParams.get('venueId');
+          if (venueFilter) {
+            if (!venueIds.includes(venueFilter)) throw new ServiceError('forbidden', 403);
+            return state.recordings.filter(item => item.venueId === venueFilter);
+          }
+          return state.recordings.filter(item => venueIds.includes(item.venueId));
+        }
+        if (parts.length === 3 && method === 'GET') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'retry' && method === 'POST') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          if (rec.status !== 'failed' || !rec.retryEligible) {
+            throw new ServiceError('conflict', 409);
+          }
+          rec.status = 'ready';
+          rec.failureReason = undefined;
+          rec.retryEligible = false;
+          rec.playbackUrl = SAMPLE_MEDIA_CONFIG.samplePlaybackUrl;
+          rec.thumbnailUrl = SAMPLE_MEDIA_CONFIG.sampleThumbnailUrl;
+          audit('recording.retried', rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'advance' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as { status: RecordingStatus; failureReason?: string };
+          const validNextStates: Record<RecordingStatus, RecordingStatus[]> = {
+            scheduled: ['recording', 'uploading', 'processing', 'ready', 'failed'],
+            recording: ['uploading', 'processing', 'ready', 'failed'],
+            uploading: ['processing', 'ready', 'failed'],
+            processing: ['ready', 'failed'],
+            failed: ['processing', 'ready', 'scheduled'],
+            ready: ['ready', 'scheduled'],
+          };
+          if (!validNextStates[rec.status]?.includes(body.status)) {
+            throw new ServiceError('conflict', 409);
+          }
+          rec.status = body.status;
+          if (body.status === 'failed') {
+            rec.failureReason = body.failureReason?.trim() || 'Simulated recording processing failure';
+            rec.retryEligible = true;
+            rec.playbackUrl = null;
+          } else if (body.status === 'ready') {
+            rec.failureReason = undefined;
+            rec.retryEligible = false;
+            rec.playbackUrl = SAMPLE_MEDIA_CONFIG.samplePlaybackUrl;
+            rec.thumbnailUrl = SAMPLE_MEDIA_CONFIG.sampleThumbnailUrl;
+          } else {
+            rec.playbackUrl = null;
+          }
+          audit(`recording.state_advanced: ${body.status}`, rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'consent' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as {
+            status?: PrivacyConsentStatus;
+            participantStatus?: PrivacyConsentStatus;
+            guardianStatus?: 'pending' | 'granted' | 'denied';
+            guardianConsentStatus?: 'pending' | 'granted' | 'denied';
+            minorParticipant?: boolean;
+            notes?: string;
+          };
+          const pStatus = body.participantStatus || body.status;
+          if (pStatus) {
+            if (!['pending', 'granted', 'denied', 'revoked'].includes(pStatus)) throw new ServiceError('validation', 422);
+            rec.consent.status = pStatus;
+          }
+          const gStatus = body.guardianStatus || body.guardianConsentStatus;
+          if (gStatus) {
+            rec.consent.guardianConsentStatus = gStatus;
+          }
+          if (body.minorParticipant !== undefined) {
+            rec.consent.requiresGuardian = body.minorParticipant;
+          }
+          if (body.notes !== undefined) {
+            rec.consent.notes = body.notes;
+          }
+          rec.consent.updatedAt = new Date().toISOString();
+          if (rec.publication.visibility === 'public') {
+            const isConsentGranted = rec.consent.status === 'granted' && (!rec.consent.requiresGuardian || rec.consent.guardianConsentStatus === 'granted');
+            if (!isConsentGranted) {
+              rec.publication.visibility = 'private';
+              rec.publication.unpublishReason = 'Consent revoked or denied';
+            }
+          }
+          audit(`recording.consent_updated: ${pStatus || 'details'}`, rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'privacy-blur' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          rec.privacy.faceBlurStatus = 'completed';
+          rec.privacy.completedAt = new Date().toISOString();
+          audit('recording.privacy_blur_completed', rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'publication' && method === 'POST') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as { visibility: MediaVisibility; ownerApproved?: boolean };
+          if (!['private', 'unlisted', 'public'].includes(body.visibility)) throw new ServiceError('validation', 422);
+
+          const ownerApproved = body.ownerApproved !== false;
+          if (body.visibility === 'public') {
+            if (rec.status !== 'ready' || !rec.playbackUrl) {
+              throw new ServiceError('validation', 422);
+            }
+            if (!ownerApproved) {
+              throw new ServiceError('validation', 422);
+            }
+            if (rec.consent.status !== 'granted') {
+              throw new ServiceError('validation', 422);
+            }
+            if (rec.consent.requiresGuardian && rec.consent.guardianConsentStatus !== 'granted') {
+              throw new ServiceError('validation', 422);
+            }
+            if (rec.privacy.faceBlurStatus !== 'completed') {
+              throw new ServiceError('validation', 422);
+            }
+          }
+
+          rec.publication.visibility = body.visibility;
+          rec.publication.ownerApproved = ownerApproved;
+          if (body.visibility === 'public') {
+            rec.publication.publishedAt = new Date().toISOString();
+            rec.publication.unpublishReason = undefined;
+          }
+          audit(`recording.publication: ${body.visibility}`, rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'unpublish' && method === 'POST') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as { reason?: string };
+          rec.publication.visibility = 'private';
+          rec.publication.unpublishReason = body?.reason?.trim() || 'Owner unpublished';
+          audit('recording.unpublished', rec.id);
+          persist();
+          return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'entitlements' && method === 'POST') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as { userId: string };
+          if (!body?.userId) throw new ServiceError('validation', 422);
+          const existing = state.entitlements.find(e => e.recordingId === rec.id && e.userId === body.userId);
+          if (existing) return existing;
+          const entitlement: ReplayEntitlement = {
+            id: `ent-${crypto.randomUUID()}`,
+            recordingId: rec.id,
+            userId: body.userId,
+            grantedBy: user.id,
+            grantedAt: new Date().toISOString(),
+          };
+          state.entitlements.push(entitlement);
+          audit('recording.entitlement_granted', `${rec.id}:${body.userId}`);
+          persist();
+          return entitlement;
+        }
+      }
       if (path === '/owner/invoices' && method === 'GET') return state.invoices.filter(item => venueIds.includes(item.venueId));
       if (path === '/owner/analytics' && method === 'GET') {
         const bookings = state.bookings.filter(item => venueIds.includes(item.venueId));
@@ -698,11 +1119,211 @@ export function createDemoTransport(storage?: DemoStorage) {
       }
     }
     if (path === '/media' && method === 'GET') { const user = account(); return state.media.filter(m => m.visibility === 'public' || state.bookings.some(b => b.id === m.bookingId && b.playerId === user.id)); }
+    if (parts[0] === 'venues' && parts[2] === 'highlights' && method === 'GET') {
+      const targetVenue = state.venues.find(v => v.id === parts[1] || v.slug === parts[1]);
+      if (!targetVenue) throw new ServiceError('not_found', 404);
+      const published = state.recordings.filter(r =>
+        r.venueId === targetVenue.id &&
+        isRecordingPubliclyEligible(r)
+      );
+      const highlights: PublicHighlight[] = published.map((r, idx) => ({
+        id: `highlight-${r.id}`,
+        venueId: r.venueId,
+        recordingId: r.id,
+        title: r.title,
+        sport: r.sport,
+        teams: r.teamName || 'Match Highlights',
+        duration: r.duration,
+        views: 100 + idx * 35,
+        playbackUrl: r.playbackUrl!,
+        thumbnailUrl: r.thumbnailUrl || undefined,
+      }));
+      return highlights;
+    }
+    if (parts[0] === 'bookings' && parts[2] === 'replay' && method === 'GET') {
+      let user: Account | null = null;
+      try { user = account(); } catch {}
+
+      const bookingId = parts[1];
+      const rec = state.recordings.find(r => r.bookingId === bookingId || r.id === bookingId);
+      const booking = state.bookings.find(b => b.id === bookingId);
+
+      if (!rec) {
+        if (!booking) {
+          throw new ServiceError('not_found', 404);
+        }
+        if (!user) {
+          throw new ServiceError('unauthorized', 401);
+        }
+        const isAdmin = user.role === 'admin';
+        const isOwner = state.venues.some(v => v.id === booking.venueId && v.ownerId === user!.id);
+        const isBookingPlayer = booking.playerId === user.id;
+        if (!isAdmin && !isOwner && !isBookingPlayer) {
+          throw new ServiceError('forbidden', 403);
+        }
+        const unavailableReplay: ReplayPlayback = {
+          recordingId: '',
+          bookingId: booking.id,
+          title: `${booking.sport.toUpperCase()} Match`,
+          sport: booking.sport,
+          teamName: booking.teamName,
+          canPlay: false,
+          playbackUrl: null,
+          entitlementStatus: 'unavailable',
+          visibility: 'private',
+          duration: '0:00',
+          reasonCode: 'no_recording_exists',
+          reason: 'No match recording exists for this booking.',
+        };
+        return unavailableReplay;
+      }
+
+      const isPublic = isRecordingPubliclyEligible(rec);
+      const isAdmin = user?.role === 'admin';
+      const isOwner = user ? state.venues.some(v => v.id === rec.venueId && v.ownerId === user!.id) : false;
+      const isBookingPlayer = user ? booking?.playerId === user.id : false;
+      const hasExplicitEntitlement = user ? state.entitlements.some(e => e.recordingId === rec.id && e.userId === user!.id && (!e.expiresAt || Date.parse(e.expiresAt) > Date.now())) : false;
+
+      const isPrivatelyAuthorized = isAdmin || isOwner || isBookingPlayer || hasExplicitEntitlement;
+
+      if (!isPrivatelyAuthorized && !isPublic) {
+        if (!user) {
+          throw new ServiceError('unauthorized', 401);
+        }
+        throw new ServiceError('forbidden', 403);
+      }
+
+      const isExpired = !!(rec.retentionExpiresAt && Date.parse(rec.retentionExpiresAt) <= Date.now());
+      let entitlementStatus: ReplayPlayback['entitlementStatus'] = 'entitled';
+      let canPlay = false;
+      let playbackUrl: string | null = null;
+      let reason: string | undefined;
+      let reasonCode: ReplayPlayback['reasonCode'] = undefined;
+
+      if (rec.status === 'scheduled') {
+        entitlementStatus = 'processing';
+        reasonCode = 'recording_scheduled';
+        reason = 'Recording is scheduled and will begin at match time';
+      } else if (rec.status === 'processing' || rec.status === 'recording' || rec.status === 'uploading') {
+        entitlementStatus = 'processing';
+        reasonCode = 'recording_processing';
+        reason = 'Recording is currently processing';
+      } else if (rec.status === 'failed') {
+        entitlementStatus = 'failed';
+        reasonCode = 'recording_failed';
+        reason = rec.failureReason || 'Video processing encountered a failure';
+      } else if (isExpired) {
+        entitlementStatus = 'expired';
+        reasonCode = 'recording_expired';
+        reason = 'Playback access for this recording has expired';
+      } else if (!rec.playbackUrl) {
+        entitlementStatus = 'unavailable';
+        reasonCode = 'no_media_source';
+        reason = 'No playable media source available';
+      } else {
+        entitlementStatus = 'entitled';
+        canPlay = true;
+        playbackUrl = rec.playbackUrl;
+      }
+
+      const replay: ReplayPlayback = {
+        recordingId: rec.id,
+        bookingId: isPrivatelyAuthorized ? rec.bookingId : undefined,
+        title: rec.title,
+        sport: rec.sport,
+        teamName: rec.teamName,
+        canPlay,
+        playbackUrl,
+        thumbnailUrl: rec.thumbnailUrl,
+        entitlementStatus,
+        retentionExpiresAt: rec.retentionExpiresAt,
+        visibility: rec.publication.visibility,
+        duration: rec.duration,
+        reason,
+        reasonCode,
+        failureReason: rec.failureReason,
+      };
+      return replay;
+    }
+    if (path === '/replays' && method === 'GET') {
+      let user: Account | null = null;
+      try { user = account(); } catch {}
+
+      const replays: ReplayPlayback[] = [];
+      for (const rec of state.recordings) {
+        const isPublic = isRecordingPubliclyEligible(rec);
+        const isAdmin = user?.role === 'admin';
+        const isOwner = user ? state.venues.some(v => v.id === rec.venueId && v.ownerId === user.id) : false;
+        const booking = state.bookings.find(b => b.id === rec.bookingId);
+        const isBookingPlayer = user ? booking?.playerId === user.id : false;
+        const hasExplicitEntitlement = user ? state.entitlements.some(e => e.recordingId === rec.id && e.userId === user.id && (!e.expiresAt || Date.parse(e.expiresAt) > Date.now())) : false;
+
+        const isPrivatelyAuthorized = isAdmin || isOwner || isBookingPlayer || hasExplicitEntitlement;
+
+        if (!isPrivatelyAuthorized && !isPublic) {
+          continue;
+        }
+
+        const isExpired = !!(rec.retentionExpiresAt && Date.parse(rec.retentionExpiresAt) <= Date.now());
+        let entitlementStatus: ReplayPlayback['entitlementStatus'] = 'entitled';
+        let canPlay = false;
+        let playbackUrl: string | null = null;
+
+        if (rec.status === 'scheduled' || rec.status === 'processing' || rec.status === 'recording' || rec.status === 'uploading') {
+          entitlementStatus = 'processing';
+        } else if (rec.status === 'failed') {
+          entitlementStatus = 'failed';
+        } else if (isExpired) {
+          entitlementStatus = 'expired';
+        } else if (!rec.playbackUrl) {
+          entitlementStatus = 'unavailable';
+        } else {
+          entitlementStatus = 'entitled';
+          canPlay = true;
+          playbackUrl = rec.playbackUrl;
+        }
+
+        replays.push({
+          recordingId: rec.id,
+          bookingId: isPrivatelyAuthorized ? rec.bookingId : undefined,
+          title: rec.title,
+          sport: rec.sport,
+          teamName: rec.teamName,
+          canPlay,
+          playbackUrl,
+          thumbnailUrl: rec.thumbnailUrl,
+          entitlementStatus,
+          retentionExpiresAt: rec.retentionExpiresAt,
+          visibility: rec.publication.visibility,
+          duration: rec.duration,
+          reason: rec.failureReason,
+        });
+      }
+      return replays;
+    }
     if (parts[0] === 'admin') {
-      requireRole('admin');
+      const adminUser = requireRole('admin');
       if (path === '/admin/users' && method === 'GET') return state.accounts;
       if (path === '/admin/audit' && method === 'GET') return state.audit;
       if (path === '/admin/stadiums' && method === 'GET') return state.venues;
+      if (path === '/admin/cameras' && method === 'GET') return state.cameras;
+      if (parts[1] === 'cameras' && parts[3] === 'certify' && method === 'POST') {
+        const cam = state.cameras.find(c => c.id === parts[2]);
+        if (!cam) throw new ServiceError('not_found', 404);
+        const input = options.body as CameraCertificationReviewInput;
+        if (!['passed', 'failed', 'revoked'].includes(input.certificationStatus)) {
+          throw new ServiceError('validation', 422);
+        }
+        cam.certificationStatus = input.certificationStatus;
+        cam.status = input.certificationStatus === 'passed' ? 'certified' : input.certificationStatus === 'revoked' ? 'revoked' : 'pending';
+        cam.failureReason = input.certificationStatus === 'passed' ? undefined : (input.failureReason?.trim() || undefined);
+        cam.recoveryGuidance = input.certificationStatus === 'passed' ? undefined : (input.recoveryGuidance?.trim() || undefined);
+        cam.certifiedAt = new Date().toISOString();
+        cam.certifiedBy = adminUser.id;
+        audit(`camera.certification: ${input.certificationStatus}`, cam.id);
+        persist();
+        return cam;
+      }
       if (parts[1] === 'stadiums' && parts[2] && method === 'PATCH') {
         const venue = state.venues.find(v => v.id === parts[2]); if (!venue) throw new ServiceError('not_found', 404);
         const input = options.body as { status: 'active' | 'suspended'; reason: string };

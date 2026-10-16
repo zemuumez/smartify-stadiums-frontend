@@ -1,10 +1,11 @@
 import { directoryFixtures } from './directory';
-import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MediaAsset, Microsite, ParticipationFormat, Team, TeamJoinRequest, Venue } from '../services/contracts';
+import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MatchRecording, MediaAsset, Microsite, ParticipationFormat, ReplayEntitlement, Team, TeamJoinRequest, Venue } from '../services/contracts';
 
 /** All operational demo records live here. Amounts are illustrative minor ETB units. */
 export const accounts: Account[] = [
   { id: 'player-1', phone: '+251911234567', full_name: 'Abebe Kebede', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'player-2', phone: '+251911998877', full_name: 'Sara Mengistu', role: 'player', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'player-3', phone: '+251911445566', full_name: 'Yonas Abebe', role: 'player', is_verified: true, is_minor: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'owner-1', phone: '+251922345678', full_name: 'Fatima Hassan', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'owner-2', phone: '+251933456789', full_name: 'Dawit Tadesse', role: 'owner', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
   { id: 'admin-1', phone: '+251944567890', full_name: 'Demo Administrator', role: 'admin', is_verified: true, is_minor: false, created_at: '2026-01-01T00:00:00Z' },
@@ -49,11 +50,18 @@ const originalCourts = [
 ];
 for (const definition of originalCourts) Object.assign(bambisFields.find(f => f.id === definition.id)!, definition);
 fields.sort((a, b) => a.venueId.localeCompare(b.venueId) || (a.venueId === 'venue-1' ? originalCourts.findIndex(f => f.id === a.id) - originalCourts.findIndex(f => f.id === b.id) : 0));
+export const SAMPLE_MEDIA_CONFIG = {
+  samplePlaybackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  sampleThumbnailUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+  provenanceAttribution: 'Sample match playback provided under Creative Commons Attribution 3.0 (Big Buck Bunny, © 2008 Blender Foundation).',
+  defaultRetentionDays: 30, // explicitly provisional
+};
+
 export interface DemoState {
   accounts: Account[]; venues: Venue[]; fields: Field[]; bookings: Booking[]; closures: Closure[];
   sites: Microsite[]; drafts: Microsite[]; teams: Team[]; teamRequests: TeamJoinRequest[];
   eventRegistrations: EventRegistration[]; cameras: CameraDevice[];
-  media: MediaAsset[]; invoices: Invoice[]; audit: AuditEntry[];
+  media: MediaAsset[]; recordings: MatchRecording[]; entitlements: ReplayEntitlement[]; invoices: Invoice[]; audit: AuditEntry[];
   idempotency: Record<string, { fingerprint: string; bookingId: string }>;
 }
 export const commercialPolicy: CommercialPolicy = { subscriptionPriceMinor: null, bookingCommissionPercent: null, currency: 'ETB' };
@@ -110,6 +118,281 @@ export function createFixtures(): DemoState {
       createdAt: '2026-01-01T00:00:00Z',
     },
   ];
+  const initialCameras: CameraDevice[] = [
+    {
+      id: 'camera-1',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      name: 'Pitch 1 4K AI Camera',
+      model: 'Veo Cam 3',
+      serialNumber: 'VEO3-ADDIS-001',
+      certificationStatus: 'passed',
+      connectivityStatus: 'online',
+      status: 'certified',
+      certifiedAt: '2026-09-01T10:00:00Z',
+      certifiedBy: 'admin-1',
+      createdAt: '2026-08-15T09:00:00Z',
+    },
+    {
+      id: 'camera-2',
+      venueId: 'venue-1',
+      fieldId: 'field-2',
+      name: 'Court 3 Hardwood AI Unit',
+      model: 'Pixellot Air',
+      serialNumber: 'PIX-ADDIS-002',
+      certificationStatus: 'pending',
+      connectivityStatus: 'offline',
+      status: 'pending',
+      createdAt: '2026-10-01T14:30:00Z',
+    },
+    {
+      id: 'camera-3',
+      venueId: 'venue-1',
+      fieldId: 'field-6',
+      name: 'Pitch 2 North Field Camera',
+      model: 'Veo Cam 2',
+      serialNumber: 'VEO2-ADDIS-003',
+      certificationStatus: 'failed',
+      connectivityStatus: 'online',
+      status: 'revoked',
+      failureReason: 'Optical occlusion detected: spectator netting obstructs south goal frame.',
+      recoveryGuidance: 'Relocate mounting pole 1.5m eastward or elevate bracket to 6m height.',
+      certifiedAt: '2026-09-15T11:00:00Z',
+      certifiedBy: 'admin-1',
+      createdAt: '2026-09-10T08:00:00Z',
+    },
+    {
+      id: 'camera-unity-1',
+      venueId: 'venue-2',
+      fieldId: 'field-5',
+      name: 'Unity Tennis Center Court Camera',
+      model: 'Veo Cam 3',
+      serialNumber: 'VEO3-UNITY-004',
+      certificationStatus: 'passed',
+      connectivityStatus: 'online',
+      status: 'certified',
+      certifiedAt: '2026-09-05T12:00:00Z',
+      certifiedBy: 'admin-1',
+      createdAt: '2026-08-20T10:00:00Z',
+    },
+  ];
+
+  const initialRecordings: MatchRecording[] = [
+    {
+      id: 'rec-1',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-1',
+      cameraId: 'camera-1',
+      sport: 'football',
+      teamId: 'team-1',
+      teamName: 'Bole Lions FC',
+      status: 'ready',
+      retryEligible: false,
+      duration: '14:20',
+      title: 'Bole Lions FC vs Addis Stars Friendly',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'granted',
+        requiresGuardian: false,
+        updatedAt: '2026-10-10T19:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'completed',
+        completedAt: '2026-10-10T19:05:00Z',
+      },
+      publication: {
+        visibility: 'public',
+        ownerApproved: true,
+        publishedAt: '2026-10-10T19:10:00Z',
+      },
+      retentionExpiresAt: '2026-11-15T00:00:00Z',
+      createdAt: '2026-10-10T18:00:00Z',
+    },
+    {
+      id: 'rec-2',
+      venueId: 'venue-1',
+      fieldId: 'field-2',
+      bookingId: 'booking-rec-2',
+      cameraId: 'camera-2',
+      sport: 'basketball',
+      teamId: 'team-2',
+      teamName: 'Addis Hoops',
+      status: 'ready',
+      retryEligible: false,
+      duration: '22:15',
+      title: 'Addis Hoops Internal Scrimmage',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'pending',
+        requiresGuardian: false,
+        updatedAt: '2026-10-11T17:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'pending',
+      },
+      publication: {
+        visibility: 'private',
+        ownerApproved: false,
+      },
+      retentionExpiresAt: '2026-11-15T00:00:00Z',
+      createdAt: '2026-10-11T16:00:00Z',
+    },
+    {
+      id: 'rec-3',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-3',
+      cameraId: 'camera-1',
+      sport: 'football',
+      status: 'failed',
+      failureReason: 'Transcoder worker crash on video chunk 8/12',
+      retryEligible: true,
+      duration: '00:00',
+      title: 'Bambis Evening 7v7 Match',
+      playbackUrl: null,
+      consent: {
+        status: 'granted',
+        requiresGuardian: false,
+        updatedAt: '2026-10-12T19:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'failed',
+      },
+      publication: {
+        visibility: 'private',
+        ownerApproved: false,
+      },
+      createdAt: '2026-10-12T18:00:00Z',
+    },
+    {
+      id: 'rec-4',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-4',
+      cameraId: 'camera-1',
+      sport: 'football',
+      status: 'processing',
+      retryEligible: false,
+      duration: '00:00',
+      title: 'Morning Corporate League Fixture',
+      playbackUrl: null,
+      consent: {
+        status: 'pending',
+        requiresGuardian: false,
+        updatedAt: '2026-10-13T09:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'pending',
+      },
+      publication: {
+        visibility: 'private',
+        ownerApproved: false,
+      },
+      createdAt: '2026-10-13T08:00:00Z',
+    },
+    {
+      id: 'rec-5',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-5',
+      cameraId: 'camera-1',
+      sport: 'football',
+      status: 'ready',
+      retryEligible: false,
+      duration: '18:50',
+      title: 'Addis Youth Academy Exhibition',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'pending',
+        requiresGuardian: true,
+        guardianConsentStatus: 'pending',
+        updatedAt: '2026-10-14T11:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'completed',
+        completedAt: '2026-10-14T12:00:00Z',
+      },
+      publication: {
+        visibility: 'private',
+        ownerApproved: false,
+      },
+      retentionExpiresAt: '2026-11-15T00:00:00Z',
+      createdAt: '2026-10-14T10:00:00Z',
+    },
+    {
+      id: 'rec-unity-1',
+      venueId: 'venue-2',
+      fieldId: 'field-5',
+      bookingId: 'booking-unity-1',
+      cameraId: 'camera-unity-1',
+      sport: 'tennis',
+      status: 'ready',
+      retryEligible: false,
+      duration: '35:10',
+      title: 'Sara Mengistu Tennis Match',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'granted',
+        requiresGuardian: false,
+        updatedAt: '2026-10-12T16:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'completed',
+        completedAt: '2026-10-12T16:05:00Z',
+      },
+      publication: {
+        visibility: 'private',
+        ownerApproved: false,
+      },
+      retentionExpiresAt: '2026-11-15T00:00:00Z',
+      createdAt: '2026-10-12T15:00:00Z',
+    },
+    {
+      id: 'rec-expired-1',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-expired-1',
+      cameraId: 'camera-1',
+      sport: 'football',
+      status: 'ready',
+      retryEligible: false,
+      duration: '10:00',
+      title: 'Expired Bambis Match',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ExpiredMatch.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'granted',
+        requiresGuardian: false,
+        updatedAt: '2026-08-01T10:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'completed',
+        completedAt: '2026-08-01T10:05:00Z',
+      },
+      publication: {
+        visibility: 'public',
+        ownerApproved: true,
+        publishedAt: '2026-08-01T10:10:00Z',
+      },
+      retentionExpiresAt: '2026-09-01T00:00:00Z', // intentionally expired in the past
+      createdAt: '2026-08-01T09:00:00Z',
+    },
+  ];
+
+  const initialEntitlements: ReplayEntitlement[] = [
+    { id: 'ent-1', recordingId: 'rec-1', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-10T19:00:00Z' },
+    { id: 'ent-2', recordingId: 'rec-2', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-11T17:00:00Z' },
+    { id: 'ent-3', recordingId: 'rec-3', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-12T19:00:00Z' },
+    { id: 'ent-4', recordingId: 'rec-4', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-13T09:00:00Z' },
+    { id: 'ent-5', recordingId: 'rec-5', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-14T11:00:00Z' },
+    { id: 'ent-unity-1', recordingId: 'rec-unity-1', userId: 'player-2', grantedBy: 'system', grantedAt: '2026-10-12T16:00:00Z' },
+  ];
+
   return structuredClone({
     accounts,
     venues,
@@ -121,7 +404,9 @@ export function createFixtures(): DemoState {
     teams: initialTeams,
     teamRequests: [],
     eventRegistrations: [],
-    cameras: [{ id: 'camera-1', venueId: 'venue-1', fieldId: 'field-1', name: 'Main pitch camera', model: 'Demo device', status: 'pending' }],
+    cameras: initialCameras,
+    recordings: initialRecordings,
+    entitlements: initialEntitlements,
     media: [],
     invoices: [],
     audit: [],

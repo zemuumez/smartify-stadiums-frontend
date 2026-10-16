@@ -17,6 +17,7 @@ import {
 } from '@/services/sports';
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
+import { ReplayModal } from './match-replay';
 
 function isFutureBooking(b: Booking): boolean {
   return Date.parse(`${b.date}T${String(b.startHour).padStart(2, '0')}:00:00+03:00`) > Date.now();
@@ -402,6 +403,7 @@ function BookingCard({
   onRescheduleClick: (booking: Booking) => void;
 }) {
   const { t, money, date: displayDate } = useLanguage();
+  const [showReplay, setShowReplay] = useState(false);
   const fieldName = queryData?.fields.find(f => f.id === booking.fieldId)?.name || booking.fieldId;
   const venueName = queryData?.venues.find(v => v.id === booking.venueId)?.name || booking.venueId;
   const canModify = booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking);
@@ -484,9 +486,9 @@ function BookingCard({
         {t('bookingReference')}: {booking.id}
       </p>
 
-      {canModify && (
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {confirmId === booking.id ? (
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {canModify && (
+          confirmId === booking.id ? (
             <div className="w-full rounded-xl border border-amber-200 bg-amber-50/50 p-3">
               <p className="text-sm text-amber-900">{t('confirmCancel')}</p>
               <div className="mt-3 flex flex-wrap gap-3">
@@ -537,8 +539,25 @@ function BookingCard({
                 {t('cancelBooking')}
               </button>
             </>
-          )}
-        </div>
+          )
+        )}
+
+        {booking.status !== 'cancelled' && (
+          <button
+            type="button"
+            className="min-h-11 rounded-xl border border-emerald-300 bg-emerald-50 px-4 text-sm font-semibold text-emerald-950 hover:bg-emerald-100 flex items-center gap-1.5"
+            onClick={() => setShowReplay(true)}
+          >
+            ▶ {t('matchReplay')}
+          </button>
+        )}
+      </div>
+
+      {showReplay && (
+        <ReplayModal
+          bookingId={booking.id}
+          onClose={() => setShowReplay(false)}
+        />
       )}
     </article>
   );

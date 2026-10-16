@@ -271,3 +271,84 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
      - Next.js production build compiles with 0 errors (npm run build).
      - All 4 end-to-end browser journeys pass cleanly (node tests/verify-teams-events-e2e.mjs).
      - Frozen UI baseline strictly preserved. Continued on branch codex/teams-events; no merge into main, push, or deploy.
+
+- Step 20 (Milestone M4 Part 2 Step 1: Camera & Recording Domain Contracts, Simulator, Fixtures & Unit Tests):
+   1. Domain contracts & DTOs:
+      - In frontend/src/services/contracts.ts, established typed CameraDevice, CameraCertificationStatus (pending, passed, failed, revoked), CameraConnectivityStatus (online, offline, unknown), CameraRegisterInput, CameraUpdateInput, and CameraCertificationReviewInput.
+      - Established typed MatchRecording, RecordingStatus (scheduled, recording, uploading, processing, ready, failed), PrivacyConsent, PrivacyConsentStatus (pending, granted, denied, revoked), PrivacyProcessing, PrivacyBlurStatus (pending, processing, completed, failed), PublicationControl, MediaVisibility (private, unlisted, public), ReplayPlayback, and PublicHighlight.
+   2. Typed service operations:
+      - In frontend/src/services/media.service.ts, implemented cameras, registerCamera, updateCamera, certifyCamera, recordings, recordingDetail, retryRecording, advanceRecordingDemoState, updateConsent, completePrivacyBlur, updatePublication, unpublishRecording, replays, bookingReplay, and venueHighlights.
+   3. Centralized fixtures and simulator:
+      - In frontend/src/demo/fixtures.ts, seeded initial camera devices across Bambis Meda (venue-1) and Unity Sports Complex (venue-2), including passed, failed, and pending devices with honest failure reasons and recovery guidance.
+      - Seeded booking-linked match recordings across both venues, representing ready, scheduled, recording, failed, and processing states, complete with Creative Commons licensed sample playback attribution.
+      - In frontend/src/demo/transport.ts, implemented tenant-scoped camera and recording routes, certification gates (owners cannot self-certify), recording retry, demo lifecycle advancement, consent updates, privacy face-blurring, publication invariants (rejecting public visibility if consent or face-blur is incomplete), unpublication, entitled replay playback, and microsite public highlights.
+   4. Unit test suite:
+      - In frontend/tests/camera-media.test.cjs, implemented 11 behavioral tests covering 2-owner isolation, admin certification separation, recording lifecycle transitions, honest error/unavailable states, team member entitlement, consent and blur publication gating, minor guardian consent enforcement, public listing boundaries, unpublication, and storage reconstruction persistence.
+
+- Step 21 (Milestone M4 Part 2 Step 2: Camera Admin UI, Recording Lifecycle, Replay Playback, Consent Matrix & Browser E2E Suite):
+   1. Venue owner camera administration:
+      - In frontend/src/components/camera-admin.tsx, implemented OwnerCameras with scoped camera listing, registration and editing dialogs, field assignment dropdowns, separated certification and connectivity status pills, failure reason displays, and actionable recovery guidance.
+      - Implemented simulated AdminReviewModal enabling platform inspection with passed, failed, and revoked outcomes (owners strictly barred from self-certifying).
+   2. Recording lifecycle & privacy controls:
+      - Added Recordings tab in owner administration showing all venue recordings with status pills, failure notices, retry buttons for eligible failed recordings, and interactive demo state advancement simulator.
+      - Implemented comprehensive RecordingDetailModal with participant consent toggles (granted, denied, revoked), minor guardian consent controls, privacy face blur simulation, publication visibility dropdown (private, unlisted, public) protected by conservative privacy invariants, and unpublication controls.
+   3. Player replay library & playback:
+      - In frontend/src/components/match-replay.tsx, created accessible ReplayModal with HTML5 video controls, Creative Commons licensed playback attribution (Big Buck Bunny), honest non-playable states (processing, failed, forbidden, expired, unavailable), and keyboard Escape listener.
+      - In frontend/src/components/booking-list.tsx, embedded Match Replay trigger on entitled player booking cards and owner reservation lists without shifting Fiber hook indices or displacing reschedule/cancel button order.
+   4. Microsite highlights integration:
+      - In frontend/src/components/venue-site.tsx, connected Recent Match Highlights & Goals section to mediaService.venueHighlights(venue.id), displaying published match clips with interactive video preview dialogs.
+   5. Internationalization & key parity:
+      - In frontend/src/i18n/en.ts and frontend/src/i18n/am.ts, added all camera, recording, consent, blur, visibility, and replay keys with 100% key parity (72/72 tests verifying dictionary parity).
+   6. In-repository browser test suite:
+      - Created frontend/tests/verify-camera-media-e2e.mjs verifying all 6 comprehensive browser journeys over Chrome DevTools Protocol:
+        - Journey 1: Owner camera administration, court assignment, failure recovery guidance, and admin certification modal.
+        - Journey 2: Match recordings tab, retry action, detail inspection, privacy/consent publication blocking, and public publishing.
+        - Journey 3: Player booking detail replay button, HTML5 video rendering, attribution text, and keyboard Escape closing.
+        - Journey 4: Microsite public match highlights grid and preview dialog playback.
+        - Journey 5: Mobile viewport (390x844) responsive layout and Amharic localization without overflow.
+        - Journey 6: Demo state persistence across full browser reload.
+   7. Full verification results:
+      - 72/72 unit tests pass (npm test).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js production build passes with 0 errors (npm run build).
+      - All 4 end-to-end browser test suites pass cleanly:
+        - Camera, Match Media & Privacy suite: 6/6 journeys pass (node tests/verify-camera-media-e2e.mjs).
+        - Booking operations suite: 7/7 journeys pass (node tests/verify-journeys-e2e.mjs).
+        - CMS publishing suite: 8/8 journeys pass (node tests/verify-cms-e2e.mjs).
+        - Teams & events suite: 4/4 journeys pass (node tests/verify-teams-events-e2e.mjs).
+      - Preserved frozen UI baseline. Working strictly on branch codex/camera-media-privacy; no merge into main, push, or deploy.
+
+- Step 22 (Milestone M4 Part 2 Review Findings Resolution: Privacy, Entitlements, Admin Review & Honest Lifecycle):
+   1. Stopped auto-manufacturing completed recordings:
+      - New online bookings and walk-in reservations create honest scheduled recordings with status: 'scheduled', playbackUrl: null, pending consent, and pending face blur. Recordings are only attached if the court has an active camera installed.
+      - GET requests (GET /bookings/:id/replay) are strictly read-only and never create missing recordings or grant consent. Bookings without recordings return honest entitlementStatus: 'unavailable', canPlay: false, and clear explanation without mutating simulator state.
+      - Centralized sample media URLs, thumbnail assets, and CC-attribution into SAMPLE_MEDIA_CONFIG in frontend/src/demo/fixtures.ts.
+   2. Explicit replay entitlements:
+      - Added typed ReplayEntitlement contract in frontend/src/services/contracts.ts and mediaService.grantReplayEntitlement in frontend/src/services/media.service.ts.
+      - Replaced team membership blanket access and hardcoded fixture-ID exceptions with explicit entitlement records in state.entitlements. Approved team members cannot play private recordings without an explicit entitlement grant.
+   3. Centralized public eligibility and expiry checks:
+      - Unified isRecordingPubliclyEligible(rec) validation across venue highlights, replay library listing, and playback endpoints. Expired recordings (retentionExpiresAt in the past) are excluded from public highlights.
+      - Public playback responses omit private booking references (bookingId: undefined).
+      - Added CMS highlight URL validation on draft save and publish (/owner/stadiums/:id/microsite), rejecting highlights referencing ineligible or expired recordings.
+   4. Usable administrator camera certification workflow:
+      - Created platform administrator review surface at /admin/cameras (AdminCameras in frontend/src/components/admin-panels.tsx and frontend/src/app/admin/cameras/page.tsx).
+      - Added cameras navigation link to adminLinks in frontend/src/components/workspace-shell.tsx.
+      - Removed owner-inaccessible review submission button from OwnerCameras; owners see certification status badges, failure reasons, and recovery guidance.
+      - Certified cameras update status to certified, certificationStatus: 'passed', and clear failure reasons and recovery guidance.
+      - Updated browser E2E test to execute administrator certification at /admin/cameras, asserting that the camera status actually updates to passed and displays Certified on the owner screen.
+   5. Restored honest highlight error state:
+      - In frontend/src/components/venue-site.tsx, stopped swallowing highlight service failures into empty arrays. Captured highlightsError and rendered an accessible ServiceErrorMessage error={highlightsError} retry={query.reload} within the highlights section.
+   6. Complete localization and demo boundaries:
+      - Localized "4K Broadcast" (broadcast4k), privacy policy text (privacyPolicyInvariant), "Minor participants present" (minorParticipantsPresent), guardian consent buttons (guardianGrant, guardianDeny), and admin review notices with 100% parity across English and Amharic dictionaries.
+      - Gated simulation controls in RecordingDetailModal behind isDemoMode with a clear demoSimulationOnly tag.
+      - Kept retention duration configurable in fixtures and commercial policy explicitly provisional.
+   7. Full verification results:
+      - 75/75 unit tests pass (npm test).
+      - Scoped ESLint passes with 0 errors and 0 warnings on all touched files.
+      - Next.js production build passes with 0 errors (npm run build).
+      - All 4 end-to-end browser test suites pass cleanly:
+        - Camera, Match Media & Privacy suite: 6/6 journeys pass (node tests/verify-camera-media-e2e.mjs).
+        - Booking operations suite: 7/7 journeys pass (node tests/verify-journeys-e2e.mjs).
+        - CMS publishing suite: 8/8 journeys pass (node tests/verify-cms-e2e.mjs).
+        - Teams & events suite: 4/4 journeys pass (node tests/verify-teams-events-e2e.mjs).
+      - Preserved frozen UI baseline. Working strictly on branch codex/camera-media-privacy; no merge into main, push, or deploy.

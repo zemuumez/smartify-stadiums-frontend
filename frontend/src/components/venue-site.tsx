@@ -5,12 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Building2, Calendar, Shield, MapPin, Star, Camera, Lightbulb, CheckCircle2, Play, Trophy, X, ArrowUpRight } from 'lucide-react';
-import { authService, contentService, eventsService, teamsService, venuesService } from '@/services';
+import { authService, contentService, eventsService, mediaService, teamsService, venuesService } from '@/services';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import { DemoMarker, Loading, ServiceErrorMessage } from './service-state';
 import { Reservation } from './booking-form';
-import type { Account, EventDetails, Field, Microsite, SiteHighlight, Team, Venue } from '@/services/contracts';
+import type { Account, EventDetails, Field, Microsite, PublicHighlight, SiteHighlight, Team, Venue } from '@/services/contracts';
 import { isSupportedImageUrl } from '@/services/media-policy';
 import { resolveVenueSiteEvents, resolveEffectiveEvent } from '@/services/events.service';
 export function VenueSite({
@@ -45,7 +45,16 @@ export function VenueSite({
       const liveEvents = await eventsService.list(venue.id, signal);
       eventDetails = resolveVenueSiteEvents(venue, site, { liveEvents });
     }
-    return { venue, fields, site, eventDetails };
+    let publishedHighlights: PublicHighlight[] = [];
+    let highlightsError: unknown = null;
+    if (!previewSite && !isDraftPreview) {
+      try {
+        publishedHighlights = await mediaService.venueHighlights(venue.id, signal);
+      } catch (err) {
+        highlightsError = err;
+      }
+    }
+    return { venue, fields, site, eventDetails, publishedHighlights, highlightsError };
   }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]), ['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id]);
   if (query.loading && !query.data) return <Loading/>;
   if (query.error || !query.data) {
@@ -73,12 +82,22 @@ export function VenueSite({
     }
     return <div className="p-8"><ServiceErrorMessage error={query.error} retry={query.reload}/><Link href="/stadiums" className="action mt-4">{t('venues')}</Link></div>;
   }
-  const { venue, fields: rawFields, site, eventDetails } = query.data;
+  const { venue, fields: rawFields, site, eventDetails, highlightsError } = query.data;
   const brandColor = site.primaryColor || '#2d6a4f';
   const heroImageSrc = (site.heroImage && isSupportedImageUrl(site.heroImage)) ? site.heroImage : venue.image;
   const logoImageSrc = (site.logoUrl && isSupportedImageUrl(site.logoUrl)) ? site.logoUrl : null;
   const fields = rawFields.map(f => ({ ...f, sport: f.sports.map(s => t(s)).join(' / '), price: (f.hourlyRateMinor / 100).toLocaleString(locale === 'am' ? 'am-ET' : 'en-ET') }));
-  const matchHighlights = (site.highlights || []).map(h => ({...h, dur: h.duration, views: h.views || 0}));
+  const editorialHighlights = (site.highlights || []).map(h => ({ ...h, dur: h.duration, views: h.views || 0 }));
+  const mediaHighlights = (query.data.publishedHighlights || []).map(h => ({
+    id: h.id,
+    title: h.title,
+    teams: h.teams || `${t(h.sport)}`,
+    duration: h.duration,
+    dur: h.duration,
+    playbackUrl: h.playbackUrl,
+    views: h.views || 0,
+  }));
+  const matchHighlights = [...mediaHighlights, ...editorialHighlights];
   const headingLead = site.tagline.split(' ').slice(0,2).join(' '); const headingAccent = site.tagline.split(' ').slice(2).join(' ');
   const handleOpenBooking = (field?: Field) => { if(field) setSelected(field); };
   const bookingField = selected || (!dismissed && params.get('book') === '1' ? rawFields.find(f=>f.id===params.get('field')) || rawFields[0] : null);
@@ -264,34 +283,46 @@ export function VenueSite({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {matchHighlights.map((m) => (
-              <div
-                key={m.id}
-                role="button" tabIndex={0} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreview(m); } }}
-                className="bg-[#f4f3ef] rounded-3xl p-6 border border-black/[0.05] hover:bg-[#eae8e1] transition-colors group cursor-pointer"
-                onClick={() => {
-                  setPreview(m);
-                }}
-              >
-                <div className="relative aspect-video rounded-2xl bg-black/10 overflow-hidden mb-4 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{ background: brandColor }}>
-                    <Play size={20} className="ml-0.5" />
+          {highlightsError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center my-4">
+              <ServiceErrorMessage error={highlightsError} retry={query.reload} />
+            </div>
+          ) : matchHighlights.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+              <p className="font-semibold text-slate-700">{t('noHighlightsAvailable')}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {matchHighlights.map((m) => (
+                <div
+                  key={m.id}
+                  role="button" tabIndex={0} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreview(m); } }}
+                  className="bg-[#f4f3ef] rounded-3xl p-6 border border-black/[0.05] hover:bg-[#eae8e1] transition-colors group cursor-pointer"
+                  onClick={() => {
+                    setPreview(m);
+                  }}
+                >
+                  <div className="relative aspect-video rounded-2xl bg-black/10 overflow-hidden mb-4 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{ background: brandColor }}>
+                      <Play size={20} className="ml-0.5" />
+                    </div>
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
+                      {m.dur}
+                    </span>
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>
+                      {m.playbackUrl ? copy("4K Replay") : t('previewOnly')}
+                    </span>
                   </div>
-                  <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
-                    {m.dur}
-                  </span>
-                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>{copy("4K Replay")}</span>
-                </div>
 
-                <h3 className="font-black text-sm text-[#111] mb-1">{m.title}</h3>
-                <div className="text-xs text-[#7a7a7a] flex items-center justify-between">
-                  <span>{m.teams}</span>
-                  <span>{m.views}{" "}{copy("views")}</span>
+                  <h3 className="font-black text-sm text-[#111] mb-1">{m.title}</h3>
+                  <div className="text-xs text-[#7a7a7a] flex items-center justify-between">
+                    <span>{m.teams}</span>
+                    <span>{m.views}{" "}{copy("views")}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

@@ -237,6 +237,18 @@ export function SiteContentEditor({draft,onChange}:{draft:Microsite;onChange:(va
                   onChange={e=>onChange({...draft,highlights:highlights.map(x=>x.id===h.id?{...x,playbackUrl:e.target.value||null}:x)})}
                 />
               </label>
+              <label className="form-label">
+                {t('linkedRecordingId')}
+                <input
+                  className="form-input font-mono text-xs"
+                  placeholder="e.g. rec-1"
+                  value={h.recordingId || ''}
+                  onChange={e => onChange({
+                    ...draft,
+                    highlights: highlights.map(x => x.id === h.id ? { ...x, recordingId: e.target.value.trim() || null } : x)
+                  })}
+                />
+              </label>
               {isInvalidVideo && (
                 <p role="alert" className="text-xs text-rose-700 font-medium">
                   {t('mediaUrlError')}
@@ -246,7 +258,7 @@ export function SiteContentEditor({draft,onChange}:{draft:Microsite;onChange:(va
             </fieldset>
           );
         })}
-        <button type="button" className="filter-pill" onClick={()=>onChange({...draft,highlights:[...highlights,{id:crypto.randomUUID(),title:'',teams:'',duration:'',playbackUrl:null}]})}>{t('addHighlight')}</button>
+        <button type="button" className="filter-pill" onClick={()=>onChange({...draft,highlights:[...highlights,{id:crypto.randomUUID(),title:'',teams:'',duration:'',playbackUrl:null,recordingId:null}]})}>{t('addHighlight')}</button>
       </section>
 
       {/* ── EVENTS SECTION ── */}
