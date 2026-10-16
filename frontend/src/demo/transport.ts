@@ -1,5 +1,5 @@
 import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
-import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
+import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
 import { commercialPolicy, createFixtures, demoOTP, SAMPLE_MEDIA_CONFIG, type DemoState } from './fixtures';
@@ -148,7 +148,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
               // Authoritatively derive playbackUrl from the linked recording—never trust stored overrides
               return { ...h, recordingId: linkedRec.id, playbackUrl: linkedRec.playbackUrl };
             }
-            return h;
+            // Unlinked editorial cards (omitted, null, or blank ID) remain strictly preview-only with no playback URL
+            return { ...h, recordingId: null, playbackUrl: null };
           });
         }
         return sanitizedSite;
@@ -366,7 +367,24 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (parts[3] === 'microsite') {
           const draft = state.drafts.find(item => item.venueId === venue.id);
           if (!draft) throw new ServiceError('not_found', 404);
-          if (method === 'GET') return draft;
+          if (method === 'GET') {
+            const sanitizedDraft = structuredClone(draft);
+            if (sanitizedDraft.highlights) {
+              sanitizedDraft.highlights = sanitizedDraft.highlights.map(h => {
+                const rawRecId = h.recordingId;
+                if (rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '') {
+                  const recId = String(rawRecId).trim();
+                  const linkedRec = state.recordings.find(r => r.id === recId && r.venueId === venue.id);
+                  if (linkedRec && isRecordingPubliclyEligible(linkedRec)) {
+                    return { ...h, recordingId: linkedRec.id, playbackUrl: linkedRec.playbackUrl };
+                  }
+                  return { ...h, recordingId: recId, playbackUrl: null };
+                }
+                return { ...h, recordingId: null, playbackUrl: null };
+              });
+            }
+            return sanitizedDraft;
+          }
           if (method === 'PATCH') {
             const input = options.body as Microsite;
             if (!/^#[\da-f]{6}$/i.test(input.primaryColor) || !input.tagline.trim() || input.tagline.length > 120 || input.description.length > 5000) throw new ServiceError('validation', 422);
@@ -380,7 +398,14 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
             if ((input.gallery || []).length > 30) throw new ServiceError('validation', 422);
             if ((input.gallery || []).some(g => !isSupportedImageUrl(g.url) || (g.caption && g.caption.length > 200))) throw new ServiceError('validation', 422);
             if ((input.highlights || []).length > 30 || (input.events || []).length > 30) throw new ServiceError('validation', 422);
-            if ((input.highlights || []).some(h => !h.title.trim() || h.title.length > 200 || (!h.recordingId && h.playbackUrl && !isSupportedVideoUrl(h.playbackUrl))) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
+            if ((input.highlights || []).some(h => {
+              if (!h.title.trim() || h.title.length > 200) return true;
+              const hasRecId = h.recordingId !== undefined && h.recordingId !== null && String(h.recordingId).trim() !== '';
+              const callerUrl = h.playbackUrl || (h as { videoUrl?: string }).videoUrl || null;
+              const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+              if (!hasRecId && hasCallerUrl) return true;
+              return false;
+            }) || (input.events || []).some(e => !e.title.trim() || e.title.length > 200 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time) || !sports.includes(e.sport) || !/^\d{4}-\d{2}-\d{2}$/.test(e.date) || !Number.isInteger(e.spots) || e.spots < 0 || (e.format && !['team', 'singles', 'doubles'].includes(e.format)))) throw new ServiceError('validation', 422);
 
             validateEventRegistrationInvariants(
               venue.id,
@@ -391,10 +416,14 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
             const validatedHighlights: SiteHighlight[] = [];
             for (const rawH of (input.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string | null })[]) {
               const rawRecId = rawH.recordingId;
+              const hasRecId = rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '';
+              const callerUrl = rawH.playbackUrl || rawH.videoUrl || null;
+              const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+
               let recId: string | null = null;
               let pUrl: string | null = null;
 
-              if (rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '') {
+              if (hasRecId) {
                 recId = String(rawRecId).trim();
                 const linkedRec = state.recordings.find(r => r.id === recId);
                 if (!linkedRec) {
@@ -408,15 +437,14 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
                 }
                 // Authoritatively derive URL from linked recording—never retain caller-supplied override
                 pUrl = linkedRec.playbackUrl;
+                recId = linkedRec.id;
               } else {
-                recId = null;
-                const callerUrl = rawH.playbackUrl || rawH.videoUrl || null;
-                if (callerUrl) {
-                  if (!isSupportedVideoUrl(callerUrl)) throw new ServiceError('validation', 422);
-                  pUrl = callerUrl;
-                } else {
-                  pUrl = null;
+                if (hasCallerUrl) {
+                  // Playable highlights strictly require an eligible, venue-owned recording ID
+                  throw new ServiceError('validation', 422);
                 }
+                recId = null;
+                pUrl = null;
               }
 
               validatedHighlights.push({
@@ -459,7 +487,11 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
             if (draft.highlights) {
               for (const rawH of draft.highlights as (SiteHighlight & { videoUrl?: string; recordingId?: string | null })[]) {
                 const rawRecId = rawH.recordingId;
-                if (rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '') {
+                const hasRecId = rawRecId !== undefined && rawRecId !== null && String(rawRecId).trim() !== '';
+                const callerUrl = rawH.playbackUrl || rawH.videoUrl || null;
+                const hasCallerUrl = Boolean(callerUrl && String(callerUrl).trim() !== '');
+
+                if (hasRecId) {
                   const recId = String(rawRecId).trim();
                   const linkedRec = state.recordings.find(r => r.id === recId);
                   if (!linkedRec || linkedRec.venueId !== venue.id || !isRecordingPubliclyEligible(linkedRec)) {
@@ -468,7 +500,11 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
                   rawH.playbackUrl = linkedRec.playbackUrl;
                   rawH.recordingId = linkedRec.id;
                 } else {
+                  if (hasCallerUrl) {
+                    throw new ServiceError('validation', 422);
+                  }
                   rawH.recordingId = null;
+                  rawH.playbackUrl = null;
                 }
               }
             }

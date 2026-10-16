@@ -724,3 +724,115 @@ test('CMS highlight linked recording is authoritative: prevents mismatched URLs,
   assert.equal(hl3?.playbackUrl, null, 'Invalid recordingId stored highlight must suppress playbackUrl to null');
 });
 
+test('CMS rejects playable highlights with omitted, null, or blank recordingId and strips legacy stored unlinked URLs to null on public reads', async () => {
+  const { createFixtures } = require('../.test-build/demo/fixtures');
+  const s = setup();
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+
+  // 1. Omitted recordingId with playbackUrl is rejected
+  await rejects(s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-omitted-id',
+        title: 'Omitted ID Highlight',
+        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        duration: '1:00',
+      },
+    ],
+  }), 'validation');
+
+  // 2. Null recordingId with playbackUrl is rejected
+  await rejects(s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-null-id',
+        title: 'Null ID Highlight',
+        recordingId: null,
+        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        duration: '1:00',
+      },
+    ],
+  }), 'validation');
+
+  // 3. Blank/whitespace recordingId with playbackUrl is rejected
+  await rejects(s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-blank-id',
+        title: 'Blank ID Highlight',
+        recordingId: '   ',
+        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        duration: '1:00',
+      },
+    ],
+  }), 'validation');
+
+  // 4. Unlinked preview-only editorial cards (no playbackUrl) are permitted
+  await s.content.save({
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-preview-only',
+        title: 'Preview Only Editorial Card',
+        recordingId: null,
+        playbackUrl: null,
+        duration: '1:00',
+      },
+    ],
+  });
+  const savedDraft = await s.content.draft('venue-1');
+  const savedHl = savedDraft.highlights?.find(h => h.id === 'hl-preview-only');
+  assert.ok(savedHl);
+  assert.equal(savedHl.playbackUrl, null);
+  assert.equal(savedHl.recordingId, null);
+
+  // 5. Legacy stored unlinked highlights in storage must be stripped to null on public reads
+  const map = new Map();
+  const mockStorage = {
+    getItem: k => map.get(k) || null,
+    setItem: (k, v) => map.set(k, String(v)),
+    removeItem: k => map.delete(k),
+  };
+  const fixtures = createFixtures();
+  const site1 = fixtures.sites.find(item => item.venueId === 'venue-1');
+  assert.ok(site1);
+  site1.highlights = [
+    {
+      id: 'legacy-unlinked-null',
+      title: 'Legacy Stored Null RecId',
+      recordingId: null,
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    },
+    {
+      id: 'legacy-unlinked-omitted',
+      title: 'Legacy Stored Omitted RecId',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    },
+    {
+      id: 'legacy-unlinked-blank',
+      title: 'Legacy Stored Blank RecId',
+      recordingId: '   ',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ExpiredMatch.mp4',
+    },
+  ];
+  map.set('etsf-demo-v2', JSON.stringify(fixtures));
+
+  const tStorage = createDemoTransport(mockStorage);
+  const sStorage = { ...createServices(tStorage), transport: tStorage };
+  const readSite = await sStorage.content.get('venue-1');
+
+  const hl1 = readSite.highlights?.find(h => h.id === 'legacy-unlinked-null');
+  assert.equal(hl1?.playbackUrl, null, 'Legacy stored unlinked highlight with null recordingId must have playbackUrl: null');
+
+  const hl2 = readSite.highlights?.find(h => h.id === 'legacy-unlinked-omitted');
+  assert.equal(hl2?.playbackUrl, null, 'Legacy stored unlinked highlight with omitted recordingId must have playbackUrl: null');
+
+  const hl3 = readSite.highlights?.find(h => h.id === 'legacy-unlinked-blank');
+  assert.equal(hl3?.playbackUrl, null, 'Legacy stored unlinked highlight with blank recordingId must have playbackUrl: null');
+});
+
+
