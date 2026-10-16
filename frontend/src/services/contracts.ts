@@ -104,9 +104,44 @@ export interface Microsite {
   published: boolean; updatedAt: string;
 }
 export { isSupportedImageUrl, isSupportedVideoUrl } from './media-policy';
+export type CameraCertificationStatus = 'pending' | 'passed' | 'failed' | 'revoked';
+export type CameraConnectivityStatus = 'online' | 'offline' | 'unknown';
+
 export interface CameraDevice {
-  id: string; venueId: string; fieldId: string; name: string; model: string;
-  status: 'pending' | 'certified' | 'active' | 'offline' | 'revoked';
+  id: string;
+  venueId: string;
+  fieldId: string;
+  name: string;
+  model: string;
+  serialNumber?: string;
+  certificationStatus: CameraCertificationStatus;
+  connectivityStatus: CameraConnectivityStatus;
+  status?: 'pending' | 'certified' | 'active' | 'offline' | 'revoked';
+  failureReason?: string;
+  recoveryGuidance?: string;
+  certifiedAt?: string;
+  certifiedBy?: string;
+  createdAt?: string;
+}
+
+export interface CameraRegisterInput {
+  venueId: string;
+  fieldId: string;
+  name: string;
+  model: string;
+  serialNumber?: string;
+}
+
+export interface CameraUpdateInput {
+  name: string;
+  fieldId: string;
+  model: string;
+}
+
+export interface CameraCertificationReviewInput {
+  certificationStatus: 'passed' | 'failed' | 'revoked';
+  failureReason?: string;
+  recoveryGuidance?: string;
 }
 export interface TeamJoinRequest {
   id: string;
@@ -151,6 +186,84 @@ export interface TeamMatchDetail extends PublicTeamMatch {
   currency?: 'ETB';
   paymentStatus?: Booking['paymentStatus'];
 }
+export type RecordingStatus = 'scheduled' | 'recording' | 'uploading' | 'processing' | 'ready' | 'failed';
+export type PrivacyConsentStatus = 'pending' | 'granted' | 'denied' | 'revoked';
+export type PrivacyBlurStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type MediaVisibility = 'private' | 'unlisted' | 'public';
+
+export interface PrivacyConsent {
+  status: PrivacyConsentStatus;
+  requiresGuardian: boolean;
+  guardianConsentStatus?: 'pending' | 'granted' | 'denied';
+  notes?: string;
+  updatedAt: string;
+}
+
+export interface PrivacyProcessing {
+  faceBlurStatus: PrivacyBlurStatus;
+  bodyBlurStatus?: 'not_required' | 'pending' | 'completed';
+  completedAt?: string;
+}
+
+export interface PublicationControl {
+  visibility: MediaVisibility;
+  ownerApproved: boolean;
+  publishedAt?: string;
+  unpublishReason?: string;
+}
+
+export interface MatchRecording {
+  id: string;
+  venueId: string;
+  fieldId: string;
+  bookingId: string;
+  cameraId?: string;
+  sport: Sport;
+  teamId?: string;
+  teamName?: string;
+  status: RecordingStatus;
+  failureReason?: string;
+  retryEligible: boolean;
+  duration: string;
+  title: string;
+  playbackUrl: string | null;
+  thumbnailUrl?: string | null;
+  consent: PrivacyConsent;
+  privacy: PrivacyProcessing;
+  publication: PublicationControl;
+  retentionExpiresAt?: string;
+  createdAt: string;
+}
+
+export interface ReplayPlayback {
+  recordingId: string;
+  bookingId: string;
+  title: string;
+  sport: Sport;
+  teamName?: string;
+  canPlay: boolean;
+  playbackUrl: string | null;
+  thumbnailUrl?: string | null;
+  entitlementStatus: 'entitled' | 'forbidden' | 'expired' | 'processing' | 'failed' | 'unavailable';
+  retentionExpiresAt?: string;
+  visibility: MediaVisibility;
+  duration: string;
+  reason?: string;
+}
+
+export interface PublicHighlight {
+  id: string;
+  venueId: string;
+  recordingId: string;
+  title: string;
+  sport: Sport;
+  teams: string;
+  duration: string;
+  views: number;
+  playbackUrl: string;
+  thumbnailUrl?: string;
+}
+
 export interface MediaAsset {
   id: string; bookingId: string; title: string;
   status: 'scheduled' | 'processing' | 'ready' | 'failed';
