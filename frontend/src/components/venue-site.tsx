@@ -46,14 +46,15 @@ export function VenueSite({
       eventDetails = resolveVenueSiteEvents(venue, site, { liveEvents });
     }
     let publishedHighlights: PublicHighlight[] = [];
+    let highlightsError: unknown = null;
     if (!previewSite && !isDraftPreview) {
       try {
         publishedHighlights = await mediaService.venueHighlights(venue.id, signal);
-      } catch {
-        publishedHighlights = [];
+      } catch (err) {
+        highlightsError = err;
       }
     }
-    return { venue, fields, site, eventDetails, publishedHighlights };
+    return { venue, fields, site, eventDetails, publishedHighlights, highlightsError };
   }, [slug, previewVenue, previewFields, previewSite, isDraftPreview]), ['venue-site', slug, !!previewSite, !!isDraftPreview, previewVenue?.id]);
   if (query.loading && !query.data) return <Loading/>;
   if (query.error || !query.data) {
@@ -81,7 +82,7 @@ export function VenueSite({
     }
     return <div className="p-8"><ServiceErrorMessage error={query.error} retry={query.reload}/><Link href="/stadiums" className="action mt-4">{t('venues')}</Link></div>;
   }
-  const { venue, fields: rawFields, site, eventDetails } = query.data;
+  const { venue, fields: rawFields, site, eventDetails, highlightsError } = query.data;
   const brandColor = site.primaryColor || '#2d6a4f';
   const heroImageSrc = (site.heroImage && isSupportedImageUrl(site.heroImage)) ? site.heroImage : venue.image;
   const logoImageSrc = (site.logoUrl && isSupportedImageUrl(site.logoUrl)) ? site.logoUrl : null;
@@ -282,34 +283,44 @@ export function VenueSite({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {matchHighlights.map((m) => (
-              <div
-                key={m.id}
-                role="button" tabIndex={0} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreview(m); } }}
-                className="bg-[#f4f3ef] rounded-3xl p-6 border border-black/[0.05] hover:bg-[#eae8e1] transition-colors group cursor-pointer"
-                onClick={() => {
-                  setPreview(m);
-                }}
-              >
-                <div className="relative aspect-video rounded-2xl bg-black/10 overflow-hidden mb-4 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{ background: brandColor }}>
-                    <Play size={20} className="ml-0.5" />
+          {highlightsError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center my-4">
+              <ServiceErrorMessage error={highlightsError} retry={query.reload} />
+            </div>
+          ) : matchHighlights.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+              <p className="font-semibold text-slate-700">{t('noHighlightsAvailable')}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {matchHighlights.map((m) => (
+                <div
+                  key={m.id}
+                  role="button" tabIndex={0} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreview(m); } }}
+                  className="bg-[#f4f3ef] rounded-3xl p-6 border border-black/[0.05] hover:bg-[#eae8e1] transition-colors group cursor-pointer"
+                  onClick={() => {
+                    setPreview(m);
+                  }}
+                >
+                  <div className="relative aspect-video rounded-2xl bg-black/10 overflow-hidden mb-4 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{ background: brandColor }}>
+                      <Play size={20} className="ml-0.5" />
+                    </div>
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
+                      {m.dur}
+                    </span>
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>{copy("4K Replay")}</span>
                   </div>
-                  <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
-                    {m.dur}
-                  </span>
-                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>{copy("4K Replay")}</span>
-                </div>
 
-                <h3 className="font-black text-sm text-[#111] mb-1">{m.title}</h3>
-                <div className="text-xs text-[#7a7a7a] flex items-center justify-between">
-                  <span>{m.teams}</span>
-                  <span>{m.views}{" "}{copy("views")}</span>
+                  <h3 className="font-black text-sm text-[#111] mb-1">{m.title}</h3>
+                  <div className="text-xs text-[#7a7a7a] flex items-center justify-between">
+                    <span>{m.teams}</span>
+                    <span>{m.views}{" "}{copy("views")}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

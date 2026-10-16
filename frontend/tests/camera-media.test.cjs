@@ -132,7 +132,7 @@ test('two owners cannot inspect or mutate each other recordings', async () => {
   await rejects(s.media.updatePublication('rec-unity-1', { visibility: 'public', ownerApproved: true }), 'forbidden');
 });
 
-test('booking resolves to its correct recording and playback states', async () => {
+test('booking resolves to its correct recording and honest scheduled state', async () => {
   const s = setup();
 
   // Player 1 creates booking
@@ -146,14 +146,33 @@ test('booking resolves to its correct recording and playback states', async () =
     idempotencyKey: 'booking-rec-test-1',
   });
 
-  // Booking resolves to its linked recording via booking replay query
+  // Booking starts with honest scheduled state, NOT auto-manufactured ready
   const replay = await s.media.bookingReplay(booking.id);
   assert.ok(replay);
   assert.equal(replay.bookingId, booking.id);
   assert.equal(replay.sport, 'football');
-  assert.equal(replay.canPlay, true);
-  assert.equal(replay.entitlementStatus, 'entitled');
-  assert.ok(replay.playbackUrl?.startsWith('https://'));
+  assert.equal(replay.canPlay, false);
+  assert.equal(replay.entitlementStatus, 'processing');
+  assert.equal(replay.playbackUrl, null);
+  assert.ok(replay.reason?.includes('scheduled'));
+
+  // Recording detail verifies pending consent and pending blur
+  s.transport.selectAccount('owner-1');
+  const rec = await s.media.recordingDetail(replay.recordingId);
+  assert.equal(rec.status, 'scheduled');
+  assert.equal(rec.playbackUrl, null);
+  assert.equal(rec.consent.status, 'pending');
+  assert.equal(rec.privacy.faceBlurStatus, 'pending');
+
+  // Explicit demo controls advance recording to ready
+  await s.media.advanceRecordingDemoState(rec.id, 'ready');
+
+  // Player now sees playable media
+  s.transport.selectAccount('player-1');
+  const readyReplay = await s.media.bookingReplay(booking.id);
+  assert.equal(readyReplay.canPlay, true);
+  assert.equal(readyReplay.entitlementStatus, 'entitled');
+  assert.ok(readyReplay.playbackUrl?.startsWith('https://'));
 
   // Another player cannot access private booking replay
   s.transport.selectAccount('player-2');
@@ -217,7 +236,7 @@ test('processing and unavailable states do not pretend to play', async () => {
   assert.ok(processingReplay.reason);
 });
 
-test('team member access follows explicit entitlement', async () => {
+test('team member access requires explicit entitlement and does not grant blanket access', async () => {
   const s = setup();
 
   // rec-2 is a private team scrimmage for Addis Hoops (team-2)
@@ -230,13 +249,23 @@ test('team member access follows explicit entitlement', async () => {
   s.transport.selectAccount('player-2');
   await rejects(s.media.bookingReplay('booking-rec-2'), 'forbidden');
 
-  // player-2 requests to join team-2
+  // player-2 requests to join team-2 and is approved
   await s.teams.join('team-2');
   s.transport.selectAccount('player-1');
   const requests = await s.teams.listRequests('team-2');
   await s.teams.approveRequest('team-2', requests[0].id);
 
-  // player-2 is now on team roster -> entitled!
+  // Member on team roster alone DOES NOT get blanket access to private recordings
+  s.transport.selectAccount('player-2');
+  await rejects(s.media.bookingReplay('booking-rec-2'), 'forbidden');
+
+  // Owner grants explicit entitlement record to player-2
+  s.transport.selectAccount('owner-1');
+  const entitlement = await s.media.grantReplayEntitlement('rec-2', { userId: 'player-2' });
+  assert.equal(entitlement.userId, 'player-2');
+  assert.equal(entitlement.recordingId, 'rec-2');
+
+  // Now player-2 is explicitly entitled and can play
   s.transport.selectAccount('player-2');
   const memberReplay = await s.media.bookingReplay('booking-rec-2');
   assert.equal(memberReplay.canPlay, true);
@@ -381,3 +410,88 @@ test('demo changes survive storage reconstruction and reload', async () => {
   const reloadedRec2 = await s2.media.recordingDetail('rec-2');
   assert.equal(reloadedRec2.consent.status, 'granted', 'Consent change must persist across reload');
 });
+
+test('replay GET requests do not manufacture recordings or grant consent', async () => {
+  const s = setup();
+
+  // Create a real booking on field-7 (which has camera: false)
+  s.transport.selectAccount('player-1');
+  const unrecordedBooking = await s.bookings.create({
+    fieldId: 'field-7',
+    sport: 'volleyball',
+    date: '2026-10-25',
+    startHour: 10,
+    endHour: 12,
+    idempotencyKey: 'booking-unrecorded-field',
+  });
+
+  s.transport.selectAccount('owner-1');
+  const recordingsBefore = (await s.media.recordings()).length;
+
+  // Requesting replay for an unrecorded booking returns unavailable and does NOT add to recordings list
+  s.transport.selectAccount('player-1');
+  const unavailable = await s.media.bookingReplay(unrecordedBooking.id);
+  assert.equal(unavailable.canPlay, false);
+  assert.equal(unavailable.entitlementStatus, 'unavailable');
+  assert.ok(unavailable.reason?.includes('No match recording exists'));
+
+  // Ensure no new recording was manufactured
+  s.transport.selectAccount('owner-1');
+  const recordingsAfter = (await s.media.recordings()).length;
+  assert.equal(recordingsAfter, recordingsBefore, 'GET replay must never manufacture records');
+
+  // Querying a completely non-existent booking throws 404
+  s.transport.selectAccount('player-1');
+  await rejects(s.media.bookingReplay('non-existent-booking-id'), 'not_found');
+});
+
+test('expired recordings are excluded from public highlights and CMS cannot bypass publication rules', async () => {
+  const s = setup();
+
+  // Venue 1 highlights do not include expired rec-expired-1
+  const highlights = await s.media.venueHighlights('venue-1');
+  assert.ok(highlights.every(h => h.recordingId !== 'rec-expired-1'), 'Expired recording must not appear in highlights');
+
+  // Owner cannot add highlight with expired recording URL
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+  const invalidDraft = {
+    ...draft,
+    highlights: [
+      {
+        id: 'hl-bypass',
+        title: 'Bypass Highlight',
+        teams: 'Bambis Match',
+        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ExpiredMatch.mp4',
+        duration: '10:00',
+      },
+    ],
+  };
+  await rejects(s.content.save(invalidDraft), 'validation');
+});
+
+test('administrator camera certification workflow updates status and clears guidance', async () => {
+  const s = setup();
+
+  // Admin lists all cameras across all venues
+  s.transport.selectAccount('admin-1');
+  const allCameras = await s.media.adminCameras();
+  assert.ok(allCameras.length >= 3);
+
+  // Admin reviews camera-2 (initially failed) and marks it passed
+  const reviewed = await s.media.certifyCamera('camera-2', {
+    certificationStatus: 'passed',
+  });
+  assert.equal(reviewed.certificationStatus, 'passed');
+  assert.equal(reviewed.status, 'certified');
+  assert.equal(reviewed.failureReason, undefined, 'Failure reason must be cleared on pass');
+  assert.equal(reviewed.recoveryGuidance, undefined, 'Recovery guidance must be cleared on pass');
+
+  // Owner views the camera and sees certified passed status
+  s.transport.selectAccount('owner-1');
+  const ownerCameras = await s.media.cameras();
+  const cam2 = ownerCameras.find(c => c.id === 'camera-2');
+  assert.equal(cam2.certificationStatus, 'passed');
+  assert.equal(cam2.status, 'certified');
+});
+

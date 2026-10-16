@@ -165,12 +165,28 @@ async function runJourneys() {
         return failed;
       })()
     `);
-    console.log('Failed camera guidance verified:', failedNoticeText.includes('Failure Reason') || failedNoticeText.includes('verification'));
+    console.log('Failed camera guidance verified:', failedNoticeText.includes('Failure Reason') || failedNoticeText.includes('Verification') || failedNoticeText.includes('failureReason'));
 
-    // Open Admin Certification Review Modal
+    // Verify owner screen shows Admin Certification Required notice, and NO owner review submit button
+    const hasOwnerCertButton = await cdp.evaluate(`
+      (() => {
+        return !!Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Simulate Admin Review'));
+      })()
+    `);
+    if (hasOwnerCertButton) throw new Error('Owner screen must NOT allow submitting admin certification');
+    console.log('Verified: Owner screen does not expose admin review submission.');
+
+    // Switch to Platform Administrator at /admin/cameras
+    await setSession(cdp, 'admin-1', 'en');
+    await cdp.send('Page.navigate', { url: 'http://localhost:3000/admin/cameras' });
+    await sleep(2000);
+    await waitForLoading(cdp);
+
+    // Open Admin Certification Review Modal on camera-3 (which is failed)
     await cdp.evaluate(`
       (() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Simulate Admin Review'));
+        const btn = document.querySelector('[data-testid="certify-camera-camera-3"]') ||
+                    Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Review & Certify'));
         if (btn) btn.click();
       })()
     `);
@@ -192,13 +208,36 @@ async function runJourneys() {
     `);
     await sleep(2000);
 
-    // Verify status updated to Certified
-    const updatedCertStatus = await cdp.evaluate(`
+    // Assert that camera-3 status specifically changed to certified / passed on admin page
+    const cam3AdminStatus = await cdp.evaluate(`
       (() => {
-        return Array.from(document.querySelectorAll('span')).map(s => s.textContent).join(' ');
+        const panels = Array.from(document.querySelectorAll('article.panel'));
+        const cam3Panel = panels.find(p => p.textContent.includes('camera-3') || p.textContent.includes('VEO2-ADDIS-003') || p.textContent.includes('Pitch 2'));
+        return cam3Panel ? cam3Panel.textContent : '';
       })()
     `);
-    console.log('Camera passed certification status verified:', updatedCertStatus.includes('Certified'));
+    console.log('Admin camera-3 panel text verified:', cam3AdminStatus.includes('PASSED'));
+    if (!cam3AdminStatus.includes('PASSED') || cam3AdminStatus.includes('Optical occlusion')) {
+      throw new Error('Camera-3 status was not updated to PASSED or failure reason was not cleared');
+    }
+
+    // Switch back to Owner view and verify owner sees camera-3 certified with guidance cleared
+    await setSession(cdp, 'owner-1', 'en');
+    await cdp.send('Page.navigate', { url: 'http://localhost:3000/dashboard/cameras' });
+    await sleep(2000);
+    await waitForLoading(cdp);
+
+    const cam3OwnerStatus = await cdp.evaluate(`
+      (() => {
+        const panels = Array.from(document.querySelectorAll('article.panel'));
+        const cam3Panel = panels.find(p => p.textContent.includes('camera-3') || p.textContent.includes('VEO2-ADDIS-003') || p.textContent.includes('Pitch 2'));
+        return cam3Panel ? cam3Panel.textContent : '';
+      })()
+    `);
+    if (!cam3OwnerStatus.includes('Certified') || cam3OwnerStatus.includes('Optical occlusion')) {
+      throw new Error('Owner view did not reflect passed certification for camera-3');
+    }
+    console.log('Owner view confirmed updated: camera-3 is Certified.');
 
     // ────────────────────────────────────────────────────────────────
     // JOURNEY 2: Match Recordings, Processing Retry, Consent & Publication
@@ -285,7 +324,7 @@ async function runJourneys() {
     // Simulate Privacy Face Blur and Grant Consent
     await cdp.evaluate(`
       (() => {
-        const blurBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Simulate Privacy Face Blur'));
+        const blurBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Blur'));
         if (blurBtn) blurBtn.click();
       })()
     `);
@@ -293,7 +332,7 @@ async function runJourneys() {
 
     await cdp.evaluate(`
       (() => {
-        const consentBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Granted');
+        const consentBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Granted') || b.textContent.includes('Grant'));
         if (consentBtn) consentBtn.click();
       })()
     `);

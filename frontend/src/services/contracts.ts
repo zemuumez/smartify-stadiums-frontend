@@ -237,7 +237,7 @@ export interface MatchRecording {
 
 export interface ReplayPlayback {
   recordingId: string;
-  bookingId: string;
+  bookingId?: string;
   title: string;
   sport: Sport;
   teamName?: string;
@@ -264,13 +264,22 @@ export interface PublicHighlight {
   thumbnailUrl?: string;
 }
 
+export interface ReplayEntitlement {
+  id: string;
+  recordingId: string;
+  userId: string;
+  grantedBy: string;
+  grantedAt: string;
+  expiresAt?: string;
+}
+
 export interface MediaAsset {
   id: string; bookingId: string; title: string;
   status: 'scheduled' | 'processing' | 'ready' | 'failed';
   visibility: 'private' | 'unlisted' | 'public'; playbackUrl: string | null;
 }
 export interface Invoice { id: string; venueId: string; totalMinor: number; currency: 'ETB'; status: 'unpaid' | 'paid' | 'cancelled' }
-export interface CommercialPolicy { subscriptionPriceMinor: number | null; bookingCommissionPercent: number | null; currency: 'ETB' }
+export interface CommercialPolicy { subscriptionPriceMinor: number | null; bookingCommissionPercent: number | null; replayRetentionDays?: number | null; currency: 'ETB' }
 export interface AuditEntry { id: string; actorId: string; action: string; resourceId: string; createdAt: string }
 export interface Analytics { bookings: number; collectedMinor: number; outstandingMinor: number; cancelled: number }
 export interface RequestOptions {

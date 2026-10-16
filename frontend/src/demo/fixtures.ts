@@ -1,5 +1,5 @@
 import { directoryFixtures } from './directory';
-import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MatchRecording, MediaAsset, Microsite, ParticipationFormat, Team, TeamJoinRequest, Venue } from '../services/contracts';
+import type { Account, AuditEntry, Booking, CameraDevice, Closure, CommercialPolicy, EventRegistration, Field, Invoice, MatchRecording, MediaAsset, Microsite, ParticipationFormat, ReplayEntitlement, Team, TeamJoinRequest, Venue } from '../services/contracts';
 
 /** All operational demo records live here. Amounts are illustrative minor ETB units. */
 export const accounts: Account[] = [
@@ -50,11 +50,18 @@ const originalCourts = [
 ];
 for (const definition of originalCourts) Object.assign(bambisFields.find(f => f.id === definition.id)!, definition);
 fields.sort((a, b) => a.venueId.localeCompare(b.venueId) || (a.venueId === 'venue-1' ? originalCourts.findIndex(f => f.id === a.id) - originalCourts.findIndex(f => f.id === b.id) : 0));
+export const SAMPLE_MEDIA_CONFIG = {
+  samplePlaybackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  sampleThumbnailUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+  provenanceAttribution: 'Sample match playback provided under Creative Commons Attribution 3.0 (Big Buck Bunny, © 2008 Blender Foundation).',
+  defaultRetentionDays: 30, // explicitly provisional
+};
+
 export interface DemoState {
   accounts: Account[]; venues: Venue[]; fields: Field[]; bookings: Booking[]; closures: Closure[];
   sites: Microsite[]; drafts: Microsite[]; teams: Team[]; teamRequests: TeamJoinRequest[];
   eventRegistrations: EventRegistration[]; cameras: CameraDevice[];
-  media: MediaAsset[]; recordings: MatchRecording[]; invoices: Invoice[]; audit: AuditEntry[];
+  media: MediaAsset[]; recordings: MatchRecording[]; entitlements: ReplayEntitlement[]; invoices: Invoice[]; audit: AuditEntry[];
   idempotency: Record<string, { fingerprint: string; bookingId: string }>;
 }
 export const commercialPolicy: CommercialPolicy = { subscriptionPriceMinor: null, bookingCommissionPercent: null, currency: 'ETB' };
@@ -345,6 +352,45 @@ export function createFixtures(): DemoState {
       retentionExpiresAt: '2026-11-15T00:00:00Z',
       createdAt: '2026-10-12T15:00:00Z',
     },
+    {
+      id: 'rec-expired-1',
+      venueId: 'venue-1',
+      fieldId: 'field-1',
+      bookingId: 'booking-rec-expired-1',
+      cameraId: 'camera-1',
+      sport: 'football',
+      status: 'ready',
+      retryEligible: false,
+      duration: '10:00',
+      title: 'Expired Bambis Match',
+      playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ExpiredMatch.mp4',
+      thumbnailUrl: '/venue-card-1.jpg',
+      consent: {
+        status: 'granted',
+        requiresGuardian: false,
+        updatedAt: '2026-08-01T10:00:00Z',
+      },
+      privacy: {
+        faceBlurStatus: 'completed',
+        completedAt: '2026-08-01T10:05:00Z',
+      },
+      publication: {
+        visibility: 'public',
+        ownerApproved: true,
+        publishedAt: '2026-08-01T10:10:00Z',
+      },
+      retentionExpiresAt: '2026-09-01T00:00:00Z', // intentionally expired in the past
+      createdAt: '2026-08-01T09:00:00Z',
+    },
+  ];
+
+  const initialEntitlements: ReplayEntitlement[] = [
+    { id: 'ent-1', recordingId: 'rec-1', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-10T19:00:00Z' },
+    { id: 'ent-2', recordingId: 'rec-2', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-11T17:00:00Z' },
+    { id: 'ent-3', recordingId: 'rec-3', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-12T19:00:00Z' },
+    { id: 'ent-4', recordingId: 'rec-4', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-13T09:00:00Z' },
+    { id: 'ent-5', recordingId: 'rec-5', userId: 'player-1', grantedBy: 'system', grantedAt: '2026-10-14T11:00:00Z' },
+    { id: 'ent-unity-1', recordingId: 'rec-unity-1', userId: 'player-2', grantedBy: 'system', grantedAt: '2026-10-12T16:00:00Z' },
   ];
 
   return structuredClone({
@@ -360,6 +406,7 @@ export function createFixtures(): DemoState {
     eventRegistrations: [],
     cameras: initialCameras,
     recordings: initialRecordings,
+    entitlements: initialEntitlements,
     media: [],
     invoices: [],
     audit: [],

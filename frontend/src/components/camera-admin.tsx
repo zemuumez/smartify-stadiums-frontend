@@ -16,6 +16,7 @@ import type {
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/en';
+import { isDemoMode } from '@/services/config';
 import { Loading, ServiceErrorMessage } from './service-state';
 
 function useModalKeyboard(isOpen: boolean, onClose: () => void) {
@@ -82,7 +83,6 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
   const [selectedVenueId, setSelectedVenueId] = useState(venueId || '');
   const [editingCamera, setEditingCamera] = useState<CameraDevice | null>(null);
   const [isAddingCamera, setIsAddingCamera] = useState(false);
-  const [certifyingCamera, setCertifyingCamera] = useState<CameraDevice | null>(null);
   const [inspectingRecording, setInspectingRecording] = useState<MatchRecording | null>(null);
   const [actionError, setActionError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
@@ -213,7 +213,7 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
                       </div>
                     )}
 
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
                       <button
                         type="button"
                         className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50"
@@ -224,13 +224,12 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
                       >
                         {t('editCamera')}
                       </button>
-                      <button
-                        type="button"
-                        className="min-h-11 rounded-xl border border-purple-300 bg-purple-50 px-4 text-sm font-semibold text-purple-900 hover:bg-purple-100"
-                        onClick={() => setCertifyingCamera(camera)}
-                      >
-                        {t('simulateAdminReview')}
-                      </button>
+                      {camera.certificationStatus !== 'passed' && (
+                        <div className="flex flex-col gap-0.5 text-xs text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                          <span className="font-semibold text-slate-800">{t('adminCertificationRequired')}</span>
+                          <span className="text-slate-500">{t('adminCertNotice')}</span>
+                        </div>
+                      )}
                     </div>
                   </article>
                 );
@@ -345,18 +344,6 @@ export function OwnerCameras({ venueId }: { venueId?: string }) {
           onSaved={() => {
             setIsAddingCamera(false);
             setEditingCamera(null);
-            query.reload();
-          }}
-        />
-      )}
-
-      {/* Admin Certification Simulation Modal */}
-      {certifyingCamera && (
-        <AdminCertificationModal
-          camera={certifyingCamera}
-          onClose={() => setCertifyingCamera(null)}
-          onCertified={() => {
-            setCertifyingCamera(null);
             query.reload();
           }}
         />
@@ -606,7 +593,7 @@ function CameraFormModal({
   );
 }
 
-function AdminCertificationModal({
+export function AdminCertificationModal({
   camera,
   onClose,
   onCertified,
@@ -663,8 +650,8 @@ function AdminCertificationModal({
         </div>
 
         <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-900">
-          <span className="font-bold">Simulated Platform Admin Inspection: </span>
-          Device certification cannot be self-issued by venue owners. Hardware specs, FOV calibration, and mount stability must pass platform review.
+          <span className="font-bold">{t('demoSimulationOnly')}: </span>
+          {t('adminCertExplanation')}
         </div>
 
         {error ? <ServiceErrorMessage error={error} /> : null}
@@ -837,42 +824,49 @@ function RecordingDetailModal({
         </div>
 
         {/* State Advancement Simulator */}
-        <section aria-label="Simulator Controls" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-          <h3 className="font-bold text-sm text-slate-800">{t('advanceSimState')}</h3>
-          <p className="text-xs text-slate-500">{t('storageNotice')}</p>
-          <div className="flex flex-wrap gap-2">
-            {(['scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed'] as const).map(nextStatus => (
-              <button
-                key={nextStatus}
-                type="button"
-                disabled={busy || recording.status === nextStatus}
-                onClick={async () => {
-                  setBusy(true);
-                  setError(undefined);
-                  try {
-                    await mediaService.advanceRecordingDemoState(
-                      recording.id,
-                      nextStatus,
-                      nextStatus === 'failed' ? 'Simulated AI tracking failure' : undefined
-                    );
-                    onUpdated();
-                  } catch (err) {
-                    setError(err);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className={`min-h-9 px-3 py-1 rounded-xl text-xs font-semibold border ${
-                  recording.status === nextStatus
-                    ? 'bg-slate-300 text-slate-800 border-slate-400'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
-                }`}
-              >
-                → {nextStatus}
-              </button>
-            ))}
-          </div>
-        </section>
+        {isDemoMode && (
+          <section aria-label={t('demoSimulationOnly')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-slate-800">{t('advanceSimState')}</h3>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                {t('demoSimulationOnly')}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">{t('storageNotice')}</p>
+            <div className="flex flex-wrap gap-2">
+              {(['scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed'] as const).map(nextStatus => (
+                <button
+                  key={nextStatus}
+                  type="button"
+                  disabled={busy || recording.status === nextStatus}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError(undefined);
+                    try {
+                      await mediaService.advanceRecordingDemoState(
+                        recording.id,
+                        nextStatus,
+                        nextStatus === 'failed' ? 'Simulated AI tracking failure' : undefined
+                      );
+                      onUpdated();
+                    } catch (err) {
+                      setError(err);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className={`min-h-9 px-3 py-1 rounded-xl text-xs font-semibold border ${
+                    recording.status === nextStatus
+                      ? 'bg-slate-300 text-slate-800 border-slate-400'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
+                  }`}
+                >
+                  → {nextStatus}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Privacy & Consent Operations */}
         <section aria-label={t('privacyConsent')} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
@@ -969,7 +963,7 @@ function RecordingDetailModal({
                     }
                   }}
                 />
-                Minor participants present
+                {t('minorParticipantsPresent')}
               </label>
               {recording.consent.requiresGuardian && (
                 <div className="mt-1">
@@ -1001,7 +995,7 @@ function RecordingDetailModal({
                   }}
                   className="min-h-9 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
                 >
-                  ✓ Guardian Grant
+                  {t('guardianGrant')}
                 </button>
                 <button
                   type="button"
@@ -1023,7 +1017,7 @@ function RecordingDetailModal({
                   }}
                   className="min-h-9 px-3 rounded-xl border border-rose-300 bg-rose-50 text-xs font-semibold text-rose-900 hover:bg-rose-100"
                 >
-                  ✕ Guardian Deny
+                  {t('guardianDeny')}
                 </button>
               </div>
             )}
@@ -1063,7 +1057,7 @@ function RecordingDetailModal({
             <div>
               <h3 className="font-bold text-sm text-slate-800">{t('publicationStatus')}</h3>
               <p className="text-xs text-slate-500">
-                Conservative privacy invariant: Public exposure requires granted consent and completed face blur.
+                {t('privacyPolicyInvariant')}
               </p>
             </div>
             <VisibilityBadge visibility={recording.publication.visibility} />

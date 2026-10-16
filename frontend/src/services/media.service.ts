@@ -8,6 +8,7 @@ import type {
   PrivacyConsentStatus,
   PublicHighlight,
   RecordingStatus,
+  ReplayEntitlement,
   ReplayPlayback,
   Transport,
 } from './contracts';
@@ -26,8 +27,14 @@ export function createMediaService(transport: Transport) {
       transport.request<CameraDevice>(`/owner/cameras/${id}`, { method: 'PATCH', body: input }),
 
     // Admin certification review
+    adminCameras: (signal?: AbortSignal) =>
+      transport.request<CameraDevice[]>('/admin/cameras', { signal }),
     certifyCamera: (id: string, input: CameraCertificationReviewInput) =>
       transport.request<CameraDevice>(`/admin/cameras/${id}/certify`, { method: 'POST', body: input }),
+    grantReplayEntitlement: (recordingId: string, input: string | { userId: string; expiresAt?: string }) => {
+      const body = typeof input === 'string' ? { userId: input } : input;
+      return transport.request<ReplayEntitlement>(`/owner/recordings/${recordingId}/entitlements`, { method: 'POST', body });
+    },
 
     // Owner recording operations
     recordings: (venueId?: string | AbortSignal, signal?: AbortSignal) => {

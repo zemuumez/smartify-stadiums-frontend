@@ -1,8 +1,8 @@
-import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl, isSupportedVideoUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
-import { commercialPolicy, createFixtures, demoOTP, type DemoState } from './fixtures';
+import { commercialPolicy, createFixtures, demoOTP, SAMPLE_MEDIA_CONFIG, type DemoState } from './fixtures';
 import type { FieldInput } from '../services/fields.service';
 
 export interface DemoStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
@@ -10,6 +10,17 @@ const DATA_KEY = 'etsf-demo-v2';
 const SESSION_KEY = 'etsf-demo-session-v1';
 const overlaps = (start: number, end: number, otherStart: number, otherEnd: number) => start < otherEnd && end > otherStart;
 const sports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
+
+export function isRecordingPubliclyEligible(rec: MatchRecording): boolean {
+  const isNotExpired = !rec.retentionExpiresAt || Date.parse(rec.retentionExpiresAt) > Date.now();
+  const isReady = rec.status === 'ready' && !!rec.playbackUrl;
+  const isPublic = rec.publication.visibility === 'public' && rec.publication.ownerApproved;
+  const isConsentGranted = rec.consent.status === 'granted';
+  const isGuardianGranted = !rec.consent.requiresGuardian || rec.consent.guardianConsentStatus === 'granted';
+  const isBlurCompleted = rec.privacy.faceBlurStatus === 'completed';
+
+  return isNotExpired && isReady && isPublic && isConsentGranted && isGuardianGranted && isBlurCompleted;
+}
 
 /** Simulator only: browser data and role checks are not a security boundary. */
 export function createDemoTransport(storage?: DemoStorage) {
@@ -27,6 +38,7 @@ export function createDemoTransport(storage?: DemoStorage) {
         if (!Array.isArray(state.eventRegistrations)) state.eventRegistrations = [];
         if (!Array.isArray(state.cameras)) state.cameras = createFixtures().cameras;
         if (!Array.isArray(state.recordings)) state.recordings = createFixtures().recordings;
+        if (!Array.isArray(state.entitlements)) state.entitlements = createFixtures().entitlements;
       }
     }
     currentId = storage?.getItem(SESSION_KEY) || null;
@@ -167,19 +179,28 @@ export function createDemoTransport(storage?: DemoStorage) {
         sport: booking.sport,
         teamId: booking.teamId,
         teamName: booking.teamName,
-        status: 'ready',
+        status: 'scheduled',
         retryEligible: false,
         duration: `${(booking.endHour - booking.startHour) * 45}:00`,
         title: `${state.venues.find(v => v.id === item.venueId)?.name || 'Match'} — ${item.name}`,
-        playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        thumbnailUrl: state.venues.find(v => v.id === item.venueId)?.image || '/venue-card-1.jpg',
-        consent: { status: 'granted', requiresGuardian: false, updatedAt: new Date().toISOString() },
-        privacy: { faceBlurStatus: 'completed', completedAt: new Date().toISOString() },
+        playbackUrl: null,
+        thumbnailUrl: null,
+        consent: { status: 'pending', requiresGuardian: user.is_minor || false, updatedAt: new Date().toISOString() },
+        privacy: { faceBlurStatus: 'pending' },
         publication: { visibility: 'private', ownerApproved: false },
-        retentionExpiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        retentionExpiresAt: new Date(Date.now() + (commercialPolicy.replayRetentionDays || SAMPLE_MEDIA_CONFIG.defaultRetentionDays) * 86400000).toISOString(),
         createdAt: new Date().toISOString(),
       };
-      state.recordings.push(rec);
+      if (item.camera && cam) {
+        state.recordings.push(rec);
+        state.entitlements.push({
+          id: `ent-${crypto.randomUUID()}`,
+          recordingId: rec.id,
+          userId: booking.playerId,
+          grantedBy: 'booking_player',
+          grantedAt: new Date().toISOString(),
+        });
+      }
       state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
@@ -287,19 +308,21 @@ export function createDemoTransport(storage?: DemoStorage) {
           bookingId: booking.id,
           cameraId: cam?.id,
           sport: booking.sport,
-          status: 'ready',
+          status: 'scheduled',
           retryEligible: false,
           duration: `${(booking.endHour - booking.startHour) * 45}:00`,
           title: `${venue.name} — ${item.name} (${input.guestName})`,
-          playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-          thumbnailUrl: venue.image || '/venue-card-1.jpg',
-          consent: { status: 'granted', requiresGuardian: false, updatedAt: new Date().toISOString() },
-          privacy: { faceBlurStatus: 'completed', completedAt: new Date().toISOString() },
+          playbackUrl: null,
+          thumbnailUrl: null,
+          consent: { status: 'pending', requiresGuardian: false, updatedAt: new Date().toISOString() },
+          privacy: { faceBlurStatus: 'pending' },
           publication: { visibility: 'private', ownerApproved: false },
-          retentionExpiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+          retentionExpiresAt: new Date(Date.now() + (commercialPolicy.replayRetentionDays || SAMPLE_MEDIA_CONFIG.defaultRetentionDays) * 86400000).toISOString(),
           createdAt: new Date().toISOString(),
         };
-        state.recordings.push(rec);
+        if (item.camera && cam) {
+          state.recordings.push(rec);
+        }
         state.idempotency[key] = { fingerprint, bookingId: booking.id };
         audit('booking.walk_in', booking.id);
         persist();
@@ -344,6 +367,16 @@ export function createDemoTransport(storage?: DemoStorage) {
               (draft.events || []) as SiteEvent[]
             );
 
+            for (const rawH of (input.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string })[]) {
+              const pUrl = rawH.playbackUrl || rawH.videoUrl;
+              if (pUrl) {
+                const linkedRec = state.recordings.find(r => r.playbackUrl === pUrl || r.id === rawH.id || r.id === rawH.recordingId || pUrl.includes(r.id));
+                if (linkedRec && !isRecordingPubliclyEligible(linkedRec)) {
+                  throw new ServiceError('validation', 422);
+                }
+              }
+            }
+
             Object.assign(draft, {
               highlights: structuredClone(input.highlights || []),
               events: structuredClone(input.events || []),
@@ -370,6 +403,15 @@ export function createDemoTransport(storage?: DemoStorage) {
               (draft.events || []) as SiteEvent[],
               (currentSite?.events || draft.events || []) as SiteEvent[]
             );
+            for (const rawH of (draft.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string })[]) {
+              const pUrl = rawH.playbackUrl || rawH.videoUrl;
+              if (pUrl) {
+                const linkedRec = state.recordings.find(r => r.playbackUrl === pUrl || r.id === rawH.id || r.id === rawH.recordingId || pUrl.includes(r.id));
+                if (linkedRec && !isRecordingPubliclyEligible(linkedRec)) {
+                  throw new ServiceError('validation', 422);
+                }
+              }
+            }
             draft.published = true;
             draft.updatedAt = new Date().toISOString();
             const site = structuredClone(draft);
@@ -483,7 +525,8 @@ export function createDemoTransport(storage?: DemoStorage) {
           rec.status = 'ready';
           rec.failureReason = undefined;
           rec.retryEligible = false;
-          rec.playbackUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+          rec.playbackUrl = SAMPLE_MEDIA_CONFIG.samplePlaybackUrl;
+          rec.thumbnailUrl = SAMPLE_MEDIA_CONFIG.sampleThumbnailUrl;
           audit('recording.retried', rec.id);
           persist();
           return rec;
@@ -494,12 +537,12 @@ export function createDemoTransport(storage?: DemoStorage) {
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
           const body = options.body as { status: RecordingStatus };
           const validNextStates: Record<RecordingStatus, RecordingStatus[]> = {
-            scheduled: ['recording', 'failed'],
-            recording: ['uploading', 'failed'],
-            uploading: ['processing', 'failed'],
+            scheduled: ['recording', 'uploading', 'processing', 'ready', 'failed'],
+            recording: ['uploading', 'processing', 'ready', 'failed'],
+            uploading: ['processing', 'ready', 'failed'],
             processing: ['ready', 'failed'],
-            failed: ['processing', 'ready'],
-            ready: ['ready'],
+            failed: ['processing', 'ready', 'scheduled'],
+            ready: ['ready', 'scheduled'],
           };
           if (!validNextStates[rec.status]?.includes(body.status)) {
             throw new ServiceError('conflict', 409);
@@ -512,7 +555,10 @@ export function createDemoTransport(storage?: DemoStorage) {
           } else if (body.status === 'ready') {
             rec.failureReason = undefined;
             rec.retryEligible = false;
-            rec.playbackUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+            rec.playbackUrl = SAMPLE_MEDIA_CONFIG.samplePlaybackUrl;
+            rec.thumbnailUrl = SAMPLE_MEDIA_CONFIG.sampleThumbnailUrl;
+          } else {
+            rec.playbackUrl = null;
           }
           audit(`recording.state_advanced: ${body.status}`, rec.id);
           persist();
@@ -613,6 +659,26 @@ export function createDemoTransport(storage?: DemoStorage) {
           audit('recording.unpublished', rec.id);
           persist();
           return rec;
+        }
+        if (parts.length === 4 && parts[3] === 'entitlements' && method === 'POST') {
+          const rec = state.recordings.find(r => r.id === parts[2]);
+          if (!rec) throw new ServiceError('not_found', 404);
+          if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
+          const body = options.body as { userId: string };
+          if (!body?.userId) throw new ServiceError('validation', 422);
+          const existing = state.entitlements.find(e => e.recordingId === rec.id && e.userId === body.userId);
+          if (existing) return existing;
+          const entitlement: ReplayEntitlement = {
+            id: `ent-${crypto.randomUUID()}`,
+            recordingId: rec.id,
+            userId: body.userId,
+            grantedBy: user.id,
+            grantedAt: new Date().toISOString(),
+          };
+          state.entitlements.push(entitlement);
+          audit('recording.entitlement_granted', `${rec.id}:${body.userId}`);
+          persist();
+          return entitlement;
         }
       }
       if (path === '/owner/invoices' && method === 'GET') return state.invoices.filter(item => venueIds.includes(item.venueId));
@@ -959,13 +1025,7 @@ export function createDemoTransport(storage?: DemoStorage) {
       if (!targetVenue) throw new ServiceError('not_found', 404);
       const published = state.recordings.filter(r =>
         r.venueId === targetVenue.id &&
-        r.publication.visibility === 'public' &&
-        r.publication.ownerApproved &&
-        r.consent.status === 'granted' &&
-        (!r.consent.requiresGuardian || r.consent.guardianConsentStatus === 'granted') &&
-        r.privacy.faceBlurStatus === 'completed' &&
-        r.status === 'ready' &&
-        r.playbackUrl !== null
+        isRecordingPubliclyEligible(r)
       );
       const highlights: PublicHighlight[] = published.map((r, idx) => ({
         id: `highlight-${r.id}`,
@@ -986,52 +1046,50 @@ export function createDemoTransport(storage?: DemoStorage) {
       try { user = account(); } catch {}
 
       const bookingId = parts[1];
-      let rec = state.recordings.find(r => r.bookingId === bookingId || r.id === bookingId);
+      const rec = state.recordings.find(r => r.bookingId === bookingId || r.id === bookingId);
       const booking = state.bookings.find(b => b.id === bookingId);
 
-      if (!rec && booking) {
-        const venue = state.venues.find(v => v.id === booking.venueId);
-        const cam = state.cameras.find(c => c.fieldId === booking.fieldId);
-        rec = {
-          id: `rec-${booking.id}`,
-          venueId: booking.venueId,
-          fieldId: booking.fieldId,
+      if (!rec) {
+        if (!booking) {
+          throw new ServiceError('not_found', 404);
+        }
+        if (!user) {
+          throw new ServiceError('unauthorized', 401);
+        }
+        const isAdmin = user.role === 'admin';
+        const isOwner = state.venues.some(v => v.id === booking.venueId && v.ownerId === user!.id);
+        const isBookingPlayer = booking.playerId === user.id;
+        if (!isAdmin && !isOwner && !isBookingPlayer) {
+          throw new ServiceError('forbidden', 403);
+        }
+        const unavailableReplay: ReplayPlayback = {
+          recordingId: '',
           bookingId: booking.id,
-          cameraId: cam?.id,
+          title: `${booking.sport.toUpperCase()} Match`,
           sport: booking.sport,
-          teamId: booking.teamId,
           teamName: booking.teamName,
-          status: 'ready',
-          retryEligible: false,
-          duration: `${(booking.endHour - booking.startHour) * 45}:00`,
-          title: `${venue?.name || 'Match'} — ${booking.sport.toUpperCase()}`,
-          playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-          thumbnailUrl: venue?.image || '/venue-card-1.jpg',
-          consent: { status: 'granted', requiresGuardian: false, updatedAt: new Date().toISOString() },
-          privacy: { faceBlurStatus: 'completed', completedAt: new Date().toISOString() },
-          publication: { visibility: 'private', ownerApproved: false },
-          retentionExpiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
-          createdAt: new Date().toISOString(),
+          canPlay: false,
+          playbackUrl: null,
+          entitlementStatus: 'unavailable',
+          visibility: 'private',
+          duration: '0:00',
+          reason: 'No match recording exists for this booking.',
         };
-        state.recordings.push(rec);
+        return unavailableReplay;
       }
 
-      if (!rec) throw new ServiceError('not_found', 404);
-
-      const isPublic = rec.publication.visibility === 'public';
-      if (!user && !isPublic) {
-        throw new ServiceError('unauthorized', 401);
-      }
-
+      const isPublic = isRecordingPubliclyEligible(rec);
       const isAdmin = user?.role === 'admin';
-      const isOwner = user ? state.venues.some(v => v.id === rec!.venueId && v.ownerId === user!.id) : false;
-      const isBookingPlayer = user ? (booking?.playerId === user.id || (['rec-1', 'rec-2', 'rec-3', 'rec-4', 'rec-5', 'booking-rec-1', 'booking-rec-2', 'booking-rec-3', 'booking-rec-4', 'booking-rec-5'].includes(bookingId) && user.id === 'player-1') || (['rec-unity-1', 'booking-unity-1'].includes(bookingId) && user.id === 'player-2')) : false;
+      const isOwner = user ? state.venues.some(v => v.id === rec.venueId && v.ownerId === user!.id) : false;
+      const isBookingPlayer = user ? booking?.playerId === user.id : false;
+      const hasExplicitEntitlement = user ? state.entitlements.some(e => e.recordingId === rec.id && e.userId === user!.id && (!e.expiresAt || Date.parse(e.expiresAt) > Date.now())) : false;
 
-      const isTeamMember = user && rec.teamId ? state.teams.some(t => t.id === rec!.teamId && (t.memberIds.includes(user!.id) || t.captainId === user!.id)) : false;
+      const isPrivatelyAuthorized = isAdmin || isOwner || isBookingPlayer || hasExplicitEntitlement;
 
-      const isEntitled = isAdmin || isOwner || isBookingPlayer || isTeamMember;
-
-      if (!isEntitled && !isPublic) {
+      if (!isPrivatelyAuthorized && !isPublic) {
+        if (!user) {
+          throw new ServiceError('unauthorized', 401);
+        }
         throw new ServiceError('forbidden', 403);
       }
 
@@ -1041,7 +1099,10 @@ export function createDemoTransport(storage?: DemoStorage) {
       let playbackUrl: string | null = null;
       let reason: string | undefined;
 
-      if (rec.status === 'processing' || rec.status === 'scheduled' || rec.status === 'recording' || rec.status === 'uploading') {
+      if (rec.status === 'scheduled') {
+        entitlementStatus = 'processing';
+        reason = 'Recording is scheduled and will begin at match time';
+      } else if (rec.status === 'processing' || rec.status === 'recording' || rec.status === 'uploading') {
         entitlementStatus = 'processing';
         reason = 'Recording is currently processing';
       } else if (rec.status === 'failed') {
@@ -1061,7 +1122,7 @@ export function createDemoTransport(storage?: DemoStorage) {
 
       const replay: ReplayPlayback = {
         recordingId: rec.id,
-        bookingId: rec.bookingId,
+        bookingId: isPrivatelyAuthorized ? rec.bookingId : undefined,
         title: rec.title,
         sport: rec.sport,
         teamName: rec.teamName,
@@ -1082,13 +1143,16 @@ export function createDemoTransport(storage?: DemoStorage) {
 
       const replays: ReplayPlayback[] = [];
       for (const rec of state.recordings) {
-        const isPublic = rec.publication.visibility === 'public';
+        const isPublic = isRecordingPubliclyEligible(rec);
         const isAdmin = user?.role === 'admin';
         const isOwner = user ? state.venues.some(v => v.id === rec.venueId && v.ownerId === user.id) : false;
-        const isBookingPlayer = user ? state.bookings.some(b => b.id === rec.bookingId && b.playerId === user.id) || (['rec-1', 'rec-2', 'rec-3', 'rec-4', 'rec-5'].includes(rec.id) && user.id === 'player-1') || (rec.id === 'rec-unity-1' && user.id === 'player-2') : false;
-        const isTeamMember = user && rec.teamId ? state.teams.some(t => t.id === rec.teamId && (t.memberIds.includes(user.id) || t.captainId === user.id)) : false;
+        const booking = state.bookings.find(b => b.id === rec.bookingId);
+        const isBookingPlayer = user ? booking?.playerId === user.id : false;
+        const hasExplicitEntitlement = user ? state.entitlements.some(e => e.recordingId === rec.id && e.userId === user.id && (!e.expiresAt || Date.parse(e.expiresAt) > Date.now())) : false;
 
-        if (!isAdmin && !isOwner && !isBookingPlayer && !isTeamMember && !isPublic) {
+        const isPrivatelyAuthorized = isAdmin || isOwner || isBookingPlayer || hasExplicitEntitlement;
+
+        if (!isPrivatelyAuthorized && !isPublic) {
           continue;
         }
 
@@ -1097,7 +1161,7 @@ export function createDemoTransport(storage?: DemoStorage) {
         let canPlay = false;
         let playbackUrl: string | null = null;
 
-        if (rec.status === 'processing' || rec.status === 'scheduled' || rec.status === 'recording' || rec.status === 'uploading') {
+        if (rec.status === 'scheduled' || rec.status === 'processing' || rec.status === 'recording' || rec.status === 'uploading') {
           entitlementStatus = 'processing';
         } else if (rec.status === 'failed') {
           entitlementStatus = 'failed';
@@ -1113,7 +1177,7 @@ export function createDemoTransport(storage?: DemoStorage) {
 
         replays.push({
           recordingId: rec.id,
-          bookingId: rec.bookingId,
+          bookingId: isPrivatelyAuthorized ? rec.bookingId : undefined,
           title: rec.title,
           sport: rec.sport,
           teamName: rec.teamName,
@@ -1134,6 +1198,7 @@ export function createDemoTransport(storage?: DemoStorage) {
       if (path === '/admin/users' && method === 'GET') return state.accounts;
       if (path === '/admin/audit' && method === 'GET') return state.audit;
       if (path === '/admin/stadiums' && method === 'GET') return state.venues;
+      if (path === '/admin/cameras' && method === 'GET') return state.cameras;
       if (parts[1] === 'cameras' && parts[3] === 'certify' && method === 'POST') {
         const cam = state.cameras.find(c => c.id === parts[2]);
         if (!cam) throw new ServiceError('not_found', 404);
@@ -1143,8 +1208,8 @@ export function createDemoTransport(storage?: DemoStorage) {
         }
         cam.certificationStatus = input.certificationStatus;
         cam.status = input.certificationStatus === 'passed' ? 'certified' : input.certificationStatus === 'revoked' ? 'revoked' : 'pending';
-        cam.failureReason = input.failureReason?.trim() || undefined;
-        cam.recoveryGuidance = input.recoveryGuidance?.trim() || undefined;
+        cam.failureReason = input.certificationStatus === 'passed' ? undefined : (input.failureReason?.trim() || undefined);
+        cam.recoveryGuidance = input.certificationStatus === 'passed' ? undefined : (input.recoveryGuidance?.trim() || undefined);
         cam.certifiedAt = new Date().toISOString();
         cam.certifiedBy = adminUser.id;
         audit(`camera.certification: ${input.certificationStatus}`, cam.id);

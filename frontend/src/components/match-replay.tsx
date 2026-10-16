@@ -98,7 +98,7 @@ export function ReplayModal({
               {t('matchReplay')}
             </h2>
             <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">
-              4K Broadcast
+              {t('broadcast4k')}
             </span>
           </div>
           <button
