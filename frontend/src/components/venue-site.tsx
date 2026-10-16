@@ -309,7 +309,9 @@ export function VenueSite({
                     <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
                       {m.dur}
                     </span>
-                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>{copy("4K Replay")}</span>
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white text-[9px] font-bold uppercase tracking-wider" style={{ background: brandColor }}>
+                      {m.playbackUrl ? copy("4K Replay") : t('previewOnly')}
+                    </span>
                   </div>
 
                   <h3 className="font-black text-sm text-[#111] mb-1">{m.title}</h3>

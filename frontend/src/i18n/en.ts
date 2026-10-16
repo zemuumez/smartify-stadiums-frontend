@@ -296,5 +296,17 @@ export const en = {
   allVenuesCameras: 'All Venue Cameras',
   recordingScheduledNotice: 'Match recording scheduled. Video capture will begin automatically at the reserved time.',
   adminCertPrompt: 'Device inspection must be performed by a platform administrator',
+  linkedRecordingId: 'Linked Recording ID',
+  liveModeProcessingGuidance: 'Automated pipeline processing required in live mode.',
+  liveModeConsentGuidance: 'Consent evidence documentation required in live mode.',
+  replayReason_no_recording_exists: 'No match recording exists for this booking.',
+  replayReason_recording_scheduled: 'Recording is scheduled and will begin at match time.',
+  replayReason_recording_processing: 'Recording is currently processing.',
+  replayReason_recording_failed: 'Video processing encountered a failure.',
+  replayReason_recording_expired: 'Playback access for this recording has expired.',
+  replayReason_no_media_source: 'No playable media source available.',
+  replayReason_access_denied: 'You do not have entitlement to view this match replay.',
+  yes: 'Yes',
+  no: 'No',
 } as const;
 export type MessageKey = keyof typeof en;

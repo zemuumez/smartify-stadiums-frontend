@@ -834,36 +834,39 @@ function RecordingDetailModal({
             </div>
             <p className="text-xs text-slate-500">{t('storageNotice')}</p>
             <div className="flex flex-wrap gap-2">
-              {(['scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed'] as const).map(nextStatus => (
-                <button
-                  key={nextStatus}
-                  type="button"
-                  disabled={busy || recording.status === nextStatus}
-                  onClick={async () => {
-                    setBusy(true);
-                    setError(undefined);
-                    try {
-                      await mediaService.advanceRecordingDemoState(
-                        recording.id,
-                        nextStatus,
-                        nextStatus === 'failed' ? 'Simulated AI tracking failure' : undefined
-                      );
-                      onUpdated();
-                    } catch (err) {
-                      setError(err);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  className={`min-h-9 px-3 py-1 rounded-xl text-xs font-semibold border ${
-                    recording.status === nextStatus
-                      ? 'bg-slate-300 text-slate-800 border-slate-400'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
-                  }`}
-                >
-                  → {nextStatus}
-                </button>
-              ))}
+              {(['scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed'] as const).map(nextStatus => {
+                const statusKey: MessageKey = `rec${nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}` as MessageKey;
+                return (
+                  <button
+                    key={nextStatus}
+                    type="button"
+                    disabled={busy || recording.status === nextStatus}
+                    onClick={async () => {
+                      setBusy(true);
+                      setError(undefined);
+                      try {
+                        await mediaService.advanceRecordingDemoState(
+                          recording.id,
+                          nextStatus,
+                          nextStatus === 'failed' ? 'Simulated AI tracking failure' : undefined
+                        );
+                        onUpdated();
+                      } catch (err) {
+                        setError(err);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    className={`min-h-9 px-3 py-1 rounded-xl text-xs font-semibold border ${
+                      recording.status === nextStatus
+                        ? 'bg-slate-300 text-slate-800 border-slate-400'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
+                    }`}
+                  >
+                    → {t(statusKey)}
+                  </button>
+                );
+              })}
             </div>
           </section>
         )}
@@ -878,114 +881,16 @@ function RecordingDetailModal({
               <span className="text-xs text-slate-500 block">{t('participantConsent')}</span>
               <ConsentStatusBadge status={recording.consent.status} />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy || recording.consent.status === 'granted'}
-                onClick={async () => {
-                  setBusy(true);
-                  setError(undefined);
-                  try {
-                    await mediaService.updateConsent(recording.id, { status: 'granted' });
-                    onUpdated();
-                  } catch (err) {
-                    setError(err);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className="min-h-9 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
-              >
-                {t('consentGranted')}
-              </button>
-              <button
-                type="button"
-                disabled={busy || recording.consent.status === 'denied'}
-                onClick={async () => {
-                  setBusy(true);
-                  setError(undefined);
-                  try {
-                    await mediaService.updateConsent(recording.id, { status: 'denied' });
-                    onUpdated();
-                  } catch (err) {
-                    setError(err);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className="min-h-9 px-3 rounded-xl border border-rose-300 bg-rose-50 text-xs font-semibold text-rose-900 hover:bg-rose-100"
-              >
-                {t('consentDenied')}
-              </button>
-              <button
-                type="button"
-                disabled={busy || recording.consent.status === 'revoked'}
-                onClick={async () => {
-                  setBusy(true);
-                  setError(undefined);
-                  try {
-                    await mediaService.updateConsent(recording.id, { status: 'revoked' });
-                    onUpdated();
-                  } catch (err) {
-                    setError(err);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className="min-h-9 px-3 rounded-xl border border-slate-300 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                {t('consentRevoked')}
-              </button>
-            </div>
-          </div>
-
-          {/* Minor Guardian Consent */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  disabled={busy}
-                  checked={recording.consent.requiresGuardian}
-                  onChange={async e => {
-                    setBusy(true);
-                    setError(undefined);
-                    try {
-                      await mediaService.updateConsent(recording.id, {
-                        minorParticipant: e.target.checked,
-                        guardianStatus: e.target.checked ? (recording.consent.guardianConsentStatus || 'pending') : undefined,
-                      });
-                      onUpdated();
-                    } catch (err) {
-                      setError(err);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                />
-                {t('minorParticipantsPresent')}
-              </label>
-              {recording.consent.requiresGuardian && (
-                <div className="mt-1">
-                  <span className="text-xs text-slate-500 block">{t('guardianConsent')}:</span>
-                  <ConsentStatusBadge status={recording.consent.guardianConsentStatus || 'pending'} />
-                </div>
-              )}
-            </div>
-
-            {recording.consent.requiresGuardian && (
+            {isDemoMode ? (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || recording.consent.guardianConsentStatus === 'granted'}
+                  disabled={busy || recording.consent.status === 'granted'}
                   onClick={async () => {
                     setBusy(true);
                     setError(undefined);
                     try {
-                      await mediaService.updateConsent(recording.id, {
-                        minorParticipant: true,
-                        guardianStatus: 'granted',
-                      });
+                      await mediaService.updateConsent(recording.id, { status: 'granted' });
                       onUpdated();
                     } catch (err) {
                       setError(err);
@@ -995,19 +900,16 @@ function RecordingDetailModal({
                   }}
                   className="min-h-9 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
                 >
-                  {t('guardianGrant')}
+                  {t('consentGranted')}
                 </button>
                 <button
                   type="button"
-                  disabled={busy || recording.consent.guardianConsentStatus === 'denied'}
+                  disabled={busy || recording.consent.status === 'denied'}
                   onClick={async () => {
                     setBusy(true);
                     setError(undefined);
                     try {
-                      await mediaService.updateConsent(recording.id, {
-                        minorParticipant: true,
-                        guardianStatus: 'denied',
-                      });
+                      await mediaService.updateConsent(recording.id, { status: 'denied' });
                       onUpdated();
                     } catch (err) {
                       setError(err);
@@ -1017,9 +919,128 @@ function RecordingDetailModal({
                   }}
                   className="min-h-9 px-3 rounded-xl border border-rose-300 bg-rose-50 text-xs font-semibold text-rose-900 hover:bg-rose-100"
                 >
-                  {t('guardianDeny')}
+                  {t('consentDenied')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || recording.consent.status === 'revoked'}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError(undefined);
+                    try {
+                      await mediaService.updateConsent(recording.id, { status: 'revoked' });
+                      onUpdated();
+                    } catch (err) {
+                      setError(err);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className="min-h-9 px-3 rounded-xl border border-slate-300 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  {t('consentRevoked')}
                 </button>
               </div>
+            ) : (
+              <span className="text-xs text-slate-500 italic">
+                {t('liveModeConsentGuidance')}
+              </span>
+            )}
+          </div>
+
+          {/* Minor Guardian Consent */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+            <div>
+              {isDemoMode ? (
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    disabled={busy}
+                    checked={recording.consent.requiresGuardian}
+                    onChange={async e => {
+                      setBusy(true);
+                      setError(undefined);
+                      try {
+                        await mediaService.updateConsent(recording.id, {
+                          minorParticipant: e.target.checked,
+                          guardianStatus: e.target.checked ? (recording.consent.guardianConsentStatus || 'pending') : undefined,
+                        });
+                        onUpdated();
+                      } catch (err) {
+                        setError(err);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                  {t('minorParticipantsPresent')}
+                </label>
+              ) : (
+                <span className="text-xs font-medium text-slate-700 block">
+                  {t('minorParticipantsPresent')}: {recording.consent.requiresGuardian ? t('yes') : t('no')}
+                </span>
+              )}
+              {recording.consent.requiresGuardian && (
+                <div className="mt-1">
+                  <span className="text-xs text-slate-500 block">{t('guardianConsent')}:</span>
+                  <ConsentStatusBadge status={recording.consent.guardianConsentStatus || 'pending'} />
+                </div>
+              )}
+            </div>
+
+            {recording.consent.requiresGuardian && (
+              isDemoMode ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || recording.consent.guardianConsentStatus === 'granted'}
+                    onClick={async () => {
+                      setBusy(true);
+                      setError(undefined);
+                      try {
+                        await mediaService.updateConsent(recording.id, {
+                          minorParticipant: true,
+                          guardianStatus: 'granted',
+                        });
+                        onUpdated();
+                      } catch (err) {
+                        setError(err);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    className="min-h-9 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+                  >
+                    {t('guardianGrant')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || recording.consent.guardianConsentStatus === 'denied'}
+                    onClick={async () => {
+                      setBusy(true);
+                      setError(undefined);
+                      try {
+                        await mediaService.updateConsent(recording.id, {
+                          minorParticipant: true,
+                          guardianStatus: 'denied',
+                        });
+                        onUpdated();
+                      } catch (err) {
+                        setError(err);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    className="min-h-9 px-3 rounded-xl border border-rose-300 bg-rose-50 text-xs font-semibold text-rose-900 hover:bg-rose-100"
+                  >
+                    {t('guardianDeny')}
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500 italic">
+                  {t('liveModeConsentGuidance')}
+                </span>
+              )
             )}
           </div>
 
@@ -1029,25 +1050,31 @@ function RecordingDetailModal({
               <span className="text-xs text-slate-500 block">{t('faceBlurStatus')}</span>
               <BlurStatusBadge status={recording.privacy.faceBlurStatus} />
             </div>
-            <button
-              type="button"
-              disabled={busy || recording.privacy.faceBlurStatus === 'completed'}
-              onClick={async () => {
-                setBusy(true);
-                setError(undefined);
-                try {
-                  await mediaService.completePrivacyBlur(recording.id);
-                  onUpdated();
-                } catch (err) {
-                  setError(err);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              className="min-h-9 px-3 rounded-xl border border-sky-300 bg-sky-50 text-xs font-semibold text-sky-900 hover:bg-sky-100"
-            >
-              {t('completeBlurAction')}
-            </button>
+            {isDemoMode ? (
+              <button
+                type="button"
+                disabled={busy || recording.privacy.faceBlurStatus === 'completed'}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(undefined);
+                  try {
+                    await mediaService.completePrivacyBlur(recording.id);
+                    onUpdated();
+                  } catch (err) {
+                    setError(err);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="min-h-9 px-3 rounded-xl border border-sky-300 bg-sky-50 text-xs font-semibold text-sky-900 hover:bg-sky-100"
+              >
+                {t('completeBlurAction')}
+              </button>
+            ) : (
+              <span className="text-xs text-slate-500 italic">
+                {t('liveModeProcessingGuidance')}
+              </span>
+            )}
           </div>
         </section>
 

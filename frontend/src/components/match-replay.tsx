@@ -5,6 +5,7 @@ import { mediaService } from '@/services';
 import type { ReplayPlayback } from '@/services/contracts';
 import { useServiceQuery } from '@/lib/use-service-query';
 import { useLanguage } from '@/i18n/provider';
+import type { MessageKey } from '@/i18n/en';
 import { Loading, ServiceErrorMessage } from './service-state';
 
 function useModalKeyboard(isOpen: boolean, onClose: () => void) {
@@ -175,6 +176,21 @@ function ReplayContent({
   }
 
   // Not playable states: processing, failed, forbidden, expired, or unavailable
+  let displayReason: string | undefined = playback.reason;
+  if (playback.reasonCode) {
+    const isCustomUserNote = Boolean(
+      playback.failureReason &&
+      playback.failureReason !== 'Video processing encountered a failure' &&
+      playback.failureReason !== 'Simulated recording processing failure' &&
+      playback.failureReason !== 'Simulated AI tracking failure'
+    );
+    if (isCustomUserNote) {
+      displayReason = playback.failureReason;
+    } else {
+      displayReason = t(`replayReason_${playback.reasonCode}` as MessageKey);
+    }
+  }
+
   return (
     <div className="py-12 px-4 text-center space-y-4">
       <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center bg-slate-100 text-2xl">
@@ -199,8 +215,8 @@ function ReplayContent({
             ? t('replayFailed')
             : t('replayUnavailable')}
         </h3>
-        {playback.reason && (
-          <p className="text-sm text-slate-500 max-w-md mx-auto">{playback.reason}</p>
+        {displayReason && (
+          <p className="text-sm text-slate-500 max-w-md mx-auto">{displayReason}</p>
         )}
       </div>
 

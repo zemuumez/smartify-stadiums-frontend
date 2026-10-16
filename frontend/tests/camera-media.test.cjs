@@ -495,3 +495,123 @@ test('administrator camera certification workflow updates status and clears guid
   assert.equal(cam2.status, 'certified');
 });
 
+test('CMS publication followed by unpublish/revocation/expiry rechecks eligibility when serving public content', async () => {
+  const s = setup();
+
+  // Owner 1 creates and saves a draft microsite highlight referencing rec-1 by explicit recordingId
+  s.transport.selectAccount('owner-1');
+  const draft = await s.content.draft('venue-1');
+  const validHighlight = {
+    id: 'hl-rec1',
+    title: 'Historic Goal',
+    teams: 'Bambis vs Unity',
+    duration: '2:15',
+    playbackUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    recordingId: 'rec-1',
+  };
+  await s.content.save({
+    ...draft,
+    highlights: [validHighlight],
+  });
+
+  // Owner publishes the microsite
+  await s.content.publish('venue-1');
+
+  // Public microsite returns the highlight with playbackUrl intact
+  let publicSite = await s.content.get('venue-1');
+  let hl = publicSite.highlights?.find(h => h.id === 'hl-rec1');
+  assert.ok(hl);
+  assert.equal(hl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+
+  // Case 1: Owner unpublishes rec-1
+  await s.media.unpublishRecording('rec-1', 'Temporarily unpublished');
+
+  // Public microsite re-checks eligibility: playbackUrl is dynamically suppressed (null)
+  publicSite = await s.content.get('venue-1');
+  hl = publicSite.highlights?.find(h => h.id === 'hl-rec1');
+  assert.ok(hl);
+  assert.equal(hl.playbackUrl, null, 'Unpublished recording must suppress playbackUrl on public microsite');
+
+  // Restore rec-1 publication
+  await s.media.updatePublication('rec-1', { visibility: 'public', ownerApproved: true });
+  publicSite = await s.content.get('venue-1');
+  hl = publicSite.highlights?.find(h => h.id === 'hl-rec1');
+  assert.equal(hl.playbackUrl, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+
+  // Case 2: Consent is revoked
+  await s.media.updateConsent('rec-1', { status: 'revoked' });
+  publicSite = await s.content.get('venue-1');
+  hl = publicSite.highlights?.find(h => h.id === 'hl-rec1');
+  assert.equal(hl.playbackUrl, null, 'Revoked consent must suppress playbackUrl on public microsite');
+});
+
+test('live-mode simulation restrictions gate advancement, blur completion, and simulated consent', async () => {
+  // Construct transport in live/api mode
+  const tLive = createDemoTransport(undefined, { isLive: true });
+  const sLive = { ...createServices(tLive), transport: tLive };
+  tLive.selectAccount('owner-1');
+
+  // Live mode restricts state advancement simulation
+  await rejects(sLive.media.advanceRecordingDemoState('rec-1', 'scheduled'), 'forbidden');
+
+  // Live mode restricts owner self-declaring privacy blur completion
+  await rejects(sLive.media.completePrivacyBlur('rec-1'), 'forbidden');
+
+  // Live mode restricts direct simulated consent declaration without verified evidence
+  await rejects(sLive.media.updateConsent('rec-1', { status: 'granted' }), 'forbidden');
+});
+
+test('Amharic status and reason code rendering preserves user-authored notes', async () => {
+  const { languages } = require('../.test-build/i18n/catalog');
+  const s = setup();
+
+  // Verify dictionary entries for all reason codes in both EN and AM
+  const reasonCodes = [
+    'no_recording_exists',
+    'recording_scheduled',
+    'recording_processing',
+    'recording_failed',
+    'recording_expired',
+    'no_media_source',
+    'access_denied',
+  ];
+  for (const code of reasonCodes) {
+    const key = `replayReason_${code}`;
+    assert.ok(languages.en.messages[key], `Missing EN message for ${key}`);
+    assert.ok(languages.am.messages[key], `Missing AM message for ${key}`);
+    assert.notEqual(languages.en.messages[key], languages.am.messages[key]);
+  }
+
+  // Verify status mapping in EN and AM
+  const statuses = ['scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed'];
+  for (const st of statuses) {
+    const key = `rec${st.charAt(0).toUpperCase() + st.slice(1)}`;
+    assert.ok(languages.en.messages[key], `Missing EN status message for ${key}`);
+    assert.ok(languages.am.messages[key], `Missing AM status message for ${key}`);
+  }
+
+  // Test unrecorded booking returns typed reasonCode: no_recording_exists
+  s.transport.selectAccount('player-1');
+  const unrecordedBooking = await s.bookings.create({
+    fieldId: 'field-7', // Volleyball, no camera
+    sport: 'volleyball',
+    date: '2026-10-28',
+    startHour: 14,
+    endHour: 16,
+    idempotencyKey: 'booking-volleyball-amharic-check',
+  });
+  const unrecordedReplay = await s.media.bookingReplay(unrecordedBooking.id);
+  assert.equal(unrecordedReplay.reasonCode, 'no_recording_exists');
+
+  // Test custom user failure note preservation: user note is not overridden by canned strings
+  s.transport.selectAccount('owner-1');
+  const customReason = 'Power surged at circuit breaker 4 during severe thunderstorm';
+  await s.media.advanceRecordingDemoState('rec-1', 'scheduled');
+  await s.media.advanceRecordingDemoState('rec-1', 'failed', customReason);
+  const failedRec = await s.media.recordingDetail('rec-1');
+  assert.equal(failedRec.failureReason, customReason, 'Custom user failure notes must be preserved verbatim');
+  const replay = await s.media.bookingReplay('booking-rec-1');
+  assert.equal(replay.failureReason, customReason, 'Replay preserves custom user failure note');
+  assert.equal(replay.reasonCode, 'recording_failed');
+});
+

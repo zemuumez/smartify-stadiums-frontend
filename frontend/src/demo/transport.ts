@@ -23,7 +23,8 @@ export function isRecordingPubliclyEligible(rec: MatchRecording): boolean {
 }
 
 /** Simulator only: browser data and role checks are not a security boundary. */
-export function createDemoTransport(storage?: DemoStorage) {
+export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: boolean }) {
+  const isLive = Boolean(config?.isLive);
   let state: DemoState = createFixtures();
   let currentId: string | null = null;
   const issuedOTPs = new Map<string, number>();
@@ -131,7 +132,23 @@ export function createDemoTransport(storage?: DemoStorage) {
       const venue = publicVenue(parts[1]);
       if (parts.length === 2) return venue;
       if (parts[2] === 'fields') return state.fields.filter(item => item.venueId === venue.id && item.active);
-      if (parts[2] === 'microsite') { const site = state.sites.find(item => item.venueId === venue.id && item.published); if (!site) throw new ServiceError('not_found', 404); return site; }
+      if (parts[2] === 'microsite') {
+        const site = state.sites.find(item => item.venueId === venue.id && item.published);
+        if (!site) throw new ServiceError('not_found', 404);
+        const sanitizedSite = structuredClone(site);
+        if (sanitizedSite.highlights) {
+          sanitizedSite.highlights = sanitizedSite.highlights.map(h => {
+            if (h.recordingId) {
+              const linkedRec = state.recordings.find(r => r.id === h.recordingId);
+              if (!linkedRec || !isRecordingPubliclyEligible(linkedRec)) {
+                return { ...h, playbackUrl: null };
+              }
+            }
+            return h;
+          });
+        }
+        return sanitizedSite;
+      }
     }
     if (parts[0] === 'fields' && parts[2] === 'availability' && method === 'GET') {
       const item = field(parts[1]); publicVenue(item.venueId);
@@ -367,18 +384,35 @@ export function createDemoTransport(storage?: DemoStorage) {
               (draft.events || []) as SiteEvent[]
             );
 
+            const validatedHighlights: SiteHighlight[] = [];
             for (const rawH of (input.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string })[]) {
-              const pUrl = rawH.playbackUrl || rawH.videoUrl;
-              if (pUrl) {
-                const linkedRec = state.recordings.find(r => r.playbackUrl === pUrl || r.id === rawH.id || r.id === rawH.recordingId || pUrl.includes(r.id));
-                if (linkedRec && !isRecordingPubliclyEligible(linkedRec)) {
+              const recId = rawH.recordingId || (rawH.id && rawH.id.startsWith('rec-') ? rawH.id : undefined);
+              let pUrl = rawH.playbackUrl || rawH.videoUrl || null;
+              const currentUrl = pUrl;
+              const linkedRec = recId
+                ? state.recordings.find(r => r.id === recId)
+                : (currentUrl ? state.recordings.find(r => r.playbackUrl === currentUrl || currentUrl.includes(r.id)) : undefined);
+              if (linkedRec) {
+                if (!isRecordingPubliclyEligible(linkedRec) || linkedRec.venueId !== venue.id) {
                   throw new ServiceError('validation', 422);
                 }
+                if (!pUrl) pUrl = linkedRec.playbackUrl;
+              } else if (pUrl) {
+                if (!isSupportedVideoUrl(pUrl)) throw new ServiceError('validation', 422);
               }
+              validatedHighlights.push({
+                id: rawH.id,
+                title: rawH.title.trim(),
+                teams: rawH.teams || '',
+                duration: rawH.duration || '0:00',
+                views: rawH.views || 0,
+                playbackUrl: pUrl,
+                recordingId: recId || linkedRec?.id || null,
+              });
             }
 
             Object.assign(draft, {
-              highlights: structuredClone(input.highlights || []),
+              highlights: validatedHighlights,
               events: structuredClone(input.events || []),
               gallery: structuredClone(input.gallery || []),
               socialLinks: structuredClone(input.socialLinks || []),
@@ -404,10 +438,14 @@ export function createDemoTransport(storage?: DemoStorage) {
               (currentSite?.events || draft.events || []) as SiteEvent[]
             );
             for (const rawH of (draft.highlights || []) as (SiteHighlight & { videoUrl?: string; recordingId?: string })[]) {
+              const recId = rawH.recordingId || (rawH.id && rawH.id.startsWith('rec-') ? rawH.id : undefined);
               const pUrl = rawH.playbackUrl || rawH.videoUrl;
-              if (pUrl) {
-                const linkedRec = state.recordings.find(r => r.playbackUrl === pUrl || r.id === rawH.id || r.id === rawH.recordingId || pUrl.includes(r.id));
-                if (linkedRec && !isRecordingPubliclyEligible(linkedRec)) {
+              const currentUrl = pUrl;
+              const linkedRec = recId
+                ? state.recordings.find(r => r.id === recId)
+                : (currentUrl ? state.recordings.find(r => r.playbackUrl === currentUrl || currentUrl.includes(r.id)) : undefined);
+              if (linkedRec) {
+                if (!isRecordingPubliclyEligible(linkedRec) || linkedRec.venueId !== venue.id) {
                   throw new ServiceError('validation', 422);
                 }
               }
@@ -532,10 +570,11 @@ export function createDemoTransport(storage?: DemoStorage) {
           return rec;
         }
         if (parts.length === 4 && parts[3] === 'advance' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
           const rec = state.recordings.find(r => r.id === parts[2]);
           if (!rec) throw new ServiceError('not_found', 404);
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
-          const body = options.body as { status: RecordingStatus };
+          const body = options.body as { status: RecordingStatus; failureReason?: string };
           const validNextStates: Record<RecordingStatus, RecordingStatus[]> = {
             scheduled: ['recording', 'uploading', 'processing', 'ready', 'failed'],
             recording: ['uploading', 'processing', 'ready', 'failed'],
@@ -549,7 +588,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           }
           rec.status = body.status;
           if (body.status === 'failed') {
-            rec.failureReason = 'Simulated recording processing failure';
+            rec.failureReason = body.failureReason?.trim() || 'Simulated recording processing failure';
             rec.retryEligible = true;
             rec.playbackUrl = null;
           } else if (body.status === 'ready') {
@@ -565,6 +604,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           return rec;
         }
         if (parts.length === 4 && parts[3] === 'consent' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
           const rec = state.recordings.find(r => r.id === parts[2]);
           if (!rec) throw new ServiceError('not_found', 404);
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
@@ -604,6 +644,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           return rec;
         }
         if (parts.length === 4 && parts[3] === 'privacy-blur' && method === 'POST') {
+          if (isLive) throw new ServiceError('forbidden', 403);
           const rec = state.recordings.find(r => r.id === parts[2]);
           if (!rec) throw new ServiceError('not_found', 404);
           if (!venueIds.includes(rec.venueId)) throw new ServiceError('forbidden', 403);
@@ -1073,6 +1114,7 @@ export function createDemoTransport(storage?: DemoStorage) {
           entitlementStatus: 'unavailable',
           visibility: 'private',
           duration: '0:00',
+          reasonCode: 'no_recording_exists',
           reason: 'No match recording exists for this booking.',
         };
         return unavailableReplay;
@@ -1098,21 +1140,27 @@ export function createDemoTransport(storage?: DemoStorage) {
       let canPlay = false;
       let playbackUrl: string | null = null;
       let reason: string | undefined;
+      let reasonCode: ReplayPlayback['reasonCode'] = undefined;
 
       if (rec.status === 'scheduled') {
         entitlementStatus = 'processing';
+        reasonCode = 'recording_scheduled';
         reason = 'Recording is scheduled and will begin at match time';
       } else if (rec.status === 'processing' || rec.status === 'recording' || rec.status === 'uploading') {
         entitlementStatus = 'processing';
+        reasonCode = 'recording_processing';
         reason = 'Recording is currently processing';
       } else if (rec.status === 'failed') {
         entitlementStatus = 'failed';
+        reasonCode = 'recording_failed';
         reason = rec.failureReason || 'Video processing encountered a failure';
       } else if (isExpired) {
         entitlementStatus = 'expired';
+        reasonCode = 'recording_expired';
         reason = 'Playback access for this recording has expired';
       } else if (!rec.playbackUrl) {
         entitlementStatus = 'unavailable';
+        reasonCode = 'no_media_source';
         reason = 'No playable media source available';
       } else {
         entitlementStatus = 'entitled';
@@ -1134,6 +1182,8 @@ export function createDemoTransport(storage?: DemoStorage) {
         visibility: rec.publication.visibility,
         duration: rec.duration,
         reason,
+        reasonCode,
+        failureReason: rec.failureReason,
       };
       return replay;
     }

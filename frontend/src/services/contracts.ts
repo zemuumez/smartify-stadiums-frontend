@@ -47,7 +47,7 @@ export interface RescheduleBookingInput {
 }
 export interface Slot { startHour: number; endHour: number; available: boolean }
 export interface VenueInput { name: string; city: string; address: string; description: string; phone: string }
-export interface SiteHighlight { id: string; title: string; teams: string; duration: string; views?: number; playbackUrl: string | null }
+export interface SiteHighlight { id: string; title: string; teams: string; duration: string; views?: number; playbackUrl: string | null; recordingId?: string | null; }
 export type ParticipationFormat = 'team' | 'singles' | 'doubles';
 export interface SiteEvent {
   id: string;
@@ -235,6 +235,15 @@ export interface MatchRecording {
   createdAt: string;
 }
 
+export type ReplayReasonCode =
+  | 'no_recording_exists'
+  | 'recording_scheduled'
+  | 'recording_processing'
+  | 'recording_failed'
+  | 'recording_expired'
+  | 'no_media_source'
+  | 'access_denied';
+
 export interface ReplayPlayback {
   recordingId: string;
   bookingId?: string;
@@ -249,6 +258,8 @@ export interface ReplayPlayback {
   visibility: MediaVisibility;
   duration: string;
   reason?: string;
+  reasonCode?: ReplayReasonCode;
+  failureReason?: string;
 }
 
 export interface PublicHighlight {
