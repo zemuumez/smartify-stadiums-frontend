@@ -537,7 +537,7 @@ export function OwnerSupportPanel() {
                   {sc.authorName} ({t(sc.authorRole)}) · {t(sc.category)}
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                  <span>{sc.messages.length} messages</span>
+                  <span>{sc.messages.length} {t('messagesCount')}</span>
                   <time>{displayDate(sc.updatedAt.slice(0, 10))}</time>
                 </div>
               </article>
@@ -606,7 +606,7 @@ export function OwnerSupportPanel() {
                         disabled={busy || isSuspended}
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
-                        placeholder="Type reply to player or administration..."
+                        placeholder={t('ownerReplyPlaceholder')}
                         className="form-input text-sm"
                       />
                     </label>
@@ -625,7 +625,7 @@ export function OwnerSupportPanel() {
               </div>
             ) : (
               <div className="panel text-center py-12 text-slate-500">
-                Select a support case to view details and reply.
+                {t('selectCasePrompt')}
               </div>
             )}
           </div>
@@ -687,7 +687,7 @@ export function OwnerSupportPanel() {
                   maxLength={120}
                   value={newSubject}
                   onChange={e => setNewSubject(e.target.value)}
-                  placeholder="e.g. Schedule issue or lighting maintenance"
+                  placeholder={t('ownerSubjectPlaceholder')}
                   className="form-input"
                 />
               </label>
@@ -700,7 +700,7 @@ export function OwnerSupportPanel() {
                   maxLength={2000}
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
-                  placeholder="Describe inquiry or issue..."
+                  placeholder={t('ownerDescriptionPlaceholder')}
                   className="form-input"
                 />
               </label>

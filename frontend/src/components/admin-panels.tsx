@@ -410,7 +410,7 @@ export function AdminSupport() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">{t('supportCases')}</h1>
-          <p className="mt-1 text-sm text-slate-600">Platform-wide moderation and customer inquiries</p>
+          <p className="mt-1 text-sm text-slate-600">{t('adminSupportSubtitle')}</p>
         </div>
       </div>
 
@@ -454,7 +454,7 @@ export function AdminSupport() {
                   {sc.authorName} ({t(sc.authorRole)}) · {t(sc.category)}
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                  <span>{sc.messages.length} messages</span>
+                  <span>{sc.messages.length} {t('messagesCount')}</span>
                   <time>{sc.updatedAt.slice(0, 10)}</time>
                 </div>
               </article>
@@ -523,7 +523,7 @@ export function AdminSupport() {
                   <textarea
                     className="form-input text-xs w-full"
                     rows={3}
-                    placeholder="Write a reply or internal staff note..."
+                    placeholder={t('adminReplyPlaceholder')}
                     value={replyMessage}
                     onChange={e => setReplyMessage(e.target.value)}
                   />
@@ -550,7 +550,7 @@ export function AdminSupport() {
               </div>
             ) : (
               <div className="panel text-center py-12 text-slate-500 text-sm">
-                Select a support case on the left to inspect conversation and send responses.
+                {t('adminSelectCasePrompt')}
               </div>
             )}
           </div>

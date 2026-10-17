@@ -552,3 +552,12 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Verified that subsequent successful retry simulation records the new successful transaction, transitions paymentStatus to 'paid', and maintains exact collection totals (3000.00 ETB) with both historical transactions retained without duplicate collections.
       - 99/99 unit and integration tests pass (npm test).
 
+- Step 35 (Milestone M5 Follow-up 2: Complete Support Localization and Eliminate Hardcoded Strings):
+   1. Extensible dictionary coverage:
+      - Added missing translation keys to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts: selectCasePrompt, adminSelectCasePrompt, adminSupportSubtitle, replyPlaceholder, ownerReplyPlaceholder, adminReplyPlaceholder, subjectPlaceholder, ownerSubjectPlaceholder, descriptionPlaceholder, ownerDescriptionPlaceholder, and messagesCount.
+      - Maintained complete key-for-key parity between English and Amharic dictionaries.
+   2. UI component localization:
+      - Updated frontend/src/components/support-modals.tsx, frontend/src/components/owner-panels.tsx, and frontend/src/components/admin-panels.tsx to reference localized message keys for all placeholders, headings, subtitles, selection prompts, and message counters.
+      - Verified dictionary parity with npm test (English and Amharic have identical nonempty message keys passes); scoped ESLint passed with 0 errors and 0 warnings.
+
+

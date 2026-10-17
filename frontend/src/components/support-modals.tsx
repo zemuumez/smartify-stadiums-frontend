@@ -278,7 +278,7 @@ export function SupportCaseModal({
                         disabled={busy || isSuspended}
                         value={replyText}
                         onChange={e => setReplyText(e.target.value)}
-                        placeholder="Type your message..."
+                        placeholder={t('replyPlaceholder')}
                         className="form-input text-sm"
                       />
                     </label>
@@ -323,7 +323,7 @@ export function SupportCaseModal({
                       disabled={isSuspended}
                       value={subject}
                       onChange={e => setSubject(e.target.value)}
-                      placeholder="e.g. Schedule inquiry or court issue"
+                      placeholder={t('subjectPlaceholder')}
                       className="form-input"
                     />
                   </label>
@@ -338,7 +338,7 @@ export function SupportCaseModal({
                     disabled={isSuspended}
                     value={message}
                     onChange={e => setMessage(e.target.value)}
-                    placeholder="Describe your issue or question in detail..."
+                    placeholder={t('descriptionPlaceholder')}
                     className="form-input"
                   />
                 </label>
