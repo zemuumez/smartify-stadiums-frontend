@@ -1,4 +1,5 @@
-import type { Field, Transport, Venue, VenueInput } from './contracts';
+import type { Field, Transport, Venue, VenueInput, VenueReviewRecord } from './contracts';
+
 export function createVenuesService(transport: Transport) {
   return {
     list: (signal?: AbortSignal) => transport.request<Venue[]>('/stadiums', { signal }),
@@ -6,5 +7,9 @@ export function createVenuesService(transport: Transport) {
     get: (slug: string, signal?: AbortSignal) => transport.request<Venue>(`/stadiums/${encodeURIComponent(slug)}`, { signal }),
     fields: (venueId: string, signal?: AbortSignal) => transport.request<Field[]>(`/stadiums/${encodeURIComponent(venueId)}/fields`, { signal }),
     create: (input: VenueInput) => transport.request<Venue>('/owner/stadiums', { method: 'POST', body: input }),
+    submitForReview: (venueId: string, notes?: string) =>
+      transport.request<{ venue: Venue; review: VenueReviewRecord }>(`/owner/stadiums/${encodeURIComponent(venueId)}/submit`, { method: 'POST', body: { notes } }),
+    reviews: (venueId: string, signal?: AbortSignal) =>
+      transport.request<VenueReviewRecord[]>(`/owner/stadiums/${encodeURIComponent(venueId)}/reviews`, { signal }),
   };
 }

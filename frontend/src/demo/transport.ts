@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, MatchRecording, MediaVisibility, Microsite, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SiteEvent, SiteHighlight, Sport, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, SupportCase, SupportCaseCreateInput, SupportCasePriority, SupportCaseStatus, SupportMessage, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, Venue, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -22,6 +22,169 @@ export function isRecordingPubliclyEligible(rec: MatchRecording): boolean {
   return isNotExpired && isReady && isPublic && isConsentGranted && isGuardianGranted && isBlurCompleted;
 }
 
+export function deriveBookingFinancialSummary(booking: Booking, transactions: PaymentTransaction[]): BookingFinancialSummary {
+  const txs = transactions.filter(t => t.bookingId === booking.id);
+  const collectedMinor = txs
+    .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+  const refundedMinor = txs
+    .filter(t => t.type === 'refund' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+  const netCollectedMinor = Math.max(0, collectedMinor - refundedMinor);
+  const outstandingMinor = Math.max(0, booking.totalMinor - netCollectedMinor);
+
+  let paymentStatus: Booking['paymentStatus'] = 'unpaid';
+  if (booking.status === 'cancelled') {
+    if (netCollectedMinor === 0 && refundedMinor > 0) {
+      paymentStatus = 'refunded';
+    } else if (netCollectedMinor > 0 && refundedMinor > 0) {
+      paymentStatus = 'partially_refunded';
+    } else if (netCollectedMinor >= booking.totalMinor) {
+      paymentStatus = 'paid';
+    } else if (netCollectedMinor > 0) {
+      paymentStatus = 'partially_paid';
+    } else {
+      paymentStatus = 'unpaid';
+    }
+  } else {
+    if (netCollectedMinor >= booking.totalMinor) {
+      paymentStatus = 'paid';
+    } else if (netCollectedMinor > 0 && refundedMinor > 0) {
+      paymentStatus = 'partially_refunded';
+    } else if (netCollectedMinor > 0) {
+      paymentStatus = 'partially_paid';
+    } else if (refundedMinor > 0 && netCollectedMinor === 0) {
+      paymentStatus = 'refunded';
+    } else if (txs.length > 0 && txs[txs.length - 1].status === 'failed') {
+      paymentStatus = 'failed';
+    } else {
+      paymentStatus = 'unpaid';
+    }
+  }
+
+  return {
+    bookingId: booking.id,
+    totalPriceMinor: booking.totalMinor,
+    collectedMinor,
+    refundedMinor,
+    netCollectedMinor,
+    outstandingMinor,
+    paymentStatus,
+    transactions: txs,
+  };
+}
+
+function formatTransactionDate(dateStr: string, venueTimezone?: string): string {
+  try {
+    const tz = venueTimezone || 'Africa/Addis_Ababa';
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(dateStr));
+  } catch {
+    return dateStr.slice(0, 10);
+  }
+}
+
+export function computeFinancialAnalytics(
+  bookings: Booking[],
+  transactions: PaymentTransaction[],
+  options?: {
+    venueId?: string;
+    sport?: Sport;
+    dateFrom?: string;
+    dateTo?: string;
+    metricDateType?: 'booking_date' | 'transaction_date';
+  },
+  venues?: Venue[]
+): FinancialAnalytics {
+  const metricDateType = options?.metricDateType || 'booking_date';
+  const allSports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
+
+  const filteredBookings = bookings.filter(b => {
+    if (options?.venueId && b.venueId !== options.venueId) return false;
+    if (options?.sport && b.sport !== options.sport) return false;
+    if (options?.dateFrom && b.date < options.dateFrom) return false;
+    if (options?.dateTo && b.date > options.dateTo) return false;
+    return true;
+  });
+
+  const filteredTransactions = transactions.filter(t => {
+    if (options?.venueId && t.venueId !== options.venueId) return false;
+    const booking = bookings.find(b => b.id === t.bookingId);
+    if (options?.sport && booking && booking.sport !== options.sport) return false;
+    if (metricDateType === 'transaction_date') {
+      const vTz = venues?.find(v => v.id === t.venueId)?.timezone || 'Africa/Addis_Ababa';
+      const txDate = formatTransactionDate(t.createdAt, vTz);
+      if (options?.dateFrom && txDate < options.dateFrom) return false;
+      if (options?.dateTo && txDate > options.dateTo) return false;
+    } else {
+      if (booking) {
+        if (options?.dateFrom && booking.date < options.dateFrom) return false;
+        if (options?.dateTo && booking.date > options.dateTo) return false;
+      }
+    }
+    return true;
+  });
+
+  const grossBookingValueMinor = filteredBookings.reduce((sum, b) => sum + b.totalMinor, 0);
+  const totalBookingsCount = filteredBookings.length;
+  const completedBookingsCount = filteredBookings.filter(b => b.status === 'completed' || (b.status === 'confirmed' && Date.parse(`${b.date}T${String(b.endHour).padStart(2, '0')}:00:00+03:00`) <= Date.now())).length;
+  const cancelledBookingsCount = filteredBookings.filter(b => b.status === 'cancelled').length;
+
+  const recordedCollectionsMinor = filteredTransactions
+    .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+
+  const completedRefundsMinor = filteredTransactions
+    .filter(t => t.type === 'refund' && (t.status === 'recorded' || t.status === 'succeeded'))
+    .reduce((sum, t) => sum + t.amountMinor, 0);
+
+  const netRevenueMinor = recordedCollectionsMinor - completedRefundsMinor;
+
+  let outstandingBalanceMinor = 0;
+  for (const b of filteredBookings) {
+    if (b.status !== 'cancelled') {
+      const summary = deriveBookingFinancialSummary(b, transactions);
+      outstandingBalanceMinor += summary.outstandingMinor;
+    }
+  }
+
+  const sportBreakdown = allSports.reduce((acc, sport) => {
+    const sBookings = filteredBookings.filter(b => b.sport === sport);
+    const sGross = sBookings.reduce((sum, b) => sum + b.totalMinor, 0);
+    const sCollections = filteredTransactions
+      .filter(t => {
+        if (t.type !== 'collection' || (t.status !== 'recorded' && t.status !== 'succeeded')) return false;
+        const b = bookings.find(item => item.id === t.bookingId);
+        return b?.sport === sport;
+      })
+      .reduce((sum, t) => sum + t.amountMinor, 0);
+    acc[sport] = {
+      bookings: sBookings.length,
+      grossMinor: sGross,
+      collectedMinor: sCollections,
+    };
+    return acc;
+  }, {} as Record<Sport, { bookings: number; grossMinor: number; collectedMinor: number }>);
+
+  return {
+    venueId: options?.venueId,
+    dateFrom: options?.dateFrom,
+    dateTo: options?.dateTo,
+    metricDateType,
+    grossBookingValueMinor,
+    totalBookingsCount,
+    completedBookingsCount,
+    cancelledBookingsCount,
+    recordedCollectionsMinor,
+    completedRefundsMinor,
+    netRevenueMinor,
+    outstandingBalanceMinor,
+    provisionalCommissionPercent: null,
+    provisionalCommissionAmountMinor: null,
+    currency: 'ETB',
+    sportBreakdown,
+  };
+}
+
 /** Simulator only: browser data and role checks are not a security boundary. */
 export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: boolean }) {
   const isLive = Boolean(config?.isLive);
@@ -40,6 +203,10 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!Array.isArray(state.cameras)) state.cameras = createFixtures().cameras;
         if (!Array.isArray(state.recordings)) state.recordings = createFixtures().recordings;
         if (!Array.isArray(state.entitlements)) state.entitlements = createFixtures().entitlements;
+        if (!Array.isArray(state.transactions)) state.transactions = [];
+        if (!Array.isArray(state.venueReviews)) state.venueReviews = [];
+        if (!Array.isArray(state.supportCases)) state.supportCases = [];
+        if (!Array.isArray(state.invoices)) state.invoices = [];
       }
     }
     currentId = storage?.getItem(SESSION_KEY) || null;
@@ -57,9 +224,14 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     if (!user) throw new ServiceError('unauthorized', 401);
     return user;
   };
-  const requireRole = (role: Role) => { const user = account(); if (user.role !== role) throw new ServiceError('forbidden', 403); return user; };
-  const owned = (venueId: string) => {
+  const requireActiveAccount = (): Account => {
     const user = account();
+    if (user.status === 'suspended') throw new ServiceError('forbidden', 403);
+    return user;
+  };
+  const requireRole = (role: Role) => { const user = requireActiveAccount(); if (user.role !== role) throw new ServiceError('forbidden', 403); return user; };
+  const owned = (venueId: string) => {
+    const user = requireActiveAccount();
     const venue = state.venues.find(item => item.id === venueId);
     if (!venue) throw new ServiceError('not_found', 404);
     if (user.role !== 'admin' && (user.role !== 'owner' || venue.ownerId !== user.id)) throw new ServiceError('forbidden', 403);
@@ -163,7 +335,12 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     }
     if (path === '/bookings' && method === 'GET') {
       const user = account();
-      return state.bookings.filter(b => user.role === 'admin' || b.playerId === user.id || (user.role === 'owner' && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)));
+      return state.bookings
+        .filter(b => user.role === 'admin' || b.playerId === user.id || (user.role === 'owner' && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+        .map(b => {
+          const summary = deriveBookingFinancialSummary(b, state.transactions);
+          return { ...b, paymentStatus: summary.paymentStatus };
+        });
     }
     if (path === '/bookings' && method === 'POST') {
       const user = requireRole('player'); const input = options.body as BookingInput;
@@ -226,17 +403,23 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       state.idempotency[key] = { fingerprint, bookingId: booking.id }; audit('booking.created', booking.id); persist(); return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'cancel' && method === 'POST') {
-      const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
+      const user = requireActiveAccount(); const booking = state.bookings.find(item => item.id === parts[1]);
       if (!booking) throw new ServiceError('not_found', 404);
       if (booking.playerId !== user.id) owned(booking.venueId);
       if (!['confirmed', 'pending', 'cancelled'].includes(booking.status)) throw new ServiceError('conflict', 409);
-      // Demo policy: future unpaid bookings only; real cancellation/refund policy remains open.
-      if (booking.paymentStatus !== 'unpaid' || Date.parse(`${booking.date}T${String(booking.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('conflict', 409);
-      if (booking.status !== 'cancelled') { booking.status = 'cancelled'; audit('booking.cancelled', booking.id); persist(); }
+      // Demo policy: future bookings only; cancellation frees slot without automatically executing refund.
+      if (Date.parse(`${booking.date}T${String(booking.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('conflict', 409);
+      if (booking.status !== 'cancelled') {
+        booking.status = 'cancelled';
+        const summary = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summary.paymentStatus;
+        audit('booking.cancelled', booking.id);
+        persist();
+      }
       return booking;
     }
     if (parts[0] === 'bookings' && parts[2] === 'reschedule' && method === 'POST') {
-      const user = account(); const booking = state.bookings.find(item => item.id === parts[1]);
+      const user = requireActiveAccount(); const booking = state.bookings.find(item => item.id === parts[1]);
       if (!booking) throw new ServiceError('not_found', 404);
       if (user.role === 'player') {
         if (booking.playerId !== user.id) throw new ServiceError('forbidden', 403);
@@ -283,6 +466,96 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       persist();
       return booking;
     }
+    if (parts[0] === 'bookings' && parts[2] === 'financials' && method === 'GET') {
+      const user = account();
+      const booking = state.bookings.find(item => item.id === parts[1]);
+      if (!booking) throw new ServiceError('not_found', 404);
+      if (booking.playerId !== user.id && user.role !== 'admin' && !state.venues.some(v => v.id === booking.venueId && v.ownerId === user.id)) {
+        throw new ServiceError('forbidden', 403);
+      }
+      return deriveBookingFinancialSummary(booking, state.transactions);
+    }
+    if (parts[0] === 'bookings' && parts[2] === 'simulate-gateway' && method === 'POST') {
+      const user = requireActiveAccount();
+      if (isLive) throw new ServiceError('forbidden', 403);
+      const booking = state.bookings.find(item => item.id === parts[1]);
+      if (!booking) throw new ServiceError('not_found', 404);
+      if (booking.playerId !== user.id && user.role !== 'admin' && !state.venues.some(v => v.id === booking.venueId && v.ownerId === user.id)) {
+        throw new ServiceError('forbidden', 403);
+      }
+      const input = options.body as GatewaySimulationInput;
+      if (!['telebirr_gateway', 'cbe_birr'].includes(input.method)) throw new ServiceError('validation', 422);
+
+      const key = options.idempotencyKey ? `${user.id}:gw:${options.idempotencyKey}` : null;
+      const fingerprint = JSON.stringify({
+        bookingId: booking.id,
+        method: input.method,
+        simulateOutcome: input.simulateOutcome || 'success',
+      });
+
+      if (key) {
+        const previous = state.idempotency[key];
+        if (previous) {
+          if (previous.fingerprint !== fingerprint) {
+            throw new ServiceError('conflict', 409);
+          }
+          const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
+          if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+        }
+      }
+
+      const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+      if (summaryBefore.outstandingMinor <= 0) throw new ServiceError('conflict', 409);
+
+      if (input.simulateOutcome === 'failure') {
+        const tx: PaymentTransaction = {
+          id: `tx-gw-fail-${crypto.randomUUID().slice(0, 8)}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: user.id,
+          amountMinor: summaryBefore.outstandingMinor,
+          currency: 'ETB',
+          type: 'collection',
+          method: input.method,
+          status: 'failed',
+          notes: 'Simulated domestic payment gateway decline / timeout',
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+        };
+        state.transactions.push(tx);
+        booking.paymentStatus = 'failed';
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
+        }
+        audit(`gateway.payment_failed: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+        persist();
+        return { transaction: tx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+      }
+
+      const tx: PaymentTransaction = {
+        id: `tx-gw-${crypto.randomUUID().slice(0, 8)}`,
+        bookingId: booking.id,
+        venueId: booking.venueId,
+        payerId: user.id,
+        amountMinor: summaryBefore.outstandingMinor,
+        currency: 'ETB',
+        type: 'collection',
+        method: input.method,
+        status: 'succeeded',
+        reference: `GW-${Date.now().toString(36).toUpperCase()}`,
+        notes: 'Simulated domestic mobile payment callback',
+        recordedBy: user.id,
+        createdAt: new Date().toISOString(),
+      };
+      state.transactions.push(tx);
+      booking.paymentStatus = deriveBookingFinancialSummary(booking, state.transactions).paymentStatus;
+      if (key) {
+        state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
+      }
+      audit(`gateway.payment_succeeded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+      persist();
+      return { transaction: tx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+    }
     if (parts[0] === 'owner') {
       const user = account(); if (!['owner', 'admin'].includes(user.role)) throw new ServiceError('forbidden', 403);
       if (parts[1] === 'walk-ins' && method === 'POST') {
@@ -290,6 +563,7 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!input.guestName?.trim() || !input.venueId || !input.fieldId) throw new ServiceError('validation', 422);
         validateInterval(input.date, input.startHour, input.endHour);
         const venue = owned(input.venueId);
+        if (venue.status === 'suspended') throw new ServiceError('conflict', 409);
         const item = field(input.fieldId);
         if (item.venueId !== venue.id) throw new ServiceError('validation', 422);
         if (!input.idempotencyKey || !item.active || !item.sports.includes(input.sport) || input.startHour < item.openHour || input.endHour > item.closeHour || Date.parse(`${input.date}T${String(input.startHour).padStart(2, '0')}:00:00+03:00`) <= Date.now()) throw new ServiceError('validation', 422);
@@ -359,10 +633,46 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const venue = { ...input, id, ownerId: user.id, slug: `venue-${id}`, sports: [], status: 'pending' as const, verified: false, image: '/venue-card-1.jpg', rating: null, reviewCount: 0, timezone: 'Africa/Addis_Ababa' };
         state.venues.push(venue);
         state.drafts.push({ venueId: id, tagline: input.name, description: input.description, primaryColor: '#2d6a4f', published: false, updatedAt: new Date().toISOString() });
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: id,
+          action: 'submit',
+          previousStatus: 'draft',
+          newStatus: 'pending',
+          reason: 'Initial venue submission',
+          reviewerId: user.id,
+          reviewerName: user.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
         audit('venue.submitted', id); persist(); return venue;
       }
       if (parts[1] === 'stadiums' && parts[2]) {
         const venue = owned(parts[2]);
+        if (parts[3] === 'submit' && method === 'POST') {
+          if (!['draft', 'changes_requested'].includes(venue.status)) throw new ServiceError('conflict', 409);
+          const previousStatus = venue.status;
+          venue.status = 'pending';
+          const body = (options.body || {}) as { notes?: string };
+          const reviewRecord: VenueReviewRecord = {
+            id: `rev-${crypto.randomUUID()}`,
+            venueId: venue.id,
+            action: 'submit',
+            previousStatus,
+            newStatus: 'pending',
+            reason: body.notes?.trim() || 'Submitted by venue owner for review',
+            reviewerId: user.id,
+            reviewerName: user.full_name,
+            createdAt: new Date().toISOString(),
+          };
+          state.venueReviews.push(reviewRecord);
+          audit('venue.submitted_for_review', venue.id);
+          persist();
+          return { venue, review: reviewRecord };
+        }
+        if (parts[3] === 'reviews' && method === 'GET') {
+          return state.venueReviews.filter(r => r.venueId === venue.id).slice().reverse();
+        }
         if (parts[3] === 'closures' && method === 'GET') return state.closures.filter(c => state.fields.some(f => f.id === c.fieldId && f.venueId === venue.id));
         if (parts[3] === 'microsite') {
           const draft = state.drafts.find(item => item.venueId === venue.id);
@@ -780,10 +1090,195 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           return entitlement;
         }
       }
-      if (path === '/owner/invoices' && method === 'GET') return state.invoices.filter(item => venueIds.includes(item.venueId));
-      if (path === '/owner/analytics' && method === 'GET') {
-        const bookings = state.bookings.filter(item => venueIds.includes(item.venueId));
-        return { bookings: bookings.length, collectedMinor: bookings.filter(b => b.paymentStatus === 'paid').reduce((sum, b) => sum + b.totalMinor, 0), outstandingMinor: bookings.filter(b => b.status === 'confirmed' && b.paymentStatus === 'unpaid').reduce((sum, b) => sum + b.totalMinor, 0), cancelled: bookings.filter(b => b.status === 'cancelled').length };
+      if (parts[1] === 'bookings' && parts[3] === 'settle' && method === 'POST') {
+        const booking = state.bookings.find(item => item.id === parts[2]);
+        if (!booking) throw new ServiceError('not_found', 404);
+        owned(booking.venueId);
+        const input = options.body as SettleBookingInput;
+
+        const key = options.idempotencyKey ? `${user.id}:settle:${options.idempotencyKey}` : null;
+        const fingerprint = JSON.stringify({
+          bookingId: booking.id,
+          amountMinor: input.amountMinor,
+          method: input.method,
+          reference: input.reference?.trim() || null,
+          notes: input.notes?.trim() || null,
+        });
+
+        if (key) {
+          const previous = state.idempotency[key];
+          if (previous) {
+            if (previous.fingerprint !== fingerprint) {
+              throw new ServiceError('conflict', 409);
+            }
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
+        if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
+          throw new ServiceError('validation', 422);
+        }
+        if (!['cash', 'pos', 'telebirr_manual', 'telebirr_gateway', 'cbe_birr', 'bank_transfer'].includes(input.method)) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+        if (input.amountMinor > summaryBefore.outstandingMinor) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const tx: PaymentTransaction = {
+          id: `tx-${crypto.randomUUID()}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: booking.playerId || undefined,
+          amountMinor: input.amountMinor,
+          currency: 'ETB',
+          type: 'collection',
+          method: input.method,
+          status: 'recorded',
+          reference: input.reference?.trim() || undefined,
+          notes: input.notes?.trim() || undefined,
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+        };
+        state.transactions.push(tx);
+        const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summaryAfter.paymentStatus;
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
+        }
+        audit(`settlement.recorded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
+        persist();
+        return { transaction: tx, summary: summaryAfter };
+      }
+
+      if (parts[1] === 'bookings' && parts[3] === 'refund' && method === 'POST') {
+        const booking = state.bookings.find(item => item.id === parts[2]);
+        if (!booking) throw new ServiceError('not_found', 404);
+        owned(booking.venueId);
+        const input = options.body as RefundBookingInput;
+
+        const key = options.idempotencyKey ? `${user.id}:refund:${options.idempotencyKey}` : null;
+        const fingerprint = JSON.stringify({
+          bookingId: booking.id,
+          amountMinor: input.amountMinor,
+          reason: input.reason?.trim() || null,
+          originalTransactionId: input.originalTransactionId || null,
+        });
+
+        if (key) {
+          const previous = state.idempotency[key];
+          if (previous) {
+            if (previous.fingerprint !== fingerprint) {
+              throw new ServiceError('conflict', 409);
+            }
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
+        if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !input.reason?.trim()) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+        if (input.amountMinor > summaryBefore.netCollectedMinor) {
+          throw new ServiceError('validation', 422);
+        }
+
+        const tx: PaymentTransaction = {
+          id: `tx-ref-${crypto.randomUUID()}`,
+          bookingId: booking.id,
+          venueId: booking.venueId,
+          payerId: booking.playerId || undefined,
+          amountMinor: input.amountMinor,
+          currency: 'ETB',
+          type: 'refund',
+          method: 'cash',
+          status: 'recorded',
+          notes: input.reason.trim(),
+          recordedBy: user.id,
+          createdAt: new Date().toISOString(),
+          originalTransactionId: input.originalTransactionId,
+        };
+        state.transactions.push(tx);
+        const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
+        booking.paymentStatus = summaryAfter.paymentStatus;
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
+        }
+        audit(`refund.recorded: ${tx.amountMinor} ETB reason: ${input.reason}`, tx.id);
+        persist();
+        return { transaction: tx, summary: summaryAfter };
+      }
+
+      if (parts[1] === 'venues' && parts[3] === 'transactions' && method === 'GET') {
+        owned(parts[2]);
+        return state.transactions.filter(t => t.venueId === parts[2]).slice().reverse();
+      }
+
+      if (path.startsWith('/owner/invoices') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId');
+        if (venueParam && !venueIds.includes(venueParam)) {
+          throw new ServiceError('forbidden', 403);
+        }
+        const targetVenueIds = venueParam ? [venueParam] : venueIds;
+        const matchingVenues = state.venues.filter(v => targetVenueIds.includes(v.id) && venueIds.includes(v.id));
+
+        const stored = state.invoices.filter(i => targetVenueIds.includes(i.venueId) && venueIds.includes(i.venueId));
+        if (stored.length > 0) return stored;
+
+        return matchingVenues.map(venue => ({
+          id: `INV-${venue.slug.toUpperCase()}-2026-10`,
+          venueId: venue.id,
+          venueName: venue.name,
+          periodStart: '2026-10-01',
+          periodEnd: '2026-10-31',
+          totalMinor: null,
+          currency: 'ETB' as const,
+          status: 'not_configured' as const,
+          lineItems: [
+            { description: 'Platform Operating License (Provisional)', quantity: 1, unitPriceMinor: null, totalMinor: null },
+            { description: 'Autonomous Camera Network Ingestion', quantity: state.cameras.filter(c => c.venueId === venue.id).length || 1, unitPriceMinor: null, totalMinor: null },
+          ],
+          issuedAt: '2026-10-01T00:00:00Z',
+          notes: 'Commercial policy is provisional and unset. No platform subscription fees are currently charged.',
+        }));
+      }
+
+      if (path.startsWith('/owner/analytics') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId');
+        const sportParam = url.searchParams.get('sport') as Sport | undefined;
+        const dateFrom = url.searchParams.get('dateFrom') || undefined;
+        const dateTo = url.searchParams.get('dateTo') || undefined;
+        const metricDateType = (url.searchParams.get('metricDateType') as 'booking_date' | 'transaction_date') || 'booking_date';
+
+        const targetVenueIds = venueParam ? (venueIds.includes(venueParam) ? [venueParam] : []) : venueIds;
+        const ownerBookings = state.bookings.filter(b => targetVenueIds.includes(b.venueId));
+        const ownerTransactions = state.transactions.filter(t => targetVenueIds.includes(t.venueId));
+
+        const detailed = computeFinancialAnalytics(
+          ownerBookings,
+          ownerTransactions,
+          {
+            venueId: venueParam || undefined,
+            sport: sportParam,
+            dateFrom,
+            dateTo,
+            metricDateType,
+          },
+          state.venues
+        );
+
+        return {
+          bookings: detailed.totalBookingsCount,
+          collectedMinor: detailed.recordedCollectionsMinor,
+          outstandingMinor: detailed.outstandingBalanceMinor,
+          cancelled: detailed.cancelledBookingsCount,
+          detailed,
+        };
       }
     }
     if ((parts[0] === 'venues' || parts[0] === 'stadiums') && parts[2] === 'events') {
@@ -1304,6 +1799,27 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
     if (parts[0] === 'admin') {
       const adminUser = requireRole('admin');
       if (path === '/admin/users' && method === 'GET') return state.accounts;
+      if (parts[1] === 'users' && parts[3] === 'status' && method === 'PATCH') {
+        const targetUser = state.accounts.find(a => a.id === parts[2]);
+        if (!targetUser) throw new ServiceError('not_found', 404);
+        const input = options.body as { status: 'active' | 'suspended'; reason: string };
+        if (!['active', 'suspended'].includes(input.status) || !input.reason?.trim()) {
+          throw new ServiceError('validation', 422);
+        }
+        if (targetUser.id === adminUser.id && input.status === 'suspended') {
+          throw new ServiceError('conflict', 409);
+        }
+        if (targetUser.role === 'admin' && input.status === 'suspended') {
+          const activeAdmins = state.accounts.filter(a => a.role === 'admin' && a.status !== 'suspended');
+          if (activeAdmins.length <= 1) {
+            throw new ServiceError('conflict', 409);
+          }
+        }
+        targetUser.status = input.status;
+        audit(`user.status: ${input.status} (${input.reason.trim()})`, targetUser.id);
+        persist();
+        return targetUser;
+      }
       if (path === '/admin/audit' && method === 'GET') return state.audit;
       if (path === '/admin/stadiums' && method === 'GET') return state.venues;
       if (path === '/admin/cameras' && method === 'GET') return state.cameras;
@@ -1324,11 +1840,290 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         persist();
         return cam;
       }
+      if (parts[1] === 'stadiums' && parts[3] === 'review' && method === 'POST') {
+        const venue = state.venues.find(v => v.id === parts[2]); if (!venue) throw new ServiceError('not_found', 404);
+        const input = options.body as { action: VenueReviewAction; reason: string; notes?: string };
+        if (!['submit', 'request_changes', 'approve', 'suspend', 'reinstate'].includes(input.action)) {
+          throw new ServiceError('validation', 422);
+        }
+        if (!input.reason?.trim() && ['request_changes', 'suspend', 'reinstate'].includes(input.action)) {
+          throw new ServiceError('validation', 422);
+        }
+        const previousStatus = venue.status;
+        let newStatus: VenueReviewStatus = previousStatus;
+        if (input.action === 'approve') newStatus = 'active';
+        else if (input.action === 'request_changes') newStatus = 'changes_requested';
+        else if (input.action === 'suspend') newStatus = 'suspended';
+        else if (input.action === 'reinstate') newStatus = 'active';
+        else if (input.action === 'submit') newStatus = 'pending';
+
+        venue.status = newStatus;
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: venue.id,
+          action: input.action,
+          previousStatus,
+          newStatus,
+          reason: input.reason?.trim() || 'Approved by administrator',
+          notes: input.notes?.trim() || undefined,
+          reviewerId: adminUser.id,
+          reviewerName: adminUser.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
+        audit(`venue.review: ${input.action} -> ${newStatus} (${input.reason})`, venue.id);
+        persist();
+        return { venue, review: reviewRecord };
+      }
+      if (parts[1] === 'stadiums' && parts[3] === 'reviews' && method === 'GET') {
+        return state.venueReviews.filter(r => r.venueId === parts[2]).slice().reverse();
+      }
       if (parts[1] === 'stadiums' && parts[2] && method === 'PATCH') {
         const venue = state.venues.find(v => v.id === parts[2]); if (!venue) throw new ServiceError('not_found', 404);
         const input = options.body as { status: 'active' | 'suspended'; reason: string };
         if (!['active', 'suspended'].includes(input.status) || !input.reason.trim()) throw new ServiceError('validation', 422);
-        venue.status = input.status; audit(`venue.${input.status}: ${input.reason}`, venue.id); persist(); return venue;
+        const previousStatus = venue.status;
+        const action: VenueReviewAction = input.status === 'active' ? (previousStatus === 'suspended' ? 'reinstate' : 'approve') : 'suspend';
+        venue.status = input.status;
+        const reviewRecord: VenueReviewRecord = {
+          id: `rev-${crypto.randomUUID()}`,
+          venueId: venue.id,
+          action,
+          previousStatus,
+          newStatus: input.status,
+          reason: input.reason.trim(),
+          reviewerId: adminUser.id,
+          reviewerName: adminUser.full_name,
+          createdAt: new Date().toISOString(),
+        };
+        state.venueReviews.push(reviewRecord);
+        audit(`venue.${input.status}: ${input.reason}`, venue.id);
+        persist();
+        return venue;
+      }
+      if (path.startsWith('/admin/analytics') && method === 'GET') {
+        const venueParam = url.searchParams.get('venueId') || undefined;
+        const sportParam = url.searchParams.get('sport') as Sport | undefined;
+        const dateFrom = url.searchParams.get('dateFrom') || undefined;
+        const dateTo = url.searchParams.get('dateTo') || undefined;
+        const metricDateType = (url.searchParams.get('metricDateType') as 'booking_date' | 'transaction_date') || 'booking_date';
+
+        return computeFinancialAnalytics(
+          state.bookings,
+          state.transactions,
+          {
+            venueId: venueParam,
+            sport: sportParam,
+            dateFrom,
+            dateTo,
+            metricDateType,
+          },
+          state.venues
+        );
+      }
+    }
+    if (parts[0] === 'support') {
+      if (parts[1] === 'cases') {
+        if (parts.length === 2 && method === 'GET') {
+          const user = account();
+          const venueParam = url.searchParams.get('venueId');
+          const statusParam = url.searchParams.get('status') as SupportCaseStatus | null;
+          let cases = state.supportCases;
+          if (user.role === 'player') {
+            cases = cases.filter(c => c.authorId === user.id);
+          } else if (user.role === 'owner') {
+            const ownedVenueIds = state.venues.filter(v => v.ownerId === user.id).map(v => v.id);
+            cases = cases.filter(c => c.authorId === user.id || (c.venueId && ownedVenueIds.includes(c.venueId)) || (c.bookingId && state.bookings.some(b => b.id === c.bookingId && ownedVenueIds.includes(b.venueId))));
+          }
+          if (venueParam) cases = cases.filter(c => c.venueId === venueParam);
+          if (statusParam) cases = cases.filter(c => c.status === statusParam);
+          return cases
+            .map(c => ({
+              ...c,
+              messages: user.role === 'admin' ? c.messages : c.messages.filter(m => !m.isInternal),
+            }))
+            .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+        }
+        if (parts.length === 3 && method === 'GET') {
+          const user = account();
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
+          const isPlayer = user.role === 'player' && sc.authorId === user.id;
+          const isAdmin = user.role === 'admin';
+          if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
+          return {
+            ...sc,
+            messages: isAdmin ? sc.messages : sc.messages.filter(m => !m.isInternal),
+          };
+        }
+        if (parts.length === 2 && method === 'POST') {
+          const user = requireActiveAccount();
+          const input = options.body as SupportCaseCreateInput;
+          if (!input.subject?.trim() || !input.message?.trim() || !input.category) {
+            throw new ServiceError('validation', 422);
+          }
+          if (input.venueId) {
+            const v = state.venues.find(item => item.id === input.venueId);
+            if (!v) throw new ServiceError('not_found', 404);
+            if (user.role === 'owner' && v.ownerId !== user.id) {
+              throw new ServiceError('forbidden', 403);
+            }
+          }
+          let linkedBooking: Booking | undefined;
+          if (input.bookingId) {
+            linkedBooking = state.bookings.find(b => b.id === input.bookingId);
+            if (!linkedBooking) throw new ServiceError('not_found', 404);
+            if (input.venueId && linkedBooking.venueId !== input.venueId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (user.role === 'player' && linkedBooking.playerId !== user.id) {
+              throw new ServiceError('forbidden', 403);
+            }
+            if (user.role === 'owner') {
+              const ownsBookingVenue = state.venues.some(v => v.id === linkedBooking!.venueId && v.ownerId === user.id);
+              if (!ownsBookingVenue && linkedBooking.playerId !== user.id) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (!input.venueId) input.venueId = linkedBooking.venueId;
+          }
+          if (input.transactionId) {
+            const linkedTx = state.transactions.find(t => t.id === input.transactionId);
+            if (!linkedTx) throw new ServiceError('not_found', 404);
+            if (input.bookingId && linkedTx.bookingId && linkedTx.bookingId !== input.bookingId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (input.venueId && linkedTx.venueId !== input.venueId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (user.role === 'player') {
+              const txBooking = state.bookings.find(b => b.id === linkedTx.bookingId);
+              if (linkedTx.payerId !== user.id && (!txBooking || txBooking.playerId !== user.id)) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (user.role === 'owner') {
+              const ownsTxVenue = state.venues.some(v => v.id === linkedTx.venueId && v.ownerId === user.id);
+              if (!ownsTxVenue) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (!input.venueId) input.venueId = linkedTx.venueId;
+            if (!input.bookingId && linkedTx.bookingId) input.bookingId = linkedTx.bookingId;
+          }
+          const caseId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const newCase: SupportCase = {
+            id: caseId,
+            caseNumber: `CASE-${100000 + state.supportCases.length + 1}`,
+            authorId: user.id,
+            authorName: user.full_name,
+            authorRole: user.role,
+            venueId: input.venueId || undefined,
+            bookingId: input.bookingId || undefined,
+            transactionId: input.transactionId || undefined,
+            category: input.category,
+            subject: input.subject.trim(),
+            status: 'open',
+            priority: (user.role === 'admin' ? input.priority : undefined) || 'medium',
+            createdAt: now,
+            updatedAt: now,
+            messages: [
+              {
+                id: `msg-${crypto.randomUUID()}`,
+                caseId,
+                senderId: user.id,
+                senderName: user.full_name,
+                senderRole: user.role,
+                message: input.message.trim(),
+                isInternal: false,
+                createdAt: now,
+              },
+            ],
+          };
+          state.supportCases.push(newCase);
+          audit(`support.case_created: ${newCase.caseNumber}`, newCase.id);
+          persist();
+          return {
+            ...newCase,
+            messages: user.role === 'admin' ? newCase.messages : newCase.messages.filter(m => !m.isInternal),
+          };
+        }
+        if (parts.length === 4 && parts[3] === 'messages' && method === 'POST') {
+          const user = requireActiveAccount();
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
+          const isPlayer = user.role === 'player' && sc.authorId === user.id;
+          const isAdmin = user.role === 'admin';
+          if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
+          const input = options.body as { message: string; isInternal?: boolean };
+          if (!input.message?.trim()) throw new ServiceError('validation', 422);
+          if (input.isInternal && !isAdmin) throw new ServiceError('forbidden', 403);
+          const isInternal = isAdmin && !!input.isInternal;
+          const now = new Date().toISOString();
+          const msg: SupportMessage = {
+            id: `msg-${crypto.randomUUID()}`,
+            caseId: sc.id,
+            senderId: user.id,
+            senderName: user.full_name,
+            senderRole: user.role,
+            message: input.message.trim(),
+            isInternal,
+            createdAt: now,
+          };
+          sc.messages.push(msg);
+          sc.updatedAt = now;
+          if (isAdmin && !isInternal && sc.status === 'open') {
+            sc.status = 'in_progress';
+          }
+          audit(`support.message_added: ${sc.caseNumber}`, msg.id);
+          persist();
+          return msg;
+        }
+        if (parts.length === 3 && method === 'PATCH') {
+          const user = requireActiveAccount();
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
+          if (!sc) throw new ServiceError('not_found', 404);
+          const isAdmin = user.role === 'admin';
+          const isAuthor = sc.authorId === user.id;
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
+          if (!isAdmin && !isAuthor && !isOwner) throw new ServiceError('forbidden', 403);
+          const input = options.body as { status?: SupportCaseStatus; priority?: SupportCasePriority };
+          if (input.priority && !isAdmin) throw new ServiceError('forbidden', 403);
+          if (input.status) {
+            if (!isAdmin && (!isAuthor || input.status !== 'closed')) {
+              throw new ServiceError('forbidden', 403);
+            }
+            sc.status = input.status;
+            if (['resolved', 'closed'].includes(input.status)) {
+              sc.resolvedAt = new Date().toISOString();
+            }
+          }
+          if (input.priority && isAdmin) {
+            sc.priority = input.priority;
+          }
+          sc.updatedAt = new Date().toISOString();
+          audit(`support.case_updated: ${sc.caseNumber}`, sc.id);
+          persist();
+          return {
+            ...sc,
+            messages: isAdmin ? sc.messages : sc.messages.filter(m => !m.isInternal),
+          };
+        }
       }
     }
     throw new ServiceError('unavailable', 501);

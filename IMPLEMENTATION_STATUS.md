@@ -352,3 +352,246 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
         - CMS publishing suite: 8/8 journeys pass (node tests/verify-cms-e2e.mjs).
         - Teams & events suite: 4/4 journeys pass (node tests/verify-teams-events-e2e.mjs).
       - Preserved frozen UI baseline. Working strictly on branch codex/camera-media-privacy; no merge into main, push, or deploy.
+
+- Step 23 (Milestone M5 Initiation & Step 1: Finance Contracts & Shared Transaction Records):
+   1. Created FINANCE_ADMIN_HANDOFF.md:
+      - Documented audit baseline, architectural gaps, role/permission matrix across Visitor/Player/Owner/Admin, state transition diagrams for settlement/venue-review/support, proposed REST API contracts, backend integration requirements (atomic transactions, double-entry/correction records, idempotency, server-side authorization), and unresolved commercial decisions.
+   2. Decoupled settlement transactions and payment states from bookings:
+      - Modeled PaymentTransaction with integer minor units (ETB), explicit transaction type ('collection' | 'refund'), payment method, status ('recorded' | 'initiated' | 'processing' | 'succeeded' | 'failed'), notes, reference, recordedBy, and originalTransactionId.
+      - Modeled BookingFinancialSummary deriving collectedMinor, refundedMinor, netCollectedMinor, outstandingMinor, and paymentStatus authoritatively from transaction history.
+      - Expanded Booking.paymentStatus to support 'partially_paid' and 'partially_refunded'.
+   3. Atomic settlement & refund mutations with idempotency and limits:
+      - Implemented /owner/bookings/:id/settle rejecting overpayment (amountMinor > outstandingMinor) and repeated submissions with identical Idempotency-Key.
+      - Implemented /owner/bookings/:id/refund rejecting refunds exceeding net collected funds (amountMinor > netCollectedMinor) and preserving audit/reversal history.
+      - Enforced cross-tenant security: only the venue owner or platform administrator can settle or refund bookings; other tenants and players are denied (HTTP 403).
+   4. Decoupled cancellation from refund execution:
+      - Booking cancellation frees slots (status: 'cancelled') without automatically issuing refunds; collected money remains intact in transaction ledger until explicit refund action.
+   5. Provisional commercial policy & subscription invoices:
+      - Commercial policy remains explicitly unset (subscriptionPriceMinor: null, bookingCommissionPercent: null), displaying 'Not configured' rather than defaulting to zero.
+      - Generated honest platform subscription invoices (/owner/invoices) with status: 'not_configured' and totalMinor: null.
+   6. Internationalization & full verification:
+      - Added partially_paid, partially_refunded, not_configured, and changes_requested to English and Amharic dictionaries with 100% key parity.
+      - 87/87 unit tests pass (npm test, including 7 new regression tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Working strictly on local branch codex/finance-platform-admin; no merge, push, or deploy.
+
+- Step 24 (Milestone M5 Step 2: Owner Settlement, Receipts, and Invoices Workflow):
+   1. Interactive financial modals & accessible keyboard navigation:
+      - In frontend/src/components/booking-financial-modals.tsx, created SettlementModal, ReceiptModal, and SimulateGatewayModal with useModalKeyboard focus trapping, Escape handling, accessible ARIA roles, loading skeletons, and ServiceErrorMessage retry handling.
+      - SettlementModal: enables owners to record manual payments (cash at counter, POS card terminal, Telebirr manual, bank transfer), supporting partial collections, a "Pay full balance" shortcut, overpayment rejection (amountMinor > outstandingMinor), duplicate submission prevention via Idempotency-Key, and live feedback.
+      - ReceiptModal: accessible to both owners and players to inspect booking financial summaries (gross booking value, net collected, total refunds, outstanding balance) and itemized transaction history table with timestamps, transaction types, methods, signed amounts, status pills, and reference numbers. Enables owners to issue refunds bounded by net collected funds with mandatory reason tracking.
+      - SimulateGatewayModal: provides a clearly labeled domestic mobile payment simulator (Telebirr and CBE Birr) with a prominent demo disclaimer, explicit success vs failure/decline simulation, idempotency guards, and honest failure state presentation.
+   2. BookingCard integration & UI baseline preservation:
+      - In frontend/src/components/booking-list.tsx, integrated financial triggers into BookingCard: owners can trigger "Record payment" (when balance > 0) and "Receipts"; players can trigger "Receipts" and "Pay online (Simulated)" (when balance > 0). Preserved existing cancel, reschedule, and match replay buttons in their approved positions.
+   3. Owner billing & subscription invoices separation:
+      - In frontend/src/components/owner-panels.tsx, updated OwnerBilling to clearly separate platform subscription licenses from customer booking receipts, providing direct navigation to the booking ledger.
+      - Rendered subscription invoices referencing venue ID, period dates, provisional status ("Not configured"), and itemized line items (Platform Operating License, Autonomous Camera Ingestion) with unapproved pricing left unset rather than defaulted to zero.
+   4. Internationalization & key parity:
+      - Added 35+ localization keys to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts with 100% key parity.
+   5. Verification results:
+      - 89/89 unit tests pass (npm test, with new simulated gateway and subscription invoice tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+
+- Step 25 (Milestone M5 Step 3: Booking-Derived Financial and Operational Analytics):
+   1. Multi-dimensional reporting & filter engine:
+      - In frontend/src/components/analytics-dashboard.tsx, implemented reusable AnalyticsDashboard supporting venue, sport, date-from, date-to, and metric date basis (booking_date vs transaction_date) filters.
+      - Documented metric calculation methodology and Addis Ababa timezone (UTC+3, EAT): Gross Booking Value and Outstanding Balance derive on scheduled booking dates; Collections and Refunds derive on transaction processing dates.
+      - Separately rendered Gross Booking Value, Actual Recorded Collections, Completed Refunds, Net Revenue, and Outstanding Balances.
+      - Displayed Platform Commission Fee as "Not configured" with an explicit advisory that commercial pricing is provisional and unset.
+      - Integrated per-sport breakdown cards and honest zero-activity empty state (t('zeroActivity')).
+   2. Owner & administrator views:
+      - In frontend/src/components/owner-panels.tsx, updated OwnerOverview to render AnalyticsDashboard scoped to owned venues with direct link to the booking ledger.
+      - In frontend/src/components/admin-panels.tsx and frontend/src/app/admin/analytics/page.tsx, implemented AdminAnalytics providing platform-wide aggregation across all venues with admin authorization.
+   3. Service & transport integration:
+      - In frontend/src/services/admin.service.ts, added typed analytics(params, signal) method calling /admin/analytics.
+      - In frontend/src/demo/transport.ts, verified /owner/analytics and /admin/analytics endpoints backed by computeFinancialAnalytics.
+   4. Internationalization & full verification:
+      - Added analytics filter, timezone, and commission advisory keys to both en.ts and am.ts with 100% key parity.
+      - 91/91 unit tests pass (npm test, with owner and admin analytics tests in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+
+- Step 26 (Milestone M5 Step 4: Venue Review and Administration):
+   1. Review lifecycle & state transitions:
+      - Reconciled existing venue review statuses (`'draft' | 'pending' | 'changes_requested' | 'active' | 'suspended'`) without introducing a contradictory secondary status system.
+      - Implemented full review actions: `submit`, `request_changes`, `approve`, `suspend`, `reinstate` with reason tracking and reverse-chronological audit history in `state.venueReviews`.
+      - Enforced mandatory review reason validation for non-approval actions (`request_changes`, `suspend`, `reinstate`).
+      - Preserved backward compatibility on `PATCH /admin/stadiums/:id` while auto-recording audit entries.
+   2. Suspension invariants & data preservation:
+      - Suspended venues are immediately excluded from public directory discovery (`/stadiums`) and return 404 on direct lookup (`/stadiums/:slug`).
+      - New public reservations (`POST /bookings`) and new walk-in reservations (`POST /owner/walk-ins`) reject when a venue is suspended.
+      - Existing reservations, payments, and refunds remain strictly intact; suspension never silently cancels bookings or issues automated refunds.
+      - Venue owners retain authorized access to `/dashboard/stadiums`, `/dashboard/bookings`, and `/dashboard/billing` to inspect records and view admin feedback.
+   3. Camera certification separation:
+      - Camera hardware and FOV certification remains strictly independent of venue operational review.
+      - Suspending or reinstating a venue preserves existing camera certification statuses (`passed`, `failed`, `revoked`).
+      - Added visual separation advisory (`cameraSeparationNotice`) in admin venues panel.
+   4. UI integration & localization:
+      - In `frontend/src/components/admin-panels.tsx` (`AdminVenues`): rendered status pills, approve/request_changes/suspend/reinstate action buttons, mandatory reason inputs, optional internal notes, and review history audit viewer.
+      - In `frontend/src/components/owner-panels.tsx` (`OwnerVenues`): rendered review submission trigger for draft and changes_requested venues, feedback notices, suspension alerts (`venueSuspensionNotice`), and review history viewer.
+      - Added 10+ matching translation keys to `en.ts` and `am.ts` with 100% key parity.
+   5. Verification results:
+      - 94/94 unit tests pass (`npm test`, with comprehensive review lifecycle, suspension invariant, and camera independence tests in `frontend/tests/finance-admin.test.cjs`).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all touched files.
+      - Next.js 16.3.1 production build compiles with 0 errors (`npm run build`, 41/41 routes).
+      - Preserved frozen UI baseline. Working strictly on local branch `codex/finance-platform-admin`; no merge into `main`, push, or deploy.
+
+- Step 27 (Milestone M5 Step 5: Support Cases, Account Moderation, and Admin Lockout Protection):
+   1. Support cases & role boundaries:
+      - Implemented SupportCase contract in frontend/src/services/contracts.ts and frontend/src/services/support.service.ts with list, get, create, addMessage, and update.
+      - Integrated supportService into frontend/src/services/create-services.ts and frontend/src/services/index.ts.
+      - Implemented /support/cases REST simulator endpoints in frontend/src/demo/transport.ts with strict role-based access:
+        - Regular players view cases authored by themselves.
+        - Owners view cases authored by themselves or associated with their owned venues.
+        - Administrators view all platform cases.
+      - Enforced isInternal message restrictions: non-admin users attempting to send internal staff notes are rejected with 403 forbidden. When non-admins fetch cases or case details, messages with isInternal: true are stripped before delivery.
+   2. Account moderation & suspension invariants:
+      - Modeled status?: 'active' | 'suspended' on Account.
+      - Implemented requireActiveAccount() in frontend/src/demo/transport.ts, denying service-layer write mutations (creating bookings, cancelling, rescheduling, creating teams, joining teams, creating support cases) with 403 forbidden when an account is suspended.
+      - Added /admin/users/:id/status endpoint and adminService.moderateUser(userId, input) supporting user status transitions (active vs suspended) with mandatory reason tracking and audit logging.
+      - Protected against admin self-lockout: an admin attempting to suspend their own account is rejected with 409 conflict.
+      - Protected against last-admin suspension: attempting to suspend the sole remaining active administrator is rejected with 409 conflict.
+   3. UI integration & localization:
+      - In frontend/src/components/admin-panels.tsx:
+        - Enhanced AdminUsers panel with user status badges (active, suspended), action buttons to suspend or reinstate users with mandatory reason prompt, and inline warnings for self-lockout and last-admin protections.
+        - Added AdminSupport panel with status filter tabs, priority pills, case details modal, public message thread, internal staff notes input (with distinct internal badge), and case status resolution selector.
+      - Added dedicated route frontend/src/app/admin/support/page.tsx and navigation item in frontend/src/components/workspace-shell.tsx.
+      - Added 30+ translation keys for support cases, message types, and moderation actions to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts with 100% key parity.
+   4. Verification results:
+      - 97/97 unit tests pass (npm test, including admin self-lockout, last-admin protection, service-layer mutation denial, role-scoped case access, and internal staff note stripping in frontend/tests/finance-admin.test.cjs).
+      - Scoped ESLint passes with 0 errors and 0 warnings across all modified files.
+      - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 42/42 routes including /admin/support).
+      - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+
+- Step 28 (Milestone M5 Correction 1: Support-Case Authorization, Ownership Consistency, and Internal Note Sanitization):
+   1. Strict support case authorization:
+      - Enforced authorization on PATCH /support/cases/:id before inspecting the request body; unrelated players or owners attempting to update or inspect cases are rejected with 403 forbidden.
+      - Ensured all non-admin responses on creation, retrieval, and updates sanitize message history by stripping internal staff notes (isInternal: true).
+   2. Asset linkage ownership and consistency validation:
+      - On POST /support/cases, validated that referenced bookings and transactions belong to the authenticated caller (or owned venue for owners) and that venue, booking, and transaction identifiers are internally consistent (rejecting mismatches with 422 validation).
+   3. Verification & test linting:
+      - Configured ESLint override in eslint.config.mjs for CommonJS test files (tests/**/*.cjs) to eliminate no-require-imports errors.
+      - Added regression tests in frontend/tests/finance-admin.test.cjs covering unauthorized update attempts, foreign booking linkage, mismatched venue/booking linkage, and sanitized update responses.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 29 (Milestone M5 Correction 2: Close Cross-Venue Invoice Access and Tenant Authorization):
+   1. Strict tenant authorization on owner invoices:
+      - Enforced that /owner/invoices?venueId=... rejects with 403 forbidden if the requested venue does not belong to the authenticated owner.
+      - Scoped both stored and generated subscription invoices strictly to matching owned venues (targetVenueIds.includes(i.venueId) && venueIds.includes(i.venueId)), preventing cross-tenant leakage of stored records.
+   2. Regression test with stored multi-owner records:
+      - Added regression test in frontend/tests/finance-admin.test.cjs with pre-seeded stored invoices for both owner-1 (Bambis Meda) and owner-2 (Unity Sports Complex).
+      - Verified that each owner receives only their respective stored invoice, and explicit cross-venue queries are rejected with 403 forbidden.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 30 (Milestone M5 Correction 3: Correct Financial Idempotency, Request Fingerprinting, and Retry Key Preservation):
+   1. Prioritized idempotency resolution & fingerprint validation:
+      - In frontend/src/demo/transport.ts, restructured settlement (/owner/bookings/:id/settle), refund (/owner/bookings/:id/refund), and gateway simulation (/bookings/:id/simulate-gateway) handlers: authenticated caller and evaluated idempotency keys prior to evaluating changing balances.
+      - Generated canonical request fingerprints (bookingId, amount, payment method, reference, notes, and outcome); verified previous fingerprint matches incoming payload and rejected alterations with 409 conflict.
+      - Enabled seamless retries of full settlements, which previously failed with 422 because outstanding balance had reduced to 0.
+   2. Preservation of retry keys on failure:
+      - In frontend/src/components/booking-financial-modals.tsx, preserved idempotency keys across transport failures in SettlementModal, ReceiptModal, and SimulateGatewayModal so subsequent retry attempts safely reuse the identical key.
+   3. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs covering full-settlement idempotency, payload-change conflict rejection, and gateway simulation retries.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 31 (Milestone M5 Correction 4: Enforce Account Suspension and Demo-Only Payment Simulation):
+   1. Transport active-account enforcement & live-mode gating:
+      - In frontend/src/demo/transport.ts, enforced requireActiveAccount() on /bookings/:id/simulate-gateway, /owner/bookings/:id/settle, and /owner/bookings/:id/refund, strictly denying suspended users from executing financial mutations with 403 forbidden.
+      - Explicitly gated payment simulation behind !isLive, ensuring live-mode configurations never allow demo payment success.
+   2. UI suspension and simulation controls:
+      - In frontend/src/components/booking-financial-modals.tsx, inspected user account status in SettlementModal, ReceiptModal, and SimulateGatewayModal; rendered prominent suspension alerts and disabled submission.
+      - Gated payment simulation in SimulateGatewayModal and booking cards behind isDemoMode, disabling and warning if invoked in live mode or while suspended.
+      - In frontend/src/components/booking-list.tsx, disabled settlement and payment simulation buttons for suspended accounts and hidden demo simulation outside demo mode.
+   3. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs verifying suspended player payment simulation rejection, suspended owner settlement and refund rejection, and live-mode transport rejection of gateway simulation.
+      - 98/98 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 32 (Milestone M5 Correction 5: Correct Analytics Reconciliation, Negative Net Revenue, and Timezone Calculations):
+   1. Reconciliation of sport breakdown with collections:
+      - In frontend/src/demo/transport.ts computeFinancialAnalytics, resolved sport breakdown collections by looking up booking sports across all known bookings rather than restricting to filteredBookings.
+      - Fixed bug where transaction-date reporting periods omitted collections from breakdown totals when the underlying booking was created outside the filter range.
+   2. Accurate negative net revenue on refund-only periods:
+      - Removed Math.max(0, ...) clamping on netRevenueMinor, enabling periods with refunds exceeding collections to accurately report negative net balances (e.g., -500.00 ETB).
+   3. Addis Ababa timezone date calculations:
+      - Calculated transaction dates using Intl.DateTimeFormat in venue timezone (Africa/Addis_Ababa, UTC+3) rather than naive UTC timestamp slicing, ensuring late-night UTC transactions (e.g., 22:30 UTC) are attributed to the correct local calendar day (the following day in Ethiopia).
+   4. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs verifying sport breakdown reconciliation with total collections, negative net revenue on refund-only periods, and timezone-adjusted transaction reporting.
+      - 99/99 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 33 (Milestone M5 Correction 6: Complete Player & Owner Support UI, Test Linter Cleanliness, and Browser E2E Coverage):
+   1. Player and owner support workflows:
+      - Created frontend/src/components/support-modals.tsx with SupportCaseModal offering ticket creation, multi-case selection, conversation thread inspection, and message reply submission.
+      - Integrated accessible keyboard focus trapping, Escape/Tab navigation, suspension guards, and category selection matching SupportCaseCategory domain types.
+      - Added "Contact support" action buttons to player booking cards and "Support cases" entry to the booking list header in frontend/src/components/booking-list.tsx.
+      - Exported OwnerSupportPanel in frontend/src/components/owner-panels.tsx and created dedicated /dashboard/support page in frontend/src/app/dashboard/support/page.tsx, linked from the owner dashboard navigation in frontend/src/components/workspace-shell.tsx.
+   2. Comprehensive E2E browser verification suite:
+      - Created frontend/tests/verify-finance-admin-e2e.mjs executing all 7 end-to-end browser journeys via Chrome DevTools Protocol (CDP) on headless Chrome:
+        * Journey 1: Owner manual settlement, overpayment validation error, collection submission, and receipts modal transaction history inspection.
+        * Journey 2: Player simulated gateway payment with simulated gateway failure, failure recovery, and receipt failure record inspection.
+        * Journey 3: Owner & admin analytics dashboards, date-type toggle between booking_date and transaction_date, and non-admin tenant denial.
+        * Journey 4: Venue review lifecycle and moderation queue rendering in /admin/stadiums.
+        * Journey 5: Account moderation card rendering and self-lockout/last-admin protection invariants.
+        * Journey 6: Player support case creation from booking card, owner support panel review, and administrator support moderation with internal note sanitization.
+        * Journey 7: Mobile viewport (390x844) and Amharic localization (የድጋፍ ጥያቄዎች and የቦታ ማስያዣዎች) verification.
+      - Saved high-resolution artifact screenshots for all 7 journeys to the conversation artifacts directory.
+   3. Verification & quality checks:
+      - npm test: 99/99 unit and integration tests pass.
+      - Scoped ESLint across all modified and new files: 0 errors, 0 warnings.
+      - Production build (npm run build): Completed successfully with 43 static/dynamic routes.
+
+- Step 34 (Milestone M5 Follow-up 1: Allow Failed Payment Retry in UI and Verify Ledger Non-Duplication):
+   1. Failed payment retry action in UI:
+      - In frontend/src/components/booking-list.tsx, updated simulated payment button rendering to include booking.paymentStatus === 'failed', enabling players to retry payment directly from booking cards after gateway declines or timeouts.
+      - Updated canModify to allow cancellation and rescheduling on confirmed bookings with failed paymentStatus where no collected funds exist.
+   2. Ledger non-duplication assertions:
+      - Extended automated regression suite in frontend/tests/finance-admin.test.cjs to assert that immediate inspection of receipts after failure reveals status 'failed', collectedMinor: 0, and exactly 1 failed transaction.
+      - Verified that subsequent successful retry simulation records the new successful transaction, transitions paymentStatus to 'paid', and maintains exact collection totals (3000.00 ETB) with both historical transactions retained without duplicate collections.
+      - 99/99 unit and integration tests pass (npm test).
+
+- Step 35 (Milestone M5 Follow-up 2: Complete Support Localization and Eliminate Hardcoded Strings):
+   1. Extensible dictionary coverage:
+      - Added missing translation keys to both frontend/src/i18n/en.ts and frontend/src/i18n/am.ts: selectCasePrompt, adminSelectCasePrompt, adminSupportSubtitle, replyPlaceholder, ownerReplyPlaceholder, adminReplyPlaceholder, subjectPlaceholder, ownerSubjectPlaceholder, descriptionPlaceholder, ownerDescriptionPlaceholder, and messagesCount.
+      - Maintained complete key-for-key parity between English and Amharic dictionaries.
+   2. UI component localization:
+      - Updated frontend/src/components/support-modals.tsx, frontend/src/components/owner-panels.tsx, and frontend/src/components/admin-panels.tsx to reference localized message keys for all placeholders, headings, subtitles, selection prompts, and message counters.
+      - Verified dictionary parity with npm test (English and Amharic have identical nonempty message keys passes); scoped ESLint passed with 0 errors and 0 warnings.
+
+- Step 36 (Milestone M5 Follow-up 3: Strict Browser E2E Test Suite Substantiation and Mandatory Assertions):
+   1. Headless browser CDP error handling & fast fail:
+      - Updated CDPClient.evaluate in frontend/tests/verify-finance-admin-e2e.mjs to inspect res?.exceptionDetails and throw an immediate Error on any unhandled in-browser exception, preventing silent failures.
+      - Introduced a strict assert helper throwing on false conditions across every journey; eliminated all passive logging in favor of mandatory checks.
+   2. Full lifecycle interactions and verifiable assertions:
+      - Journey 1 (Owner Manual Settlement & Refund Lifecycle): Tested settlement overpayment rejection (displaying application-level overpayment validation error); recorded 500 ETB settlement; opened receipts modal; issued actual 100 ETB refund with reason; verified ledger displays both collection and refund rows with updated 400 ETB net collections. Added noValidate to settlement and refund forms in frontend/src/components/booking-financial-modals.tsx and exposed transaction notes/reason in the ledger table.
+      - Journey 2 (Simulated Gateway Failure & UI Retry): Simulated payment failure on booking card; verified status transitioned to 'failed'; clicked newly visible 'Pay online (Simulated)' button on failed booking; simulated successful collection; verified status updated to 'paid'; asserted receipts ledger contains exactly 2 transaction attempts (1 failed attempt, 1 success) with net collection of 1,500.00 ETB without duplicate charges.
+      - Journey 3 (Analytics Dashboards & Timezone Verification): Verified owner analytics Addis Ababa timezone notice; toggled metric date basis to 'transaction_date' and asserted selection state; verified admin platform analytics and gross/net revenue totals; asserted non-admin tenant denial (forbidden).
+      - Journey 4 (Venue Review Moderation): Submitted suspension reason and suspended active venue-1; asserted status updated to 'suspended' and displayed venue suspension notice; opened review history and asserted suspension record with reason; submitted reinstatement reason and reinstated venue-1; asserted status returned to 'active'.
+      - Journey 5 (Account Moderation & Self-Lockout Guard): Verified admin self-suspension button is disabled and displays warning notice; submitted moderation reason and suspended non-admin player-2; asserted status updated to 'suspended' and displayed account suspension notice; reinstated player-2 and asserted status returned to 'active'.
+      - Journey 6 (Support Workflows, Tenant Isolation & Sanitization): Player submitted inquiry on booking card; owner-1 replied publicly and verified message appeared in conversation; verified tenant isolation (unrelated owner-2 denied access and does not see venue-1 cases); admin posted internal staff note (highlighted with amber badge) and public reply; verified player-1 and owner-1 views contain all public replies while internal staff note is completely sanitized and absent.
+      - Journey 7 (Mobile Viewport & Amharic Localization): Emulated 390x844 mobile viewport; verified owner support panel, open conversation view, reply textarea placeholder, and reply button in Amharic; opened create case modal and verified Amharic categories, subject placeholder, and description placeholder; verified player mobile bookings view, opened player support modal, and verified Amharic title, placeholders, and buttons.
+   3. Verification evidence:
+      - All 7 journeys fully substantiated and passed (node tests/verify-finance-admin-e2e.mjs exited with 0).
+      - 7 screenshot artifacts updated in brain storage: finance_journey_1_settlement_receipts.png, finance_journey_2_player_gateway_simulation.png, finance_journey_3_analytics_dashboard.png, finance_journey_4_venue_review_moderation.png, finance_journey_5_account_moderation.png, finance_journey_6_support_workflow_sanitization.png, and finance_journey_7_mobile_amharic.png.
+      - 99/99 unit and integration tests passed (npm test).
+      - Scoped ESLint passed with 0 errors and 0 warnings.
+      - Production build passed (npm run build).
+
+- Step 37 (Milestone M5 Follow-up 4: Enforce Mandatory Refund Reason and Separate Reschedule from Payment Retry):
+    1. Mandatory refund reason validation:
+       - In frontend/src/components/booking-financial-modals.tsx (handleRefund), added explicit pre-flight validation for empty or whitespace-only refund reasons (!refundReason.trim()). When reason is missing or blank, displays localized error (t('reasonRequired')) and halts immediately without dispatching a refund mutation.
+       - Removed fallback 'Manual refund' substitution, strictly passing user-provided trimmed reasons (reason: refundReason.trim()).
+       - Verified that blank/whitespace submissions cannot create transactions or modify collected ledger balances.
+    2. Decouple modification eligibility from payment retry:
+       - In frontend/src/components/booking-list.tsx, reverted canModify to strictly check booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking).
+       - Preserved independent payment retry eligibility on line 624 (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid' || booking.paymentStatus === 'failed'), ensuring failed payments can retry without exposing unusable reschedule actions that the service rejects with 409 conflict.
+    3. Test suite & verification:
+       - In frontend/tests/finance-admin.test.cjs, added targeted assertions verifying that blank ('') and whitespace-only ('   ') refund reasons are rejected with validation error and create no transactions.
+       - Added targeted assertion verifying that rescheduling a booking with failed paymentStatus is rejected with 409 conflict, while payment simulation retry succeeds and updates status to paid.
+       - 99/99 unit and integration tests pass (npm test).
+       - Scoped ESLint passes with 0 errors and 0 warnings.
+       - Production build passes (npm run build).
+
+

@@ -18,6 +18,10 @@ import {
 import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
 import { ReplayModal } from './match-replay';
+import { SettlementModal, ReceiptModal, SimulateGatewayModal } from './booking-financial-modals';
+import { SupportCaseModal } from './support-modals';
+import { useAuthStore } from '@/lib/auth-store';
+import { isDemoMode } from '@/services/config';
 
 function isFutureBooking(b: Booking): boolean {
   return Date.parse(`${b.date}T${String(b.startHour).padStart(2, '0')}:00:00+03:00`) > Date.now();
@@ -94,6 +98,7 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
   const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [showGeneralSupport, setShowGeneralSupport] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
 
@@ -138,9 +143,17 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold">{t(owner ? 'ownerBookings' : 'bookings')}</h1>
         <div className="flex flex-wrap items-center gap-3">
-          {owner && (
+          {owner ? (
             <button type="button" className="action" onClick={() => setShowWalkInModal(true)}>
               {t('walkInReservation')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="min-h-11 inline-flex items-center rounded-xl border border-slate-300 px-4 font-semibold hover:bg-slate-50"
+              onClick={() => setShowGeneralSupport(true)}
+            >
+              {t('supportCases')}
             </button>
           )}
           <Link href="/stadiums" className="min-h-11 inline-flex items-center rounded-xl border border-slate-300 px-4 font-semibold hover:bg-slate-50">
@@ -375,6 +388,12 @@ function BookingRecords({ owner, bookingId, venueId }: { owner: boolean; booking
           onRescheduled={query.reload}
         />
       )}
+
+      {showGeneralSupport && (
+        <SupportCaseModal
+          onClose={() => setShowGeneralSupport(false)}
+        />
+      )}
     </div>
   );
 }
@@ -403,7 +422,13 @@ function BookingCard({
   onRescheduleClick: (booking: Booking) => void;
 }) {
   const { t, money, date: displayDate } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
   const [showReplay, setShowReplay] = useState(false);
+  const [showSettlement, setShowSettlement] = useState(false);
+  const [showReceipts, setShowReceipts] = useState(false);
+  const [showSimulateGateway, setShowSimulateGateway] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const fieldName = queryData?.fields.find(f => f.id === booking.fieldId)?.name || booking.fieldId;
   const venueName = queryData?.venues.find(v => v.id === booking.venueId)?.name || booking.venueId;
   const canModify = booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking);
@@ -551,12 +576,104 @@ function BookingCard({
             ▶ {t('matchReplay')}
           </button>
         )}
+
+        {/* Financial Actions */}
+        {owner ? (
+          <>
+            {booking.status !== 'cancelled' && booking.paymentStatus !== 'paid' && (
+              <button
+                type="button"
+                disabled={isSuspended}
+                className={`action ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setShowSettlement(true)}
+              >
+                {t('recordSettlement')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50"
+              onClick={() => setShowReceipts(true)}
+            >
+              {t('receipts')}
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50"
+              onClick={() => setShowSupport(true)}
+            >
+              {t('support')}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50"
+              onClick={() => setShowReceipts(true)}
+            >
+              {t('receipts')}
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50"
+              onClick={() => setShowSupport(true)}
+            >
+              {t('support')}
+            </button>
+            {isDemoMode && booking.status !== 'cancelled' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid' || booking.paymentStatus === 'failed') && (
+              <button
+                type="button"
+                disabled={isSuspended}
+                className={`min-h-11 rounded-xl border border-sky-300 bg-sky-50 px-4 text-sm font-semibold text-sky-950 hover:bg-sky-100 ${
+                  isSuspended ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                onClick={() => setShowSimulateGateway(true)}
+              >
+                {t('simulatePayment')}
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {showReplay && (
         <ReplayModal
           bookingId={booking.id}
           onClose={() => setShowReplay(false)}
+        />
+      )}
+
+      {showSettlement && (
+        <SettlementModal
+          booking={booking}
+          onClose={() => setShowSettlement(false)}
+          onSuccess={() => onCancelSuccess()}
+        />
+      )}
+
+      {showReceipts && (
+        <ReceiptModal
+          booking={booking}
+          owner={owner}
+          onClose={() => setShowReceipts(false)}
+          onUpdated={() => onCancelSuccess()}
+        />
+      )}
+
+      {showSimulateGateway && (
+        <SimulateGatewayModal
+          booking={booking}
+          onClose={() => setShowSimulateGateway(false)}
+          onSuccess={() => onCancelSuccess()}
+        />
+      )}
+
+      {showSupport && (
+        <SupportCaseModal
+          bookingId={booking.id}
+          venueId={booking.venueId}
+          onClose={() => setShowSupport(false)}
         />
       )}
     </article>
