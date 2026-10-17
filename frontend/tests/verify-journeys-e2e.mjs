@@ -194,8 +194,93 @@ export async function runBrowserJourneysTest() {
       mobile: false
     });
 
+    // =========================================================================
+    // JOURNEY 0: PUBLIC DISCOVERY, BASKETBALL SEARCH & CONTEXTUAL SIGN-IN
+    // =========================================================================
+    console.log('\n[JOURNEY 0] Public Discovery & Contextual Sign-In Flow...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/stadiums' });
+    await sleep(2000);
+    await client.evaluate(`
+      (() => {
+        sessionStorage.clear();
+        localStorage.clear();
+        localStorage.setItem('etsf-locale', 'en');
+      })()
+    `);
+    await client.send('Page.navigate', { url: 'http://localhost:3000/stadiums' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    // Filter by Basketball
+    const discoveryFilter = await client.evaluate(`
+      (() => {
+        const sportButtons = Array.from(document.querySelectorAll('button'));
+        const bballBtn = sportButtons.find(b => b.textContent && b.textContent.trim() === 'Basketball');
+        if (bballBtn) bballBtn.click();
+        return { clicked: !!bballBtn };
+      })()
+    `);
+    await sleep(800);
+
+    // Verify Unity Sports Complex is visible in the filtered results
+    const unityVisible = await client.evaluate(`
+      (() => {
+        const text = document.body.textContent || '';
+        return text.includes('Unity Sports Complex');
+      })()
+    `);
+    if (!unityVisible) {
+      throw new Error(`Journey 0 assertion failed: Unity Sports Complex not visible after Basketball filter: ${JSON.stringify(discoveryFilter)}`);
+    }
+
+    // Navigate to Unity Sports Complex microsite directly
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/unity-complex' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const micrositeCheck = await client.evaluate(`
+      (() => {
+        const h1 = document.querySelector('h1')?.textContent || '';
+        return { h1, hasUnity: h1.includes('Unity Sports Complex') };
+      })()
+    `);
+    if (!micrositeCheck.hasUnity) {
+      throw new Error(`Journey 0 assertion failed: Unity Sports Complex microsite title missing: ${JSON.stringify(micrositeCheck)}`);
+    }
+
+    // Contextual booking with return URL when signed out
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings/new?venue=unity-complex&field=field-3&date=2026-10-25' });
+    await sleep(1500);
+
+    // Sign in as player-1
+    await client.evaluate(`
+      (() => {
+        sessionStorage.setItem('etsf-demo-session-v1', 'player-1');
+      })()
+    `);
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings/new?venue=unity-complex&field=field-3&date=2026-10-25' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const bookingContextCheck = await client.evaluate(`
+      (() => {
+        const url = window.location.href;
+        const text = document.body.textContent || '';
+        const venueSelected = text.includes('Unity Sports Complex') || text.includes('unity-complex');
+        return { url, venueSelected };
+      })()
+    `);
+    console.log('  Journey 0 context check:', bookingContextCheck);
+    if (!bookingContextCheck.venueSelected) {
+      throw new Error(`Journey 0 assertion failed: Booking context not preserved: ${JSON.stringify(bookingContextCheck)}`);
+    }
+
+    const shot0Path = path.join(artifactDir, 'journey_0_discovery_signin_preserved.png');
+    await client.captureScreenshot(shot0Path);
+    console.log('  ✓ Screenshot captured (discovery & signin):', shot0Path);
+
     // STEP 0: Set clean demo session for owner-1 (Fatima Hassan, Bambis Meda Stadium)
-    console.log('[STEP 0] Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis Meda Stadium)...');
+    console.log('\n[STEP 0] Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis Meda Stadium)...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/auth/login' });
     await sleep(1500);
 
@@ -704,6 +789,124 @@ export async function runBrowserJourneysTest() {
     const shot7Path = path.join(artifactDir, 'journey_7_player_view.png');
     await client.captureScreenshot(shot7Path);
     console.log('  ✓ Screenshot captured (player view):', shot7Path);
+
+    // =========================================================================
+    // JOURNEY 8: PLAYER BOOKING & CANCELLATION LIFECYCLE
+    // =========================================================================
+    console.log('\n[JOURNEY 8] Player Booking Creation & Cancellation Lifecycle...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings/new?venue=unity-complex&field=field-3&date=2026-10-26' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const slotSelect = await client.evaluate(`
+      (() => {
+        const radios = Array.from(document.querySelectorAll('input[name="start"]'));
+        if (radios.length === 0) return { error: 'No start slot radio buttons available', body: document.body.innerText.slice(0, 300) };
+        const radio = radios[0];
+        const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked');
+        if (descriptor) descriptor.set.call(radio, true);
+        radio.click();
+        radio.dispatchEvent(new Event('click', { bubbles: true }));
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+        const submitBtn = document.querySelector('button[type="submit"]');
+        return { clickedRadio: true, submitDisabled: submitBtn ? submitBtn.disabled : null };
+      })()
+    `);
+    console.log('  Selected start slot for booking:', slotSelect);
+    if (slotSelect.error) {
+      throw new Error(`Journey 8 assertion failed: ${slotSelect.error}`);
+    }
+    await sleep(800);
+
+    const submitAction = await client.evaluate(`
+      (() => {
+        const form = document.querySelector('form');
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.type === 'submit');
+        if (!form || !btn) return { error: 'No form or submit button found' };
+        if (btn.disabled) return { error: 'Submit button remains disabled after slot selection' };
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          btn.click();
+        }
+        return { submitted: true };
+      })()
+    `);
+    console.log('  Submitted reservation form:', submitAction);
+    if (submitAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${submitAction.error}`);
+    }
+    await sleep(2500);
+    await waitForLoading(client);
+
+    const postSubmitState = await client.evaluate(`
+      (() => ({
+        url: window.location.href,
+        hasError: !!document.querySelector('[role="alert"]'),
+        alertText: document.querySelector('[role="alert"]')?.textContent,
+        bodySnippet: document.body.innerText.slice(0, 300)
+      }))()
+    `);
+    console.log('  Post-submit form state:', postSubmitState);
+
+    // Navigate to player's bookings list
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const bookingsPageCheck = await client.evaluate(`
+      (() => ({
+        url: window.location.href,
+        text: document.body.innerText.slice(0, 400),
+        buttons: Array.from(document.querySelectorAll('button')).map(b => b.textContent?.trim())
+      }))()
+    `);
+    console.log('  /bookings page state:', bookingsPageCheck);
+
+    const cancelAction = await client.evaluate(`
+      (() => {
+        const cancelButtons = Array.from(document.querySelectorAll('button')).filter(b => b.textContent && b.textContent.includes('Cancel reservation'));
+        if (cancelButtons.length === 0) return { error: 'No cancel reservation button found on /bookings' };
+        cancelButtons[0].click();
+        return { clickedCancel: true };
+      })()
+    `);
+    console.log('  Cancel button clicked:', cancelAction);
+    if (cancelAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${cancelAction.error}`);
+    }
+    await sleep(800);
+
+    const confirmAction = await client.evaluate(`
+      (() => {
+        const confirmBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.trim() === 'Confirm');
+        if (!confirmBtn) return { error: 'No Confirm button found in cancel prompt' };
+        confirmBtn.click();
+        return { clickedConfirm: true };
+      })()
+    `);
+    console.log('  Confirm cancellation clicked:', confirmAction);
+    if (confirmAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${confirmAction.error}`);
+    }
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const cancelledBadgeCheck = await client.evaluate(`
+      (() => {
+        const badges = Array.from(document.querySelectorAll('span, div')).map(el => el.textContent?.trim());
+        const hasCancelled = badges.some(t => t === 'Cancelled' || t === 'ተሰርዟል');
+        return { hasCancelled };
+      })()
+    `);
+    console.log('  Cancelled badge check:', cancelledBadgeCheck);
+    if (!cancelledBadgeCheck.hasCancelled) {
+      throw new Error(`Journey 8 assertion failed: Cancelled badge not found after cancellation: ${JSON.stringify(cancelledBadgeCheck)}`);
+    }
+
+    const shot8Path = path.join(artifactDir, 'journey_8_booking_cancelled.png');
+    await client.captureScreenshot(shot8Path);
+    console.log('  ✓ Screenshot captured (booking cancelled):', shot8Path);
 
     client.close();
     proc.kill();
