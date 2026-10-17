@@ -344,6 +344,11 @@ export function ReceiptModal({
       return;
     }
 
+    if (!refundReason.trim()) {
+      setRefundError(t('reasonRequired'));
+      return;
+    }
+
     if (!refundIdempotencyRef.current) {
       refundIdempotencyRef.current = `refund-${booking.id}-${Date.now()}`;
     }
@@ -354,7 +359,7 @@ export function ReceiptModal({
         booking.id,
         {
           amountMinor,
-          reason: refundReason.trim() || 'Manual refund',
+          reason: refundReason.trim(),
         },
         refundIdempotencyRef.current
       );

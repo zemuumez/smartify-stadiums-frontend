@@ -579,4 +579,19 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Scoped ESLint passed with 0 errors and 0 warnings.
       - Production build passed (npm run build).
 
+- Step 37 (Milestone M5 Follow-up 4: Enforce Mandatory Refund Reason and Separate Reschedule from Payment Retry):
+    1. Mandatory refund reason validation:
+       - In frontend/src/components/booking-financial-modals.tsx (handleRefund), added explicit pre-flight validation for empty or whitespace-only refund reasons (!refundReason.trim()). When reason is missing or blank, displays localized error (t('reasonRequired')) and halts immediately without dispatching a refund mutation.
+       - Removed fallback 'Manual refund' substitution, strictly passing user-provided trimmed reasons (reason: refundReason.trim()).
+       - Verified that blank/whitespace submissions cannot create transactions or modify collected ledger balances.
+    2. Decouple modification eligibility from payment retry:
+       - In frontend/src/components/booking-list.tsx, reverted canModify to strictly check booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking).
+       - Preserved independent payment retry eligibility on line 624 (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid' || booking.paymentStatus === 'failed'), ensuring failed payments can retry without exposing unusable reschedule actions that the service rejects with 409 conflict.
+    3. Test suite & verification:
+       - In frontend/tests/finance-admin.test.cjs, added targeted assertions verifying that blank ('') and whitespace-only ('   ') refund reasons are rejected with validation error and create no transactions.
+       - Added targeted assertion verifying that rescheduling a booking with failed paymentStatus is rejected with 409 conflict, while payment simulation retry succeeds and updates status to paid.
+       - 99/99 unit and integration tests pass (npm test).
+       - Scoped ESLint passes with 0 errors and 0 warnings.
+       - Production build passes (npm run build).
+
 

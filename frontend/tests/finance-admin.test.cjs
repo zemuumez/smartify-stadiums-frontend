@@ -215,6 +215,27 @@ test('refund limits are enforced against net collected funds and preserve correc
     'validation'
   );
 
+  // Explicit validation: blank or whitespace-only refund reasons are rejected and record NO transaction
+  const txCountBeforeBlank = (await s.billing.bookingFinancials(booking.id)).transactions.length;
+  await rejects(
+    s.billing.refundBooking(booking.id, {
+      amountMinor: 50000,
+      reason: '',
+    }),
+    'validation'
+  );
+  await rejects(
+    s.billing.refundBooking(booking.id, {
+      amountMinor: 50000,
+      reason: '   ',
+    }),
+    'validation'
+  );
+  const finAfterBlank = await s.billing.bookingFinancials(booking.id);
+  assert.equal(finAfterBlank.transactions.length, txCountBeforeBlank, 'No transaction must be created for blank or whitespace reason');
+  assert.equal(finAfterBlank.refundedMinor, 0);
+  assert.equal(finAfterBlank.netCollectedMinor, 200000);
+
   // Partial refund of 1000.00 ETB succeeds
   const ref1 = await s.billing.refundBooking(booking.id, {
     amountMinor: 100000,
@@ -342,6 +363,17 @@ test('simulated gateway payments support telebirr and cbe_birr with explicit suc
   assert.equal(failReceipts.collectedMinor, 0);
   assert.equal(failReceipts.transactions.length, 1);
   assert.equal(failReceipts.transactions[0].status, 'failed');
+
+  // Verify failed payment is ineligible for modification/reschedule (rescheduling requires unpaid status)
+  await rejects(
+    s.bookings.reschedule(booking.id, {
+      date: '2099-05-16',
+      startHour: 10,
+      endHour: 12,
+      idempotencyKey: crypto.randomUUID(),
+    }),
+    'conflict'
+  );
 
   // Retry with success using an idempotency key
   const gwKey = 'gw-idem-key-1';
