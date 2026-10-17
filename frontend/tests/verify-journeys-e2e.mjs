@@ -566,8 +566,18 @@ export async function runBrowserJourneysTest() {
         }
         walk(document.body[k]);
         let h = target?.memoizedState;
-        for (let i = 0; i < 9; i++) h = h?.next;
-        const queryData = h?.next?.memoizedState?.data;
+        let queryData = null;
+        while (h) {
+          if (h.memoizedState?.data?.venues) {
+            queryData = h.memoizedState.data;
+            break;
+          }
+          if (h.memoizedState?.venues) {
+            queryData = h.memoizedState;
+            break;
+          }
+          h = h.next;
+        }
         const ownedVenues = queryData?.venues || [];
         const venueFields = queryData?.fields || [];
         const cards = Array.from(document.querySelectorAll('article'));
