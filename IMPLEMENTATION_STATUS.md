@@ -594,4 +594,29 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
        - Scoped ESLint passes with 0 errors and 0 warnings.
        - Production build passes (npm run build).
 
+- Step 38 (Milestone M6: Frontend Acceptance and Backend Handoff Preparation):
+    1. Comprehensive product route inventory and 14 acceptance journeys matrix:
+       - Created FRONTEND_ACCEPTANCE.md documenting all 46 application routes (43 Next.js compiled routes) across Public, Player, Venue Owner, Platform Administrator, System, and Tenant Subdomain namespaces.
+       - Mapped all 14 acceptance journeys specified in FRONTEND_MASTER_PLAN.md to concrete routes, components, behavioral unit tests, and CDP browser e2e test suites.
+       - Explicitly identified missing backend-dependent functionality (server-side atomic locking, real gateway webhooks, RTSP stream transcoding, persistent multi-tenant relational storage, SMS/email notifications, and staff audit logs).
+    2. Usability, accessibility, and localization verification:
+       - Verified desktop, tablet, and 390px mobile viewport responsiveness across all screens.
+       - Audited keyboard focus management: modal initial focus placement, Tab/Shift-Tab focus trapping, Escape dismissal, and return-to-trigger focus restoration across WalkInModal, RescheduleModal, SupportCaseModal, SettlementModal, ReceiptModal, and MediaViewerModal.
+       - Verified text zoom and viewport scaling up to 200% without horizontal scroll or truncated text.
+       - Verified 100% English and Amharic translation key parity across all domains with dynamic document language and direction metadata.
+    3. Resilience and truthful behavior:
+       - Audited loading skeletons, empty state call-to-actions, and service error retry buttons.
+       - Verified multi-tenant session isolation across venue owners, players, and platform administrators.
+       - Enforced truthful demo/live boundaries: payment simulation and mock data are strictly forbidden in live configurations, and provisional commercial rates are explicitly marked as illustrative.
+    4. Reproducible test infrastructure:
+       - Removed machine-specific artifact paths across test suites; established dynamic Chrome detection supporting Windows, macOS, and Linux CI.
+       - Added npm run ci pipeline executing scoped lint, unit tests, and production build in sequence.
+       - Added npm run test:browser:all to run all 5 browser suites.
+    5. Backend handoff specifications:
+       - Documented complete M7 backend contract: 40+ RESTful API endpoints, role-based access control matrix, finite state machines for bookings, transactions, venue lifecycle, and media streams, along with database schema requirements.
+    6. Verification & quality checks:
+       - npm run ci: 0 lint errors, 99/99 unit tests passing, clean production build (43 routes).
+       - Preserved approved visual baseline with zero unwanted redesigns.
+
+
 
