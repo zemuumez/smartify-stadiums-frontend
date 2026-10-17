@@ -466,3 +466,14 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Scoped ESLint passes with 0 errors and 0 warnings across all modified files.
       - Next.js 16.3.1 production build compiles with 0 errors (npm run build, 42/42 routes including /admin/support).
       - Preserved frozen UI baseline. Working strictly on local branch codex/finance-platform-admin; no merge into main, push, or deploy.
+
+- Step 28 (Milestone M5 Correction 1: Support-Case Authorization, Ownership Consistency, and Internal Note Sanitization):
+   1. Strict support case authorization:
+      - Enforced authorization on PATCH /support/cases/:id before inspecting the request body; unrelated players or owners attempting to update or inspect cases are rejected with 403 forbidden.
+      - Ensured all non-admin responses on creation, retrieval, and updates sanitize message history by stripping internal staff notes (isInternal: true).
+   2. Asset linkage ownership and consistency validation:
+      - On POST /support/cases, validated that referenced bookings and transactions belong to the authenticated caller (or owned venue for owners) and that venue, booking, and transaction identifiers are internally consistent (rejecting mismatches with 422 validation).
+   3. Verification & test linting:
+      - Configured ESLint override in eslint.config.mjs for CommonJS test files (tests/**/*.cjs) to eliminate no-require-imports errors.
+      - Added regression tests in frontend/tests/finance-admin.test.cjs covering unauthorized update attempts, foreign booking linkage, mismatched venue/booking linkage, and sanitized update responses.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.

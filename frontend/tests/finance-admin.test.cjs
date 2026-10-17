@@ -765,6 +765,47 @@ test('support cases enforce role boundaries and strip internal staff notes for n
   const closedCase = await s.support.update(newCase.id, { status: 'closed' });
   assert.equal(closedCase.status, 'closed');
   assert.ok(closedCase.resolvedAt);
+
+  // Unrelated player (player-2) cannot call support.update on case-1 (even with empty payload)
+  s.transport.selectAccount('player-2');
+  await rejects(s.support.update('case-1', {}), 'forbidden');
+
+  // Player-2 cannot create a case linking Player-1's booking
+  await rejects(
+    s.support.create({
+      bookingId: booking.id,
+      category: 'booking_dispute',
+      subject: 'Dispute another player booking',
+      message: 'Trying to link someone elses booking',
+    }),
+    'forbidden'
+  );
+
+  // Creating a case with inconsistent bookingId and venueId is rejected with validation error
+  s.transport.selectAccount('player-1');
+  await rejects(
+    s.support.create({
+      venueId: 'venue-2',
+      bookingId: booking.id, // belongs to venue-1
+      category: 'booking_dispute',
+      subject: 'Inconsistent booking and venue',
+      message: 'Mismatched venue and booking',
+    }),
+    'validation'
+  );
+
+  // Admin adds an internal note to newCase, then player-1 updates it: player must NOT receive internal note
+  s.transport.selectAccount('admin-1');
+  await s.support.addMessage(newCase.id, {
+    message: 'Staff investigation note: confirmed weather report.',
+    isInternal: true,
+  });
+  s.transport.selectAccount('player-1');
+  const sanitizedUpdatedCase = await s.support.update(newCase.id, {});
+  assert.ok(
+    !sanitizedUpdatedCase.messages.some(m => m.isInternal),
+    'Non-admin update response must sanitize internal notes'
+  );
 });
 
 

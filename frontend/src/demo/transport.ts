@@ -1888,7 +1888,11 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           const user = account();
           const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
           if (!sc) throw new ServiceError('not_found', 404);
-          const isOwner = user.role === 'owner' && (sc.authorId === user.id || (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)));
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
           const isPlayer = user.role === 'player' && sc.authorId === user.id;
           const isAdmin = user.role === 'admin';
           if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
@@ -1903,14 +1907,54 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           if (!input.subject?.trim() || !input.message?.trim() || !input.category) {
             throw new ServiceError('validation', 422);
           }
-          if (input.venueId && !state.venues.some(v => v.id === input.venueId)) {
-            throw new ServiceError('not_found', 404);
+          if (input.venueId) {
+            const v = state.venues.find(item => item.id === input.venueId);
+            if (!v) throw new ServiceError('not_found', 404);
+            if (user.role === 'owner' && v.ownerId !== user.id) {
+              throw new ServiceError('forbidden', 403);
+            }
           }
-          if (input.bookingId && !state.bookings.some(b => b.id === input.bookingId)) {
-            throw new ServiceError('not_found', 404);
+          let linkedBooking: Booking | undefined;
+          if (input.bookingId) {
+            linkedBooking = state.bookings.find(b => b.id === input.bookingId);
+            if (!linkedBooking) throw new ServiceError('not_found', 404);
+            if (input.venueId && linkedBooking.venueId !== input.venueId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (user.role === 'player' && linkedBooking.playerId !== user.id) {
+              throw new ServiceError('forbidden', 403);
+            }
+            if (user.role === 'owner') {
+              const ownsBookingVenue = state.venues.some(v => v.id === linkedBooking!.venueId && v.ownerId === user.id);
+              if (!ownsBookingVenue && linkedBooking.playerId !== user.id) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (!input.venueId) input.venueId = linkedBooking.venueId;
           }
-          if (input.transactionId && !state.transactions.some(t => t.id === input.transactionId)) {
-            throw new ServiceError('not_found', 404);
+          if (input.transactionId) {
+            const linkedTx = state.transactions.find(t => t.id === input.transactionId);
+            if (!linkedTx) throw new ServiceError('not_found', 404);
+            if (input.bookingId && linkedTx.bookingId && linkedTx.bookingId !== input.bookingId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (input.venueId && linkedTx.venueId !== input.venueId) {
+              throw new ServiceError('validation', 422);
+            }
+            if (user.role === 'player') {
+              const txBooking = state.bookings.find(b => b.id === linkedTx.bookingId);
+              if (linkedTx.payerId !== user.id && (!txBooking || txBooking.playerId !== user.id)) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (user.role === 'owner') {
+              const ownsTxVenue = state.venues.some(v => v.id === linkedTx.venueId && v.ownerId === user.id);
+              if (!ownsTxVenue) {
+                throw new ServiceError('forbidden', 403);
+              }
+            }
+            if (!input.venueId) input.venueId = linkedTx.venueId;
+            if (!input.bookingId && linkedTx.bookingId) input.bookingId = linkedTx.bookingId;
           }
           const caseId = crypto.randomUUID();
           const now = new Date().toISOString();
@@ -1926,7 +1970,7 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
             category: input.category,
             subject: input.subject.trim(),
             status: 'open',
-            priority: input.priority || 'medium',
+            priority: (user.role === 'admin' ? input.priority : undefined) || 'medium',
             createdAt: now,
             updatedAt: now,
             messages: [
@@ -1945,13 +1989,20 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           state.supportCases.push(newCase);
           audit(`support.case_created: ${newCase.caseNumber}`, newCase.id);
           persist();
-          return newCase;
+          return {
+            ...newCase,
+            messages: user.role === 'admin' ? newCase.messages : newCase.messages.filter(m => !m.isInternal),
+          };
         }
         if (parts.length === 4 && parts[3] === 'messages' && method === 'POST') {
           const user = requireActiveAccount();
-          const sc = state.supportCases.find(c => c.id === parts[2]);
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
           if (!sc) throw new ServiceError('not_found', 404);
-          const isOwner = user.role === 'owner' && (sc.authorId === user.id || (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)));
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
           const isPlayer = user.role === 'player' && sc.authorId === user.id;
           const isAdmin = user.role === 'admin';
           if (!isAdmin && !isOwner && !isPlayer) throw new ServiceError('forbidden', 403);
@@ -1981,10 +2032,16 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         }
         if (parts.length === 3 && method === 'PATCH') {
           const user = requireActiveAccount();
-          const sc = state.supportCases.find(c => c.id === parts[2]);
+          const sc = state.supportCases.find(c => c.id === parts[2] || c.caseNumber === parts[2]);
           if (!sc) throw new ServiceError('not_found', 404);
           const isAdmin = user.role === 'admin';
           const isAuthor = sc.authorId === user.id;
+          const isOwner = user.role === 'owner' && (
+            sc.authorId === user.id ||
+            (sc.venueId && state.venues.some(v => v.id === sc.venueId && v.ownerId === user.id)) ||
+            (sc.bookingId && state.bookings.some(b => b.id === sc.bookingId && state.venues.some(v => v.id === b.venueId && v.ownerId === user.id)))
+          );
+          if (!isAdmin && !isAuthor && !isOwner) throw new ServiceError('forbidden', 403);
           const input = options.body as { status?: SupportCaseStatus; priority?: SupportCasePriority };
           if (input.priority && !isAdmin) throw new ServiceError('forbidden', 403);
           if (input.status) {
@@ -2002,7 +2059,10 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
           sc.updatedAt = new Date().toISOString();
           audit(`support.case_updated: ${sc.caseNumber}`, sc.id);
           persist();
-          return sc;
+          return {
+            ...sc,
+            messages: isAdmin ? sc.messages : sc.messages.filter(m => !m.isInternal),
+          };
         }
       }
     }
