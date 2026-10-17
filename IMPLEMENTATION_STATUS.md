@@ -521,3 +521,25 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
    4. Verification & tests:
       - Added regression tests in frontend/tests/finance-admin.test.cjs verifying sport breakdown reconciliation with total collections, negative net revenue on refund-only periods, and timezone-adjusted transaction reporting.
       - 99/99 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 33 (Milestone M5 Correction 6: Complete Player & Owner Support UI, Test Linter Cleanliness, and Browser E2E Coverage):
+   1. Player and owner support workflows:
+      - Created frontend/src/components/support-modals.tsx with SupportCaseModal offering ticket creation, multi-case selection, conversation thread inspection, and message reply submission.
+      - Integrated accessible keyboard focus trapping, Escape/Tab navigation, suspension guards, and category selection matching SupportCaseCategory domain types.
+      - Added "Contact support" action buttons to player booking cards and "Support cases" entry to the booking list header in frontend/src/components/booking-list.tsx.
+      - Exported OwnerSupportPanel in frontend/src/components/owner-panels.tsx and created dedicated /dashboard/support page in frontend/src/app/dashboard/support/page.tsx, linked from the owner dashboard navigation in frontend/src/components/workspace-shell.tsx.
+   2. Comprehensive E2E browser verification suite:
+      - Created frontend/tests/verify-finance-admin-e2e.mjs executing all 7 end-to-end browser journeys via Chrome DevTools Protocol (CDP) on headless Chrome:
+        * Journey 1: Owner manual settlement, overpayment validation error, collection submission, and receipts modal transaction history inspection.
+        * Journey 2: Player simulated gateway payment with simulated gateway failure, failure recovery, and receipt failure record inspection.
+        * Journey 3: Owner & admin analytics dashboards, date-type toggle between booking_date and transaction_date, and non-admin tenant denial.
+        * Journey 4: Venue review lifecycle and moderation queue rendering in /admin/stadiums.
+        * Journey 5: Account moderation card rendering and self-lockout/last-admin protection invariants.
+        * Journey 6: Player support case creation from booking card, owner support panel review, and administrator support moderation with internal note sanitization.
+        * Journey 7: Mobile viewport (390x844) and Amharic localization (የድጋፍ ጥያቄዎች and የቦታ ማስያዣዎች) verification.
+      - Saved high-resolution artifact screenshots for all 7 journeys to the conversation artifacts directory.
+   3. Verification & quality checks:
+      - npm test: 99/99 unit and integration tests pass.
+      - Scoped ESLint across all modified and new files: 0 errors, 0 warnings.
+      - Production build (npm run build): Completed successfully with 43 static/dynamic routes.
+

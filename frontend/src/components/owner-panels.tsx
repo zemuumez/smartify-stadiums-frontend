@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { billingService, fieldsService, venuesService } from '@/services';
-import type { Field, Venue, VenueReviewRecord } from '@/services/contracts';
+import { billingService, fieldsService, venuesService, supportService } from '@/services';
+import type { Field, Venue, VenueReviewRecord, SupportCase, SupportCaseCategory } from '@/services/contracts';
 import type { FieldInput } from '@/services/fields.service';
 import { supportedSports, hourLabel } from '@/services/sports';
 import { useServiceQuery } from '@/lib/use-service-query';
@@ -384,4 +384,347 @@ export function OwnerBilling() {
 export function AccountSettings() {
   const { t } = useLanguage(); const { user } = useAuthStore();
   return <div className="panel space-y-4"><h1 className="text-3xl font-bold">{t('account')}</h1><dl><dt className="font-semibold">{t('name')}</dt><dd className="mb-4">{user?.full_name}</dd><dt className="font-semibold">{t('phone')}</dt><dd>{user?.phone}</dd></dl><p>{t('profileEditingPending')}</p><Link href="/contact" className="underline">{t('support')}</Link></div>;
+}
+
+export function OwnerSupportPanel() {
+  const { t, date: displayDate } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
+
+  const venuesQuery = useServiceQuery(useCallback(signal => venuesService.owned(signal), []));
+  const casesQuery = useServiceQuery(useCallback(signal => supportService.list(undefined, signal), []));
+
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newVenueId, setNewVenueId] = useState('');
+  const [newCategory, setNewCategory] = useState<SupportCaseCategory>('facility_issue');
+  const [newSubject, setNewSubject] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+
+  const selectedCase = casesQuery.data?.find(c => c.id === selectedCaseId);
+  const venues = venuesQuery.data || [];
+
+  const handleSendReply = async () => {
+    if (!selectedCaseId || !replyMessage.trim() || isSuspended) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await supportService.addMessage(selectedCaseId, {
+        message: replyMessage.trim(),
+      });
+      setReplyMessage('');
+      casesQuery.reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUpdateStatus = async (status: SupportCase['status']) => {
+    if (!selectedCaseId || isSuspended) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await supportService.update(selectedCaseId, { status });
+      casesQuery.reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateCase = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newSubject.trim() || !newMessage.trim() || isSuspended) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const created = await supportService.create({
+        venueId: newVenueId || (venues[0]?.id),
+        category: newCategory,
+        subject: newSubject.trim(),
+        message: newMessage.trim(),
+        priority: 'medium',
+      });
+      setNewSubject('');
+      setNewMessage('');
+      setShowCreateModal(false);
+      setSelectedCaseId(created.id);
+      casesQuery.reload();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">{t('supportCases')}</h1>
+          <p className="mt-1 text-sm text-slate-600">Stadium operations, player disputes, and platform inquiries</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          disabled={isSuspended}
+          className="action"
+        >
+          + {t('support')}
+        </button>
+      </div>
+
+      {isSuspended && (
+        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">
+          {t('accountSuspendedNotice')}
+        </div>
+      )}
+
+      {error ? <ServiceErrorMessage error={error} /> : null}
+
+      {casesQuery.loading ? (
+        <Loading />
+      ) : casesQuery.error ? (
+        <ServiceErrorMessage error={casesQuery.error} retry={casesQuery.reload} />
+      ) : !casesQuery.data?.length ? (
+        <div className="panel text-center py-12 space-y-3">
+          <p className="text-slate-500">{t('empty')}</p>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            disabled={isSuspended}
+            className="action"
+          >
+            + {t('support')}
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="space-y-3 lg:col-span-2">
+            {casesQuery.data.map(sc => (
+              <article
+                key={sc.id}
+                onClick={() => setSelectedCaseId(sc.id)}
+                className={`panel cursor-pointer space-y-2 transition-colors ${
+                  selectedCaseId === sc.id ? 'ring-2 ring-emerald-600' : 'hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-slate-700">{sc.caseNumber}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      sc.status === 'open'
+                        ? 'bg-amber-100 text-amber-900'
+                        : sc.status === 'in_progress'
+                        ? 'bg-blue-100 text-blue-900'
+                        : sc.status === 'resolved'
+                        ? 'bg-emerald-100 text-emerald-900'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {t(sc.status)}
+                  </span>
+                </div>
+                <h3 className="font-bold text-slate-900 line-clamp-1">{sc.subject}</h3>
+                <p className="text-xs text-slate-600">
+                  {sc.authorName} ({t(sc.authorRole)}) · {t(sc.category)}
+                </p>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span>{sc.messages.length} messages</span>
+                  <time>{displayDate(sc.updatedAt.slice(0, 10))}</time>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="lg:col-span-3">
+            {selectedCase ? (
+              <div className="panel space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <span className="font-mono text-xs text-slate-500">{selectedCase.caseNumber}</span>
+                    <h2 className="text-xl font-bold text-slate-900">{selectedCase.subject}</h2>
+                    <p className="text-xs text-slate-600">
+                      {selectedCase.authorName} · {t(selectedCase.category)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedCase.status !== 'resolved' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus('resolved')}
+                        disabled={busy || isSuspended}
+                        className="min-h-9 px-3 text-xs font-bold rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                      >
+                        {t('resolved')}
+                      </button>
+                    )}
+                    {selectedCase.status !== 'closed' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus('closed')}
+                        disabled={busy || isSuspended}
+                        className="min-h-9 px-3 text-xs font-bold rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700"
+                      >
+                        {t('closed')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {selectedCase.messages.map((m, idx) => (
+                    <div
+                      key={m.id || idx}
+                      className="rounded-xl p-3 text-sm space-y-1 bg-slate-50 border border-slate-200"
+                    >
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="font-semibold text-slate-800">
+                          {m.senderName} ({t(m.senderRole)})
+                        </span>
+                        <time>{displayDate(m.createdAt.slice(0, 10))}</time>
+                      </div>
+                      <p className="text-slate-800 whitespace-pre-wrap">{m.message}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedCase.status !== 'closed' && (
+                  <div className="space-y-3 pt-3 border-t border-slate-200">
+                    <label className="form-label">
+                      {t('reply')}
+                      <textarea
+                        rows={3}
+                        required
+                        disabled={busy || isSuspended}
+                        value={replyMessage}
+                        onChange={e => setReplyMessage(e.target.value)}
+                        placeholder="Type reply to player or administration..."
+                        className="form-input text-sm"
+                      />
+                    </label>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || isSuspended || !replyMessage.trim()}
+                        onClick={handleSendReply}
+                        className="action"
+                      >
+                        {busy ? t('processing') : t('sendReply')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="panel text-center py-12 text-slate-500">
+                Select a support case to view details and reply.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h2 className="text-xl font-bold text-slate-900">{t('support')}</h2>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleCreateCase} className="space-y-3">
+              <label className="form-label">
+                {t('venues')}
+                <select
+                  value={newVenueId}
+                  onChange={e => setNewVenueId(e.target.value)}
+                  className="form-input"
+                >
+                  {venues.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="form-label">
+                {t('category')}
+                <select
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value as SupportCaseCategory)}
+                  className="form-input"
+                >
+                  <option value="facility_issue">{t('facility_issue')}</option>
+                  <option value="payment_issue">{t('payment_issue')}</option>
+                  <option value="booking_inquiry">{t('booking_inquiry')}</option>
+                  <option value="general">{t('general')}</option>
+                </select>
+              </label>
+
+              <label className="form-label">
+                {t('subject')}
+                <input
+                  type="text"
+                  required
+                  maxLength={120}
+                  value={newSubject}
+                  onChange={e => setNewSubject(e.target.value)}
+                  placeholder="e.g. Schedule issue or lighting maintenance"
+                  className="form-input"
+                />
+              </label>
+
+              <label className="form-label">
+                {t('description')}
+                <textarea
+                  required
+                  rows={4}
+                  maxLength={2000}
+                  value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  placeholder="Describe inquiry or issue..."
+                  className="form-input"
+                />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="min-h-11 px-4 rounded-xl border border-slate-300 font-semibold"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy || isSuspended}
+                  className="action"
+                >
+                  {busy ? t('processing') : t('confirm')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
