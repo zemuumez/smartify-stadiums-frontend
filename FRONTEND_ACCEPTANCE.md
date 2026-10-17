@@ -86,18 +86,18 @@ Every route defined under `frontend/src/app` has been audited for route paramete
 
 | # | Master Plan Journey Requirement | Target Screens & Components | Service DTOs & Endpoints | Test Verification Method | Observed Result | Status |
 |---|---|---|---|---|---|---|
-| **1** | Future basketball search, choose venue B, sign in, preserved context, no venue A replacement. | `/stadiums`, `/s/unity-complex`, `/bookings/new`, `/auth/login` | `directoryService.list`, `venuesService.get`, `authService.login` | `verify-journeys-e2e.mjs` (Journey 0) & `services.test.cjs` | Basketball filter selects Unity Sports Complex; microsite opens at `/s/unity-complex`; contextual booking parameters preserve venue, court, and date across authentication without leaking Bambis Meda (venue A). | **PASS** |
-| **2** | 1-hr & 2-hr fixture booking; totals reflect duration; unset commission remains unset. | `stadium-booking-modal.tsx`, `booking-form.tsx` | `bookingsService.quote`, `billingService.policy` | `services.test.cjs` & `finance-admin.test.cjs` | Duration calculations compute integer minor units; commercial policy confirms null commission and provisional fees. | **PASS** |
+| **1** | Future basketball search, choose venue B, sign in, preserved context, no venue A replacement. | `/stadiums`, `/s/unity-complex`, `/bookings/new`, `/auth/login` | `venuesService.list`, `venuesService.get`, `authService.login` | `verify-journeys-e2e.mjs` (Journey 0) & `services.test.cjs` | Basketball filter selects Unity Sports Complex; microsite opens at `/s/unity-complex`; contextual booking parameters preserve venue, court, and date across authentication without leaking Bambis Meda (venue A). | **PASS** |
+| **2** | 1-hr & 2-hr fixture booking; totals reflect duration; unset commission remains unset. | `stadium-booking-modal.tsx`, `booking-form.tsx` | `quoteMinor`, `billingService.policy` | `services.test.cjs` & `finance-admin.test.cjs` | Duration calculations compute integer minor units; commercial policy confirms null commission and provisional fees. | **PASS** |
 | **3** | Slot becomes unavailable before submission; conflict explained; no fake success. | `stadium-booking-modal.tsx`, `booking-list.tsx` | `bookingsService.create` (409 Conflict) | `verify-journeys-e2e.mjs` (Journey 2) & `services.test.cjs` | Displays application error notice: "This action conflicts with an existing reservation or state. Refresh and try again." | **PASS** |
-| **4** | Owner enters walk-in booking or closure; player availability updates immediately. | `booking-list.tsx` (WalkInModal, ClosureForm) | `bookingsService.walkIn`, `bookingsService.createClosure` | `verify-journeys-e2e.mjs` (Journey 1) & `services.test.cjs` | Walk-in creates booking with guest badge; slot disappears from online availability; closures reject bookings. | **PASS** |
+| **4** | Owner enters walk-in booking or closure; player availability updates immediately. | `booking-list.tsx` (WalkInModal, ClosureForm) | `bookingsService.createWalkIn`, `bookingsService.close` | `verify-journeys-e2e.mjs` (Journey 1) & `services.test.cjs` | Walk-in creates booking with guest badge; slot disappears from online availability; closures reject bookings. | **PASS** |
 | **5** | Player cancels eligible booking; calendar and ledger remain consistent under documented policy. | `/bookings/new`, `/bookings` (Cancel confirmation, receipts) | `bookingsService.create`, `bookingsService.cancel`, `billingService.bookingFinancials` | `verify-journeys-e2e.mjs` (Journey 8) & `finance-admin.test.cjs` | Player creates reservation, triggers "Cancel reservation" modal, confirms cancellation; booking card updates to "Cancelled" badge, slot is freed immediately, and payment ledger retains balance without fake automated refund. | **PASS** |
 | **6** | Owner edits microsite draft, previews, publishes, reloads; only that venue changes; invalid slugs/suspensions handled. | `microsite-editor.tsx`, `venue-site.tsx` | `venuesService.updateDraft`, `venuesService.publishDraft` | `verify-cms-e2e.mjs` (Journeys 1, 4, 5, 6, 8) | Local storage draft updates cleanly; live preview renders draft-only; publication updates public site; unpublish yields 404 notice. | **PASS** |
-| **7** | Player cannot use owner/admin actions; anonymous/expired sessions get correct return flow. | `access-gate.tsx`, `workspace-shell.tsx` | `authService.me`, 403 Forbidden | `verify-cms-e2e.mjs` (Journey 6) & `verify-finance-admin-e2e.mjs` (Journey 3) | Denies access with friendly unauthorized panel; unauthenticated requests redirect to login with `returnTo`. | **PASS** |
+| **7** | Player cannot use owner/admin actions; anonymous/expired sessions get correct return flow. | `access-gate.tsx`, `workspace-shell.tsx` | `authService.current`, 403 Forbidden | `verify-cms-e2e.mjs` (Journey 6) & `verify-finance-admin-e2e.mjs` (Journey 3) | Denies access with friendly unauthorized panel; unauthenticated requests redirect to login with `returnTo`. | **PASS** |
 | **8** | Team captain creates team, admits member, books; unauthorized members cannot manage team. | `team-panels.tsx`, `stadium-booking-modal.tsx` | `teamsService.create`, `teamsService.approveJoinRequest` | `verify-teams-events-e2e.mjs` (Journeys 1 & 2) | Captaincy controls exposed only to captain; members have leave button; captain books on behalf of team with team badge. | **PASS** |
 | **9** | Academy booking without completed consent cannot publish footage; blur/processing visible; recoverable. | `camera-admin.tsx`, `match-replay.tsx` | `mediaService.updateConsent`, `mediaService.recordings` | `verify-camera-media-e2e.mjs` (Journey 2) | Publish button disabled with guidance until consent is granted; blur processing status rendered honestly. | **PASS** |
-| **10**| Camera certification fails, corrected in fixture scenario; recording blocked until certified. | `camera-admin.tsx` | `cameraService.reviewDevice` | `verify-camera-media-e2e.mjs` (Journey 1) & `camera-media.test.cjs` | Uncertified/failed cameras show troubleshooting guidance; recordings cannot initiate on uncertified devices. | **PASS** |
-| **11**| Replay states: processing, ready-private, entitled, expired, public; correct audience views. | `match-replay.tsx`, `venue-site.tsx` | `mediaService.entitlement`, `mediaService.playback` | `verify-camera-media-e2e.mjs` (Journeys 3 & 4) | Entitled player streams 1080p replay with telemetry; non-entitled players denied; public highlights visible on microsite. | **PASS** |
-| **12**| Manual settlement & failed simulated gateway checkout produce clear distinct outcomes; no real money claimed. | `booking-financial-modals.tsx` | `billingService.settleBooking`, `billingService.simulateGateway` | `verify-finance-admin-e2e.mjs` (Journeys 1 & 2) & `finance-admin.test.cjs` | Manual settlement records cash/POS collections; gateway simulation declination records failed attempt; retry completes payment. | **PASS** |
+| **10**| Camera certification fails, corrected in fixture scenario; recording blocked until certified. | `camera-admin.tsx` | `adminService.reviewCamera`, `mediaService.cameras` | `verify-camera-media-e2e.mjs` (Journey 1) & `camera-media.test.cjs` | Uncertified/failed cameras show troubleshooting guidance; recordings cannot initiate on uncertified devices. | **PASS** |
+| **11**| Replay states: processing, ready-private, entitled, expired, public; correct audience views. | `match-replay.tsx`, `venue-site.tsx` | `mediaService.entitlements`, `mediaService.playback` | `verify-camera-media-e2e.mjs` (Journeys 3 & 4) | Entitled player streams 1080p replay with telemetry; non-entitled players denied; public highlights visible on microsite. | **PASS** |
+| **12**| Manual settlement & failed simulated gateway checkout produce clear distinct outcomes; no real money claimed. | `booking-financial-modals.tsx` | `billingService.settle`, `billingService.simulateGateway` | `verify-finance-admin-e2e.mjs` (Journeys 1 & 2) & `finance-admin.test.cjs` | Manual settlement records cash/POS collections; gateway simulation declination records failed attempt; retry completes payment. | **PASS** |
 | **13**| Admin rejects/suspends venue with reason; owner and public reflect it; audit entry appears. | `admin-panels.tsx`, `venue-site.tsx` | `adminService.reviewVenue`, `adminService.venueReviews` | `verify-finance-admin-e2e.mjs` (Journey 4) & `finance-admin.test.cjs` | Suspended venue displays suspension notice; public discovery halted; review history retains reason and reviewer ID. | **PASS** |
 | **14**| All critical flows complete by keyboard, 390px viewport, network failures, and empty datasets. | All Views (`useModalKeyboard`, `ServiceErrorMessage`) | Global error handling, abort signals | `verify-journeys-e2e.mjs` (Journey 3 & 7), `verify-cms-e2e.mjs` (Journey 7) | Tab focus traps, Escape closes modals, 0 horizontal overflow at 390px, retry buttons recover from outages. | **PASS** |
 
@@ -248,23 +248,35 @@ The project enforces `npm run lint:scoped` across 100% of migrated and active do
 
 ## 8. Backend Handoff Specification (M6 -> M7 Blueprint)
 
-As the project transitions to **Milestone M7 (Backend, API, Schema & Concurrency Design)**, the following requirements must be enforced at the server and database layer:
+As the project transitions to **Milestone M7 (Backend, API, Schema & Concurrency Design)**, the following contracts and requirements derived directly from the frontend implementation ([contracts.ts](file:///c:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/services/contracts.ts)) form the authoritative baseline. All underlying infrastructure, retention durations, and cryptographic implementations are labeled as **proposals requiring formal review and founder/architect approval in M7**.
 
-### 1. Domain Entities & Vocabulary
-- **Venue**: Stadium facility with physical location, geographic coordinates, operating hours, amenities, primary branding, review rating, and lifecycle status (`pending`, `active`, `suspended`, `changes_requested`).
-- **Field / Court**: Sub-resource belonging to a venue. Supports multi-sport configuration (`football`, `basketball`, `tennis`, `volleyball`, `running`, `padel`). Multiple sports can share a physical court ID.
-- **Booking**: Time-bound court reservation. Attributes: `fieldId`, `sport`, `date` (YYYY-MM-DD), `startHour`, `endHour`, `totalMinor` (integer Ethiopian Birr cents), `currency: 'ETB'`, `status` (`confirmed`, `cancelled`, `no_show`), `source` (`online`, `walk_in`).
-- **Payment Ledger & Transactions**: Immutably appended ledger records. Transaction types: `collection`, `refund`, `adjustment`, `payout`. Status: `recorded`, `succeeded`, `failed`. Dynamic payment status derived strictly from collection vs refund balances (`unpaid`, `partially_paid`, `paid`, `partially_refunded`, `refunded`, `failed`).
-- **Autonomous Camera Device**: Hardware camera installation. Status: `healthy`, `degraded`, `failed`, `pending_certification`, `certified`.
-- **Match Recording & Replay**: Video assets linked to a booking ID. Visibility: `private`, `entitled`, `public`. Privacy consent: `pending`, `granted`, `withheld`.
-- **Support Case**: Structured inquiries between players, venue owners, and platform administrators. Internal staff notes must be strictly sanitized from non-admin responses.
+### 1. Implemented Domain Entities & Contract Vocabulary
+- **Role**: `'player' | 'owner' | 'admin'`
+- **Sport**: Multi-sport configuration strictly limited to confirmed sports: `'football' | 'basketball' | 'volleyball' | 'badminton' | 'tennis' | 'futsal'` *(running and padel are not part of the active schema)*.
+- **Venue**: Facility profile with physical location, geographic coordinates, operating hours, amenities, primary branding, review rating, and lifecycle status (`'draft' | 'pending' | 'changes_requested' | 'active' | 'suspended'`).
+- **Field / Court**: Sub-resource belonging to a venue. Attributes: `venueId`, `name`, `sports: Sport[]`, `surface`, `hourlyRateMinor` (integer minor ETB units), `lighting`, `changingRoom`, `camera`, `active`, `openHour`, `closeHour`. Multiple sports can share a single physical court.
+- **Booking**: Time-bound reservation. Attributes: `fieldId`, `sport`, `date` (YYYY-MM-DD), `startHour`, `endHour`, `totalMinor` (integer Ethiopian Birr cents), `currency: 'ETB'`, `status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show'`, `source?: 'online' | 'walk_in'`, optional `guestName`/`guestPhone` (walk-in), optional `teamId`/`teamName` (team booking).
+- **Payment Ledger & Transactions**: Immutably appended ledger records. Transaction types: `'collection' | 'refund' | 'adjustment' | 'payout'`. Transaction status: `'recorded' | 'succeeded' | 'failed'`.
+- **Derived Payment Status**: Calculated strictly from collection vs refund balances: `'unpaid' | 'processing' | 'partially_paid' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'`.
+- **Autonomous Camera Device**: Hardware camera installation. Contract states:
+  - `certificationStatus: 'pending' | 'passed' | 'failed' | 'revoked'`
+  - `connectivityStatus: 'online' | 'offline' | 'unknown'`
+  - `status?: 'pending' | 'certified' | 'active' | 'offline' | 'revoked'`
+- **Match Recording & Privacy Consent**:
+  - `status: 'scheduled' | 'recording' | 'uploading' | 'processing' | 'ready' | 'failed'`
+  - `consent.status: 'pending' | 'granted' | 'denied' | 'revoked'`
+  - `consent.guardianConsentStatus?: 'pending' | 'granted' | 'denied'`
+  - `privacy.faceBlurStatus: 'pending' | 'processing' | 'completed' | 'failed'`
+  - `publication.visibility: 'private' | 'unlisted' | 'public'`
+  - Player streaming access is granted strictly through `ReplayEntitlement` records (`userId`, `recordingId`, `grantedBy`, `grantedAt`).
+- **Support Case**: Structured tickets between players, venue owners, and platform administrators. Category: `'booking' | 'payment' | 'recording' | 'general'`. Priority: `'low' | 'medium' | 'high' | 'urgent'`. Internal staff notes must be strictly sanitized and stripped from non-admin responses.
 
 ### 2. State Machine Transitions
 
 ```
-[Booking Status]
-  Created (Unpaid/Confirmed) ──> Cancelled (Slot restored)
-                             └──> Completed (Past schedule)
+[Booking Lifecycle]
+  Pending / Confirmed (Unpaid) ──(Player / Owner Cancel)──> Cancelled (Slot immediately restored)
+                               └──(Schedule Passes)──────> Completed (Eligible for match replay)
 
 [Derived Payment Status]
   unpaid ──(collection < total)──> partially_paid ──(collection == total)──> paid
@@ -279,18 +291,52 @@ As the project transitions to **Milestone M7 (Backend, API, Schema & Concurrency
   draft ──> pending ──(Admin Approve)──> active ──(Admin Suspend)──> suspended ──(Admin Reinstate)──> active
               │                                                         │
               └──(Admin Request Changes)──> changes_requested           └──(Owner Appeal / Fix)──> pending
+
+[Camera Certification Status]
+  pending ──(Admin Pass)──> passed (Device certified, recording unlocked)
+          ├──(Admin Fail)──> failed (Guidance provided, recording blocked)
+          └──(Admin Revoke)─> revoked (Certification withdrawn)
+
+[Privacy Consent Status]
+  pending ──(Player / Guardian Grant)──> granted (Eligible for publication after blur completion)
+          ├──(Player Deny)────────────> denied (Publication strictly blocked)
+          └──(Consent Revocation)─────> revoked (Must immediately take down public footage)
 ```
 
-### 3. Server-Side Invariants (What Mocks Cannot Enforce)
-1. **Atomic Double-Booking Prevention**: Database-level serializable isolation or PostgreSQL exclusion constraints (`EXCLUDE USING gist`) over `(field_id WITH =, date WITH =, tsrange(start_time, end_time) WITH &&)`.
-2. **Cryptographic Idempotency Keys**: Redis or PostgreSQL idempotency store caching request fingerprints (`sha256(user_id + payload)`) for 24 hours to prevent duplicate financial settlement or booking charges.
-3. **Webhook Signature Verification**: Domestic payment gateway callbacks (Telebirr, CBE Birr, Chapa) must verify HMAC-SHA256 signatures before updating ledger transactions.
-4. **Secure Media Transcoding & Signed URLs**: Match replay MP4s and HLS streams must be hosted in private cloud object storage (S3/GCS) with short-lived HMAC signed URLs (max 60 minutes) accessible only to entitled roster participants or guardians who have granted consent.
-5. **Multi-Tenant Row-Level Security (RLS)**: Enforce PostgreSQL Row-Level Security on `tenant_id` / `venue_id` so cross-tenant queries cannot leak records even in the event of application logic defects.
-6. **Tamper-Proof Audit Logging**: Immutable audit log tables for venue suspensions, user account lockouts, payment refunds, and camera certifications.
+### 3. Service Layer Contract Inventory (11 Implemented Services)
 
-### 4. Unresolved Commercial Policies for M7 Confirmation
-- Exact platform commission percentage (currently unset / null).
-- Exact monthly SaaS subscription fee per camera/court (currently unset / null).
-- Automatic cancellation refund schedule and late-cancellation fee percentages.
-- Venue payout clearance windows and domestic banking settlement reconciliation.
+| Service Singleton | Implemented Client Methods | Proposed REST Contract Endpoints (M7 Review) |
+|---|---|---|
+| `authService` | `requestOtp`, `login`, `register`, `logout`, `current` | `POST /auth/request-otp`, `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /users/me` |
+| `venuesService` | `list`, `get`, `fields`, `owned`, `create`, `update`, `getDraft`, `updateDraft`, `publishDraft`, `microsite` | `GET /stadiums`, `GET /stadiums/:id`, `GET /stadiums/:id/fields`, `GET /owner/stadiums`, `POST /owner/stadiums`, `PUT /owner/stadiums/:id`, `GET/PUT /owner/stadiums/:id/microsite-draft`, `POST /owner/stadiums/:id/publish-microsite` |
+| `fieldsService` | `list`, `create`, `update`, `toggle` | `GET /stadiums/:id/fields`, `POST /owner/stadiums/:id/fields`, `PUT /owner/stadiums/:id/fields/:fieldId` |
+| `bookingsService`| `list`, `availability`, `create`, `createWalkIn`, `reschedule`, `cancel`, `closures`, `close` | `GET /bookings`, `GET /fields/:id/availability`, `POST /bookings`, `POST /owner/walk-ins`, `POST /bookings/:id/reschedule`, `POST /bookings/:id/cancel`, `GET/POST /owner/closures` |
+| `teamsService` | `list`, `get`, `create`, `requestJoin`, `joinRequests`, `approveJoinRequest`, `rejectJoinRequest`, `leave`, `matches` | `GET/POST /teams`, `GET /teams/:id`, `POST /teams/:id/join`, `GET /teams/:id/requests`, `POST /teams/requests/:id/approve|reject`, `POST /teams/:id/leave`, `GET /teams/:id/matches` |
+| `eventsService` | `list`, `get`, `register`, `cancel` | `GET /events`, `GET /events/:id`, `POST /events/:id/register`, `POST /events/:id/cancel` |
+| `mediaService` | `cameras`, `registerCamera`, `updateCamera`, `recordings`, `entitlements`, `playback`, `updateConsent`, `publish`, `unpublish` | `GET /owner/stadiums/:id/cameras`, `POST /owner/cameras`, `PUT /owner/cameras/:id`, `GET /stadiums/:id/recordings`, `GET /media/entitlements`, `GET /recordings/:id/playback`, `POST /recordings/:id/consent`, `POST /recordings/:id/publish|unpublish` |
+| `billingService`| `policy`, `invoices`, `settle`, `simulateGateway`, `refund`, `bookingFinancials`, `financialAnalytics` | `GET /commercial-policy`, `GET /owner/invoices`, `POST /owner/bookings/settle`, `POST /payments/simulate-gateway`, `POST /owner/bookings/refund`, `GET /bookings/:id/financials`, `GET /owner/analytics` |
+| `adminService` | `stats`, `venues`, `reviewVenue`, `venueReviews`, `users`, `updateUserStatus`, `cameras`, `reviewCamera`, `financialAnalytics`, `auditLogs` | `GET /admin/stats`, `GET /admin/venues`, `POST /admin/venues/:id/review`, `GET /admin/venues/:id/reviews`, `GET /admin/users`, `PUT /admin/users/:id/status`, `GET /admin/cameras`, `POST /admin/cameras/:id/review`, `GET /admin/analytics`, `GET /admin/audit-logs` |
+| `supportService`| `list`, `get`, `create`, `reply`, `updateStatus` | `GET/POST /support/cases`, `GET /support/cases/:id`, `POST /support/cases/:id/messages`, `PUT /support/cases/:id/status` |
+| `contentService`| `terms`, `privacy`, `about`, `careers` | Static content & localized legal disclosures |
+
+### 4. Proposed Architectural Choices Requiring M7 Review
+The following technical choices are **proposals** formulated during frontend design that must be formally evaluated, validated, and finalized during M7 backend design:
+
+1. **Proposed Database & Concurrency Architecture**:
+   - *Proposal*: PostgreSQL with serializable transactions or exclusion constraints (`EXCLUDE USING gist`) over `(field_id WITH =, date WITH =, tsrange(start_time, end_time) WITH &&)` to guarantee zero double-bookings under high concurrent load.
+   - *Review Requirement*: M7 architect to evaluate whether PostgreSQL exclusion constraints or Redis distributed locking provides the lowest latency under peak Addis Ababa evening reservation rushes.
+2. **Proposed Cryptographic Signing & Verification Algorithms**:
+   - *Proposal*: HMAC-SHA256 signatures for domestic payment gateway webhook callbacks (Telebirr, CBE Birr, Chapa).
+   - *Proposal*: RS256 or Ed25519 asymmetric key pairs for temporary signed match replay streaming URLs (expiring in 60 minutes).
+   - *Review Requirement*: M7 security review to confirm supported cryptographic standards across Ethiopian telecom and banking APIs.
+3. **Proposed Media Retention Policy**:
+   - *Proposal*: Default 30-day retention period (`defaultRetentionDays: 30`) before match footage archival or deletion.
+   - *Review Requirement*: M7 infrastructure review to model cloud storage and egress costs across multi-court 1080p/4K footage before finalizing commercial retention tiers.
+4. **Proposed Multi-Tenant Row-Level Security (RLS)**:
+   - *Proposal*: PostgreSQL Row-Level Security enforced by connection session tenant ID (`venue_id`), preventing cross-tenant data leaks even in the presence of application-level bugs.
+   - *Review Requirement*: M7 database design to benchmark RLS performance against schema-per-tenant or standard foreign key isolation.
+5. **Provisional Commercial Policies Requiring Founder Approval**:
+   - Platform booking commission percentage (currently unset / `null`).
+   - Monthly SaaS subscription fee per camera/court (currently unset / `null`).
+   - Automated player refund schedule and late-cancellation fee percentages.
+   - Venue settlement payout clearance windows and banking reconciliation workflows.

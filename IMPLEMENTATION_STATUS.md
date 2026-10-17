@@ -618,5 +618,36 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
        - npm run ci: 0 lint errors, 99/99 unit tests passing, clean production build (43 routes).
        - Preserved approved visual baseline with zero unwanted redesigns.
 
+- Step 39 (Milestone M6 Acceptance Corrections & Backend Handoff Reconciliation):
+    1. Public route audit & truthful workflows (Correction 1):
+       - Connected `/contact` form to `supportService.create` generating `CASE-XXXXXX` references with active support links for authenticated accounts and clear guest login notices; eliminated fake 24-hr promise.
+       - Audited `/about`, `/pricing`, `/careers`, `/terms`, `/privacy`, and `/`: replaced fabricated metrics and hardcoded English with localized strings, honest partner counts (6 venues, 6 sports), and explicit provisional commercial disclaimers.
+    2. Acceptance matrix correction & missing browser checks (Correction 2):
+       - Corrected Journey 1 citation to Journey 0 (Discovery & Sign-in) and Journey 5 citation to Journey 8 (Player Cancellation Lifecycle).
+       - Implemented Journey 0 in `frontend/tests/verify-journeys-e2e.mjs`: Basketball search filter, `/s/unity-complex` navigation, contextual `/bookings/new` query preservation across sign-in.
+       - Implemented Journey 8 in `frontend/tests/verify-journeys-e2e.mjs`: Player reservation creation on `/bookings/new`, `/bookings` cancellation action, confirmation modal, and "Cancelled" badge assertion.
+    3. Accessibility & mobile performance evidence (Correction 3):
+       - Implemented `frontend/tests/verify-a11y-performance.mjs` verifying:
+         - Keyboard focus restoration to triggering control after Escape dismissal.
+         - Tablet 768px reflow with 0px horizontal overflow across directory, microsite, and dashboard.
+         - 200% zoom scaling without overflow or layout collisions.
+         - Mobile performance under documented conditions (390x844 viewport, 4x CPU slowdown, Fast 3G network): recorded real TTFB, DOM Interactive, DOM Content Loaded, and full Load event metrics.
+         - Replaced unsubstantiated ~125KB bundle claim with exact measured client timings.
+    4. CI automation & clean-checkout setup (Correction 4):
+       - Checked in `.github/workflows/ci.yml` running lint:scoped, unit tests, build with explicit test environment flags, automated server launch, execution of all 5 browser suites + a11y suite, and artifact upload on failure.
+       - Created `frontend/tests/run-all-e2e.mjs` for clean-checkout and local execution (`npm run ci:full`).
+       - Documented clean-checkout reproduction steps and remaining lint exclusions in `FRONTEND_ACCEPTANCE.md`.
+    5. Backend handoff reconciliation with contracts (Correction 5):
+       - Reconciled sports list to active confirmed sports: `football`, `basketball`, `volleyball`, `badminton`, `tennis`, `futsal` (removed running and padel).
+       - Reconciled camera certification status (`pending`, `passed`, `failed`, `revoked`), connectivity status (`online`, `offline`, `unknown`), and device status (`pending`, `certified`, `active`, `offline`, `revoked`).
+       - Reconciled match recording and privacy consent states (`pending`, `granted`, `denied`, `revoked`; visibility: `private`, `unlisted`, `public`).
+       - Corrected all non-existent service method references in the acceptance matrix and handoff tables to match the 11 implemented service singletons.
+       - Labeled proposed retention policies (30 days), cryptographic signing algorithms (HMAC-SHA256, RS256/Ed25519), and infrastructure choices (PostgreSQL, Redis, cloud object storage, RLS) as proposals requiring formal M7 review.
+    6. Verification:
+       - Scoped lint: 0 errors, 0 warnings.
+       - Unit tests: 99/99 passed.
+       - Production build: passed cleanly.
+       - All browser journeys (0 through 8 in verify-journeys-e2e, plus a11y-performance) verified passing.
+
 
 
