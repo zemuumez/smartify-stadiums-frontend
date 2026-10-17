@@ -171,23 +171,48 @@ Every route defined under `frontend/src/app` has been audited for route paramete
 
 ## 6. Automated Test Suite & CI Verification
 
-The verification architecture is completely reproducible across local workstations and continuous integration (CI) runners:
+The verification architecture is automated via checked-in continuous integration (CI) workflows and fully reproducible on clean checkouts:
 
-### Test Execution Commands
-- **Unit & Integration Suite**: `npm test`  
-  Runs TypeScript compilation (`tsc -p tsconfig.tests.json`) and Node test runner (`node --test tests/*.test.cjs`).
-- **Scoped Linting**: `npm run lint:scoped`  
-  Executes ESLint across all 19 domain components, services, demo adapters, localization dictionaries, and browser test scripts.
-- **Production Build**: `npm run build`  
-  Validates Next.js production bundle compilation and static page generation under Turbopack.
-- **Combined CI Check**: `npm run ci`  
-  Executes `lint:scoped` -> `test` -> `build` sequentially; fails closed if any error is encountered.
-- **All Browser Suites**: `npm run test:browser:all`  
-  Runs all 5 end-to-end headless Chrome suites via Chrome DevTools Protocol.
+### Checked-in CI Workflow
+- **Workflow Path**: [ci.yml](file:///.github/workflows/ci.yml)
+- **Trigger**: Runs on push and pull requests against `main` and feature branches.
+- **Automated Pipeline Stages**:
+  1. **Dependency Installation**: `npm ci` with lockfile caching.
+  2. **Scoped Linting**: `npm run lint:scoped` across all 19 domain components, services, demo adapters, localization dictionaries, and browser test suites.
+  3. **Unit & Integration Suite**: `npm test` compiling test TypeScript and running 99/99 service tests.
+  4. **Production Build**: `npm run build` compiling Turbopack bundle with explicit test environment flags (`NEXT_PUBLIC_APP_ENV=test`).
+  5. **Automated Server & E2E Browser Runner**: `node tests/run-all-e2e.mjs` starts the production/test server, waits for health check on port 3000, executes all 5 browser suites + accessibility performance suite sequentially, and gracefully terminates the background server.
+  6. **Failure Artifact Retention**: `actions/upload-artifact@v4` with `if: always()` uploads the entire `frontend/.test-artifacts` directory with a 14-day retention period.
+
+### Clean-Checkout & Local Reproduction Instructions
+To reproduce the full verification suite on a fresh clone without an existing development server:
+```bash
+# 1. Clone repository and navigate to frontend directory
+git clone <repo-url>
+cd smartify-stadiums-frontend/frontend
+
+# 2. Install exact locked dependencies
+npm ci
+
+# 3. Execute combined static checks and unit tests
+npm run ci
+
+# 4. Execute automated end-to-end browser suites (auto-starts server & runs all suites)
+npm run test:ci:e2e
+
+# Or run the complete end-to-end CI pipeline in a single command:
+npm run ci:full
+```
 
 ### Machine-Agnostic Environment Adaptation
 - **Dynamic Chrome Path Detection**: Tests check `process.env.CHROME_BIN`, followed by standard paths across Windows 64-bit, Windows 32-bit, local app data, macOS, and Linux (`google-chrome`).
 - **Dynamic Artifact Directory**: Screenshots and test artifacts output to `process.env.ARTIFACT_DIR` or default to `.test-artifacts` relative to repository root.
+
+### Documented Lint Exclusions & Migration Scope
+The project enforces `npm run lint:scoped` across 100% of migrated and active domain code. The following paths remain excluded with documented rationale:
+1. `src/components/SpotNowHero3D.tsx`: Legacy 3D Three.js canvas component from the initial template baseline with pre-existing React 19 / `@types/three` type definitions awaiting 3D engine modernization.
+2. `src/sanity/*`: Pre-existing headless CMS stub configuration files from the initial repository template, decoupled in favor of the in-tree typed `venuesService` microsite CMS.
+3. Unmigrated template landing animations not part of the founder-approved venue discovery baseline.
 
 ---
 
