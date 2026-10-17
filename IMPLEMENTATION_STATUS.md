@@ -509,3 +509,15 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
    3. Verification & tests:
       - Added regression tests in frontend/tests/finance-admin.test.cjs verifying suspended player payment simulation rejection, suspended owner settlement and refund rejection, and live-mode transport rejection of gateway simulation.
       - 98/98 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 32 (Milestone M5 Correction 5: Correct Analytics Reconciliation, Negative Net Revenue, and Timezone Calculations):
+   1. Reconciliation of sport breakdown with collections:
+      - In frontend/src/demo/transport.ts computeFinancialAnalytics, resolved sport breakdown collections by looking up booking sports across all known bookings rather than restricting to filteredBookings.
+      - Fixed bug where transaction-date reporting periods omitted collections from breakdown totals when the underlying booking was created outside the filter range.
+   2. Accurate negative net revenue on refund-only periods:
+      - Removed Math.max(0, ...) clamping on netRevenueMinor, enabling periods with refunds exceeding collections to accurately report negative net balances (e.g., -500.00 ETB).
+   3. Addis Ababa timezone date calculations:
+      - Calculated transaction dates using Intl.DateTimeFormat in venue timezone (Africa/Addis_Ababa, UTC+3) rather than naive UTC timestamp slicing, ensuring late-night UTC transactions (e.g., 22:30 UTC) are attributed to the correct local calendar day (the following day in Ethiopia).
+   4. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs verifying sport breakdown reconciliation with total collections, negative net revenue on refund-only periods, and timezone-adjusted transaction reporting.
+      - 99/99 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.

@@ -1,4 +1,4 @@
-import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, SupportCase, SupportCaseCreateInput, SupportCasePriority, SupportCaseStatus, SupportMessage, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
+import type { Account, Booking, BookingFinancialSummary, BookingInput, CameraCertificationReviewInput, CameraDevice, CameraRegisterInput, CameraUpdateInput, Closure, EventRegistration, EventRegistrationInput, FinancialAnalytics, GatewaySimulationInput, MatchRecording, MediaVisibility, Microsite, PaymentTransaction, PrivacyConsentStatus, PublicHighlight, PublicTeamMatch, RecordingStatus, RefundBookingInput, ReplayEntitlement, ReplayPlayback, RequestOptions, RescheduleBookingInput, Role, SettleBookingInput, SiteEvent, SiteHighlight, Sport, SupportCase, SupportCaseCreateInput, SupportCasePriority, SupportCaseStatus, SupportMessage, Team, TeamInput, TeamJoinRequest, TeamMatchDetail, Transport, Venue, VenueInput, VenueReviewAction, VenueReviewRecord, VenueReviewStatus, WalkInBookingInput } from '../services/contracts';
 import { isSupportedImageUrl } from '../services/media-policy';
 import { ServiceError } from '../services/errors';
 import { quoteMinor, validateInterval } from '../services/bookings.service';
@@ -74,6 +74,15 @@ export function deriveBookingFinancialSummary(booking: Booking, transactions: Pa
   };
 }
 
+function formatTransactionDate(dateStr: string, venueTimezone?: string): string {
+  try {
+    const tz = venueTimezone || 'Africa/Addis_Ababa';
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(dateStr));
+  } catch {
+    return dateStr.slice(0, 10);
+  }
+}
+
 export function computeFinancialAnalytics(
   bookings: Booking[],
   transactions: PaymentTransaction[],
@@ -83,7 +92,8 @@ export function computeFinancialAnalytics(
     dateFrom?: string;
     dateTo?: string;
     metricDateType?: 'booking_date' | 'transaction_date';
-  }
+  },
+  venues?: Venue[]
 ): FinancialAnalytics {
   const metricDateType = options?.metricDateType || 'booking_date';
   const allSports: Sport[] = ['football', 'basketball', 'volleyball', 'badminton', 'tennis', 'futsal'];
@@ -101,7 +111,8 @@ export function computeFinancialAnalytics(
     const booking = bookings.find(b => b.id === t.bookingId);
     if (options?.sport && booking && booking.sport !== options.sport) return false;
     if (metricDateType === 'transaction_date') {
-      const txDate = t.createdAt.slice(0, 10);
+      const vTz = venues?.find(v => v.id === t.venueId)?.timezone || 'Africa/Addis_Ababa';
+      const txDate = formatTransactionDate(t.createdAt, vTz);
       if (options?.dateFrom && txDate < options.dateFrom) return false;
       if (options?.dateTo && txDate > options.dateTo) return false;
     } else {
@@ -126,7 +137,7 @@ export function computeFinancialAnalytics(
     .filter(t => t.type === 'refund' && (t.status === 'recorded' || t.status === 'succeeded'))
     .reduce((sum, t) => sum + t.amountMinor, 0);
 
-  const netRevenueMinor = Math.max(0, recordedCollectionsMinor - completedRefundsMinor);
+  const netRevenueMinor = recordedCollectionsMinor - completedRefundsMinor;
 
   let outstandingBalanceMinor = 0;
   for (const b of filteredBookings) {
@@ -139,9 +150,12 @@ export function computeFinancialAnalytics(
   const sportBreakdown = allSports.reduce((acc, sport) => {
     const sBookings = filteredBookings.filter(b => b.sport === sport);
     const sGross = sBookings.reduce((sum, b) => sum + b.totalMinor, 0);
-    const sBookingIds = new Set(sBookings.map(b => b.id));
     const sCollections = filteredTransactions
-      .filter(t => t.type === 'collection' && (t.status === 'recorded' || t.status === 'succeeded') && t.bookingId && sBookingIds.has(t.bookingId))
+      .filter(t => {
+        if (t.type !== 'collection' || (t.status !== 'recorded' && t.status !== 'succeeded')) return false;
+        const b = bookings.find(item => item.id === t.bookingId);
+        return b?.sport === sport;
+      })
       .reduce((sum, t) => sum + t.amountMinor, 0);
     acc[sport] = {
       bookings: sBookings.length,
@@ -1245,13 +1259,18 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const ownerBookings = state.bookings.filter(b => targetVenueIds.includes(b.venueId));
         const ownerTransactions = state.transactions.filter(t => targetVenueIds.includes(t.venueId));
 
-        const detailed = computeFinancialAnalytics(ownerBookings, ownerTransactions, {
-          venueId: venueParam || undefined,
-          sport: sportParam,
-          dateFrom,
-          dateTo,
-          metricDateType,
-        });
+        const detailed = computeFinancialAnalytics(
+          ownerBookings,
+          ownerTransactions,
+          {
+            venueId: venueParam || undefined,
+            sport: sportParam,
+            dateFrom,
+            dateTo,
+            metricDateType,
+          },
+          state.venues
+        );
 
         return {
           bookings: detailed.totalBookingsCount,
@@ -1889,13 +1908,18 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const dateTo = url.searchParams.get('dateTo') || undefined;
         const metricDateType = (url.searchParams.get('metricDateType') as 'booking_date' | 'transaction_date') || 'booking_date';
 
-        return computeFinancialAnalytics(state.bookings, state.transactions, {
-          venueId: venueParam,
-          sport: sportParam,
-          dateFrom,
-          dateTo,
-          metricDateType,
-        });
+        return computeFinancialAnalytics(
+          state.bookings,
+          state.transactions,
+          {
+            venueId: venueParam,
+            sport: sportParam,
+            dateFrom,
+            dateTo,
+            metricDateType,
+          },
+          state.venues
+        );
       }
     }
     if (parts[0] === 'support') {

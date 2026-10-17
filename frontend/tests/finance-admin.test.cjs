@@ -1010,6 +1010,122 @@ test('M5 Correction 4: Financial mutations require active account and gate payme
   );
 });
 
+test('M5 Correction 5: Analytics reconciles sport breakdown with totals, supports negative net revenue, and uses venue timezone', async () => {
+  const { computeFinancialAnalytics } = require('../.test-build/demo/transport');
+
+  // 1. Reconcile sport breakdown with collections when booking is outside transaction date range
+  const mockBooking = {
+    id: 'b-old-1',
+    venueId: 'venue-1',
+    fieldId: 'field-1',
+    playerId: 'p-1',
+    sport: 'basketball',
+    date: '2099-04-10', // booking is in April
+    startHour: 10,
+    endHour: 12,
+    totalMinor: 100000,
+    currency: 'ETB',
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    createdAt: '2099-04-10T08:00:00Z',
+  };
+
+  const mockTx = {
+    id: 'tx-may-1',
+    bookingId: 'b-old-1',
+    venueId: 'venue-1',
+    payerId: 'p-1',
+    amountMinor: 100000, // 1000.00 ETB
+    currency: 'ETB',
+    type: 'collection',
+    method: 'telebirr',
+    status: 'succeeded',
+    createdAt: '2099-05-15T10:00:00Z', // transaction occurred in May
+  };
+
+  const mayReport = computeFinancialAnalytics(
+    [mockBooking],
+    [mockTx],
+    {
+      metricDateType: 'transaction_date',
+      dateFrom: '2099-05-01',
+      dateTo: '2099-05-31',
+    }
+  );
+
+  // Collections total must be 100,000 minor units
+  assert.equal(mayReport.recordedCollectionsMinor, 100000);
+  // Sport breakdown for basketball must match the total 100,000 minor units, NOT 0
+  assert.equal(mayReport.sportBreakdown.basketball.collectedMinor, 100000);
+  assert.equal(mayReport.sportBreakdown.football.collectedMinor, 0);
+
+  // 2. Refund-only periods report negative net revenue
+  const refundTx = {
+    id: 'tx-ref-1',
+    bookingId: 'b-old-1',
+    venueId: 'venue-1',
+    payerId: 'p-1',
+    amountMinor: 50000,
+    currency: 'ETB',
+    type: 'refund',
+    method: 'cash',
+    status: 'succeeded',
+    createdAt: '2099-06-01T10:00:00Z',
+  };
+
+  const refundReport = computeFinancialAnalytics(
+    [mockBooking],
+    [refundTx],
+    {
+      metricDateType: 'transaction_date',
+      dateFrom: '2099-06-01',
+      dateTo: '2099-06-30',
+    }
+  );
+
+  assert.equal(refundReport.recordedCollectionsMinor, 0);
+  assert.equal(refundReport.completedRefundsMinor, 50000);
+  assert.equal(refundReport.netRevenueMinor, -50000, 'Refund-only period net revenue must be negative');
+
+  // 3. Timezone calculation: 22:30 UTC is next-day in Africa/Addis_Ababa (+3 hours)
+  const lateUtcTx = {
+    id: 'tx-tz-1',
+    bookingId: 'b-old-1',
+    venueId: 'venue-1',
+    payerId: 'p-1',
+    amountMinor: 25000,
+    currency: 'ETB',
+    type: 'collection',
+    method: 'cbe_birr',
+    status: 'succeeded',
+    createdAt: '2099-05-15T22:30:00Z', // 22:30 UTC = 01:30 AM on 2099-05-16 in Addis Ababa
+  };
+
+  // Report for 2099-05-16 must include this transaction
+  const may16Report = computeFinancialAnalytics(
+    [mockBooking],
+    [lateUtcTx],
+    {
+      metricDateType: 'transaction_date',
+      dateFrom: '2099-05-16',
+      dateTo: '2099-05-16',
+    }
+  );
+  assert.equal(may16Report.recordedCollectionsMinor, 25000);
+
+  // Report for 2099-05-15 must NOT include this transaction
+  const may15Report = computeFinancialAnalytics(
+    [mockBooking],
+    [lateUtcTx],
+    {
+      metricDateType: 'transaction_date',
+      dateFrom: '2099-05-15',
+      dateTo: '2099-05-15',
+    }
+  );
+  assert.equal(may15Report.recordedCollectionsMinor, 0);
+});
+
 
 
 
