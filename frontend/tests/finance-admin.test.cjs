@@ -4,8 +4,8 @@ const crypto = require('node:crypto');
 const { createDemoTransport } = require('../.test-build/demo/transport');
 const { createServices } = require('../.test-build/services/create-services');
 
-const setup = () => {
-  const transport = createDemoTransport();
+const setup = (storage, config) => {
+  const transport = createDemoTransport(storage, config);
   return { transport, ...createServices(transport) };
 };
 
@@ -934,6 +934,79 @@ test('support cases enforce role boundaries and strip internal staff notes for n
   assert.ok(
     !sanitizedUpdatedCase.messages.some(m => m.isInternal),
     'Non-admin update response must sanitize internal notes'
+  );
+});
+
+test('M5 Correction 4: Financial mutations require active account and gate payment simulation', async () => {
+  const s = setup();
+  s.transport.selectAccount('player-1');
+  const booking = await s.bookings.create(input());
+
+  // Admin suspends player-1
+  s.transport.selectAccount('admin-1');
+  await s.admin.moderateUser('player-1', {
+    status: 'suspended',
+    reason: 'Policy violations',
+  });
+
+  // Suspended player attempting simulated gateway payment is denied with 403 forbidden
+  s.transport.selectAccount('player-1');
+  await rejects(
+    s.billing.simulateGateway(booking.id, {
+      method: 'telebirr_gateway',
+      simulateOutcome: 'success',
+    }),
+    'forbidden'
+  );
+
+  // Reinstate player-1, verify simulated gateway payment succeeds in demo mode
+  s.transport.selectAccount('admin-1');
+  await s.admin.moderateUser('player-1', {
+    status: 'active',
+    reason: 'Reinstated',
+  });
+
+  s.transport.selectAccount('player-1');
+  const simRes = await s.billing.simulateGateway(booking.id, {
+    method: 'telebirr_gateway',
+    simulateOutcome: 'success',
+  });
+  assert.equal(simRes.transaction.status, 'succeeded');
+
+  // Suspended owner cannot record settlement or issue refund
+  s.transport.selectAccount('admin-1');
+  await s.admin.moderateUser('owner-1', {
+    status: 'suspended',
+    reason: 'Suspended owner',
+  });
+
+  s.transport.selectAccount('owner-1');
+  await rejects(
+    s.billing.settleBooking(booking.id, {
+      amountMinor: 50000,
+      method: 'cash',
+    }),
+    'forbidden'
+  );
+
+  await rejects(
+    s.billing.refundBooking(booking.id, {
+      amountMinor: 50000,
+      reason: 'Suspended owner refund',
+    }),
+    'forbidden'
+  );
+
+  // Live transport rejects payment simulation
+  const sLive = setup(undefined, { isLive: true });
+  sLive.transport.selectAccount('player-1');
+  const liveBooking = await sLive.bookings.create(input());
+  await rejects(
+    sLive.billing.simulateGateway(liveBooking.id, {
+      method: 'telebirr_gateway',
+      simulateOutcome: 'success',
+    }),
+    'forbidden'
   );
 });
 

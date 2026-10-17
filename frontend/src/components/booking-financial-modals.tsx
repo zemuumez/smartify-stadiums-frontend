@@ -4,6 +4,8 @@ import { billingService } from '@/services';
 import type { Booking, PaymentMethod, PaymentTransaction } from '@/services/contracts';
 import { useLanguage } from '@/i18n/provider';
 import { useServiceQuery } from '@/lib/use-service-query';
+import { useAuthStore } from '@/lib/auth-store';
+import { isDemoMode } from '@/services/config';
 import { Loading, ServiceErrorMessage } from './service-state';
 
 function useModalKeyboard(isOpen: boolean, onClose: () => void) {
@@ -75,6 +77,8 @@ export function SettlementModal({
 }) {
   const modalRef = useModalKeyboard(true, onClose);
   const { t, money } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
   const [customAmount, setCustomAmount] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reference, setReference] = useState('');
@@ -96,6 +100,11 @@ export function SettlementModal({
     e.preventDefault();
     setSubmitError(null);
     setValidationError(null);
+
+    if (isSuspended) {
+      setSubmitError(t('accountSuspendedNotice'));
+      return;
+    }
 
     const amountMinor = Math.round(parseFloat(amountInput) * 100);
     if (isNaN(amountMinor) || amountMinor <= 0) {
@@ -191,6 +200,11 @@ export function SettlementModal({
                 {submitError}
               </div>
             )}
+            {isSuspended && (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">
+                {t('accountSuspendedNotice')}
+              </div>
+            )}
 
             <div className="space-y-3">
               <label className="form-label">
@@ -265,7 +279,7 @@ export function SettlementModal({
               </button>
               <button
                 type="submit"
-                disabled={busy || financials.outstandingMinor <= 0}
+                disabled={busy || financials.outstandingMinor <= 0 || isSuspended}
                 className="action"
               >
                 {busy ? t('processing') : t('recordSettlement')}
@@ -291,6 +305,8 @@ export function ReceiptModal({
 }) {
   const modalRef = useModalKeyboard(true, onClose);
   const { t, money, date: displayDate } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
 
   const query = useServiceQuery(
     useCallback(signal => billingService.bookingFinancials(booking.id, signal), [booking.id]),
@@ -312,6 +328,11 @@ export function ReceiptModal({
   async function handleRefund(e: FormEvent) {
     e.preventDefault();
     setRefundError(null);
+
+    if (isSuspended) {
+      setRefundError(t('accountSuspendedNotice'));
+      return;
+    }
 
     const amountMinor = Math.round(parseFloat(refundAmount) * 100);
     if (isNaN(amountMinor) || amountMinor <= 0) {
@@ -433,13 +454,22 @@ export function ReceiptModal({
                   {!showRefundForm && (
                     <button
                       type="button"
+                      disabled={isSuspended}
                       onClick={() => setShowRefundForm(true)}
-                      className="min-h-11 px-3 text-xs font-semibold rounded-xl border border-rose-300 bg-white text-rose-900 hover:bg-rose-50"
+                      className={`min-h-11 px-3 text-xs font-semibold rounded-xl border border-rose-300 bg-white text-rose-900 hover:bg-rose-50 ${
+                        isSuspended ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       {t('issueRefund')}
                     </button>
                   )}
                 </div>
+
+                {isSuspended && (
+                  <p className="text-xs text-rose-800 bg-rose-100 p-2 rounded-lg font-medium">
+                    {t('accountSuspendedNotice')}
+                  </p>
+                )}
 
                 {showRefundForm && (
                   <form onSubmit={handleRefund} className="space-y-3 pt-2 border-t border-rose-200">
@@ -457,6 +487,7 @@ export function ReceiptModal({
                           min="0.01"
                           max={(financials.netCollectedMinor / 100).toFixed(2)}
                           required
+                          disabled={isSuspended}
                           value={refundAmount}
                           onChange={e => setCustomRefundAmount(e.target.value)}
                           className="form-input"
@@ -468,6 +499,7 @@ export function ReceiptModal({
                           type="text"
                           required
                           maxLength={200}
+                          disabled={isSuspended}
                           value={refundReason}
                           onChange={e => setRefundReason(e.target.value)}
                           placeholder="e.g. Weather closure or customer cancellation"
@@ -486,7 +518,7 @@ export function ReceiptModal({
                       </button>
                       <button
                         type="submit"
-                        disabled={refundBusy}
+                        disabled={refundBusy || isSuspended}
                         className="min-h-11 px-4 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700"
                       >
                         {refundBusy ? t('processing') : t('issueRefund')}
@@ -598,6 +630,8 @@ export function SimulateGatewayModal({
 }) {
   const modalRef = useModalKeyboard(true, onClose);
   const { t, money } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
   const [method, setMethod] = useState<'telebirr_gateway' | 'cbe_birr'>('telebirr_gateway');
   const [outcome, setOutcome] = useState<'succeed' | 'fail'>('succeed');
   const [busy, setBusy] = useState(false);
@@ -614,6 +648,16 @@ export function SimulateGatewayModal({
   async function handleSimulate(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!isDemoMode) {
+      setError(t('gatewaySimulationNotice'));
+      return;
+    }
+
+    if (isSuspended) {
+      setError(t('accountSuspendedNotice'));
+      return;
+    }
 
     if (financials && financials.outstandingMinor <= 0) {
       setError(t('overpaymentError'));
@@ -698,6 +742,16 @@ export function SimulateGatewayModal({
                 {error}
               </div>
             )}
+            {isSuspended && (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">
+                {t('accountSuspendedNotice')}
+              </div>
+            )}
+            {!isDemoMode && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {t('gatewaySimulationNotice')}
+              </div>
+            )}
 
             <div className="space-y-3">
               <label className="form-label">
@@ -706,6 +760,7 @@ export function SimulateGatewayModal({
                   value={method}
                   onChange={e => setMethod(e.target.value as 'telebirr_gateway' | 'cbe_birr')}
                   className="form-input"
+                  disabled={!isDemoMode || isSuspended}
                 >
                   <option value="telebirr_gateway">{t('telebirr_gateway')}</option>
                   <option value="cbe_birr">{t('cbe_birr')}</option>
@@ -718,6 +773,7 @@ export function SimulateGatewayModal({
                   value={outcome}
                   onChange={e => setOutcome(e.target.value as 'succeed' | 'fail')}
                   className="form-input font-medium"
+                  disabled={!isDemoMode || isSuspended}
                 >
                   <option value="succeed">{t('simulateSuccess')}</option>
                   <option value="fail">{t('simulateFailure')}</option>
@@ -736,7 +792,7 @@ export function SimulateGatewayModal({
               </button>
               <button
                 type="submit"
-                disabled={busy || financials.outstandingMinor <= 0}
+                disabled={busy || financials.outstandingMinor <= 0 || isSuspended || !isDemoMode}
                 className="action"
               >
                 {busy ? t('processing') : t('simulatePayment')}

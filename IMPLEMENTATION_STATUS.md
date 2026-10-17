@@ -497,3 +497,15 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
    3. Verification & tests:
       - Added regression tests in frontend/tests/finance-admin.test.cjs covering full-settlement idempotency, payload-change conflict rejection, and gateway simulation retries.
       - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 31 (Milestone M5 Correction 4: Enforce Account Suspension and Demo-Only Payment Simulation):
+   1. Transport active-account enforcement & live-mode gating:
+      - In frontend/src/demo/transport.ts, enforced requireActiveAccount() on /bookings/:id/simulate-gateway, /owner/bookings/:id/settle, and /owner/bookings/:id/refund, strictly denying suspended users from executing financial mutations with 403 forbidden.
+      - Explicitly gated payment simulation behind !isLive, ensuring live-mode configurations never allow demo payment success.
+   2. UI suspension and simulation controls:
+      - In frontend/src/components/booking-financial-modals.tsx, inspected user account status in SettlementModal, ReceiptModal, and SimulateGatewayModal; rendered prominent suspension alerts and disabled submission.
+      - Gated payment simulation in SimulateGatewayModal and booking cards behind isDemoMode, disabling and warning if invoked in live mode or while suspended.
+      - In frontend/src/components/booking-list.tsx, disabled settlement and payment simulation buttons for suspended accounts and hidden demo simulation outside demo mode.
+   3. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs verifying suspended player payment simulation rejection, suspended owner settlement and refund rejection, and live-mode transport rejection of gateway simulation.
+      - 98/98 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.

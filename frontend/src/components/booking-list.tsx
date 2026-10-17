@@ -19,6 +19,8 @@ import { AccessGate } from './access-gate';
 import { DemoNotice, Empty, Loading, ServiceErrorMessage } from './service-state';
 import { ReplayModal } from './match-replay';
 import { SettlementModal, ReceiptModal, SimulateGatewayModal } from './booking-financial-modals';
+import { useAuthStore } from '@/lib/auth-store';
+import { isDemoMode } from '@/services/config';
 
 function isFutureBooking(b: Booking): boolean {
   return Date.parse(`${b.date}T${String(b.startHour).padStart(2, '0')}:00:00+03:00`) > Date.now();
@@ -404,6 +406,8 @@ function BookingCard({
   onRescheduleClick: (booking: Booking) => void;
 }) {
   const { t, money, date: displayDate } = useLanguage();
+  const { user } = useAuthStore();
+  const isSuspended = user?.status === 'suspended';
   const [showReplay, setShowReplay] = useState(false);
   const [showSettlement, setShowSettlement] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
@@ -562,7 +566,8 @@ function BookingCard({
             {booking.status !== 'cancelled' && booking.paymentStatus !== 'paid' && (
               <button
                 type="button"
-                className="action"
+                disabled={isSuspended}
+                className={`action ${isSuspended ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setShowSettlement(true)}
               >
                 {t('recordSettlement')}
@@ -585,10 +590,13 @@ function BookingCard({
             >
               {t('receipts')}
             </button>
-            {booking.status !== 'cancelled' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid') && (
+            {isDemoMode && booking.status !== 'cancelled' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid') && (
               <button
                 type="button"
-                className="min-h-11 rounded-xl border border-sky-300 bg-sky-50 px-4 text-sm font-semibold text-sky-950 hover:bg-sky-100"
+                disabled={isSuspended}
+                className={`min-h-11 rounded-xl border border-sky-300 bg-sky-50 px-4 text-sm font-semibold text-sky-950 hover:bg-sky-100 ${
+                  isSuspended ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
                 onClick={() => setShowSimulateGateway(true)}
               >
                 {t('simulatePayment')}
