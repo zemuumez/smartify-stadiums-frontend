@@ -543,3 +543,12 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Scoped ESLint across all modified and new files: 0 errors, 0 warnings.
       - Production build (npm run build): Completed successfully with 43 static/dynamic routes.
 
+- Step 34 (Milestone M5 Follow-up 1: Allow Failed Payment Retry in UI and Verify Ledger Non-Duplication):
+   1. Failed payment retry action in UI:
+      - In frontend/src/components/booking-list.tsx, updated simulated payment button rendering to include booking.paymentStatus === 'failed', enabling players to retry payment directly from booking cards after gateway declines or timeouts.
+      - Updated canModify to allow cancellation and rescheduling on confirmed bookings with failed paymentStatus where no collected funds exist.
+   2. Ledger non-duplication assertions:
+      - Extended automated regression suite in frontend/tests/finance-admin.test.cjs to assert that immediate inspection of receipts after failure reveals status 'failed', collectedMinor: 0, and exactly 1 failed transaction.
+      - Verified that subsequent successful retry simulation records the new successful transaction, transitions paymentStatus to 'paid', and maintains exact collection totals (3000.00 ETB) with both historical transactions retained without duplicate collections.
+      - 99/99 unit and integration tests pass (npm test).
+

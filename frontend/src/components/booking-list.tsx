@@ -431,7 +431,7 @@ function BookingCard({
   const [showSupport, setShowSupport] = useState(false);
   const fieldName = queryData?.fields.find(f => f.id === booking.fieldId)?.name || booking.fieldId;
   const venueName = queryData?.venues.find(v => v.id === booking.venueId)?.name || booking.venueId;
-  const canModify = booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking);
+  const canModify = booking.status === 'confirmed' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'failed') && isFutureBooking(booking);
 
   return (
     <article className="panel">
@@ -621,7 +621,7 @@ function BookingCard({
             >
               {t('support')}
             </button>
-            {isDemoMode && booking.status !== 'cancelled' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid') && (
+            {isDemoMode && booking.status !== 'cancelled' && (booking.paymentStatus === 'unpaid' || booking.paymentStatus === 'partially_paid' || booking.paymentStatus === 'failed') && (
               <button
                 type="button"
                 disabled={isSuspended}

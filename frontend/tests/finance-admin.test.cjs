@@ -336,6 +336,13 @@ test('simulated gateway payments support telebirr and cbe_birr with explicit suc
   assert.equal(failRes.summary.outstandingMinor, 300000);
   assert.equal(failRes.summary.paymentStatus, 'failed');
 
+  // Verify receipts ledger immediately reflects the failed attempt without counting as collected
+  const failReceipts = await s.billing.bookingFinancials(booking.id);
+  assert.equal(failReceipts.paymentStatus, 'failed');
+  assert.equal(failReceipts.collectedMinor, 0);
+  assert.equal(failReceipts.transactions.length, 1);
+  assert.equal(failReceipts.transactions[0].status, 'failed');
+
   // Retry with success using an idempotency key
   const gwKey = 'gw-idem-key-1';
   const successRes = await s.billing.simulateGateway(
@@ -350,6 +357,16 @@ test('simulated gateway payments support telebirr and cbe_birr with explicit suc
   assert.equal(successRes.summary.outstandingMinor, 0);
   assert.equal(successRes.summary.netCollectedMinor, 300000);
   assert.equal(successRes.summary.paymentStatus, 'paid');
+
+  // Verify ledger after successful retry: retains failed attempt record and succeeded record without duplicate collection
+  const successReceipts = await s.billing.bookingFinancials(booking.id);
+  assert.equal(successReceipts.paymentStatus, 'paid');
+  assert.equal(successReceipts.collectedMinor, 300000);
+  assert.equal(successReceipts.netCollectedMinor, 300000);
+  assert.equal(successReceipts.outstandingMinor, 0);
+  assert.equal(successReceipts.transactions.length, 2);
+  assert.ok(successReceipts.transactions.some(t => t.status === 'failed'));
+  assert.ok(successReceipts.transactions.some(t => t.status === 'succeeded'));
 
   // Retrying the exact same successful payment with identical idempotency key returns the original transaction
   const retrySuccess = await s.billing.simulateGateway(
