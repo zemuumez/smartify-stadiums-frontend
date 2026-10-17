@@ -336,10 +336,69 @@ test('subscription invoices are distinct from booking receipts and reflect unset
     }
   }
 
-  // Cross-tenant invoice isolation: owner-2 cannot request owner-1's invoices
-  s.transport.selectAccount('owner-2');
-  const owner2Invoices = await s.billing.invoices({ venueId: 'venue-1' });
-  assert.equal(owner2Invoices.length, 0);
+  // Add regression test with stored invoices belonging to both owners
+  // We can populate state.invoices via transport or demo storage simulation
+  const storedInv1 = {
+    id: 'INV-STORED-V1',
+    venueId: 'venue-1',
+    venueName: 'Bambis Meda Stadium',
+    periodStart: '2026-09-01',
+    periodEnd: '2026-09-30',
+    totalMinor: null,
+    currency: 'ETB',
+    status: 'not_configured',
+    lineItems: [],
+    issuedAt: '2026-09-01T00:00:00Z',
+    notes: 'Stored invoice for owner 1',
+  };
+  const storedInv2 = {
+    id: 'INV-STORED-V2',
+    venueId: 'venue-2',
+    venueName: 'Unity Sports Complex',
+    periodStart: '2026-09-01',
+    periodEnd: '2026-09-30',
+    totalMinor: null,
+    currency: 'ETB',
+    status: 'not_configured',
+    lineItems: [],
+    issuedAt: '2026-09-01T00:00:00Z',
+    notes: 'Stored invoice for owner 2',
+  };
+
+  // Inject stored invoices for both owners
+  // The simulator keeps state.invoices
+  const { createFixtures } = require('../.test-build/demo/fixtures');
+  const memStorage = {
+    _data: {},
+    getItem(key) { return this._data[key] || null; },
+    setItem(key, val) { this._data[key] = String(val); },
+    removeItem(key) { delete this._data[key]; },
+  };
+  const initialData = createFixtures();
+  initialData.invoices = [storedInv1, storedInv2];
+  memStorage.setItem('etsf-demo-v2', JSON.stringify(initialData));
+  const tWithStored = createDemoTransport(memStorage);
+  const sStored = { ...createServices(tWithStored), transport: tWithStored };
+
+  // Owner 1 requests invoices: receives ONLY stored invoice for venue-1, never venue-2
+  sStored.transport.selectAccount('owner-1');
+  const owner1Invoices = await sStored.billing.invoices();
+  assert.equal(owner1Invoices.length, 1);
+  assert.equal(owner1Invoices[0].id, 'INV-STORED-V1');
+  assert.equal(owner1Invoices[0].venueId, 'venue-1');
+
+  // Owner 1 explicitly requests venue-2 invoice: rejected with forbidden
+  await rejects(sStored.billing.invoices({ venueId: 'venue-2' }), 'forbidden');
+
+  // Owner 2 requests invoices: receives ONLY stored invoice for venue-2, never venue-1
+  sStored.transport.selectAccount('owner-2');
+  const owner2Invoices = await sStored.billing.invoices();
+  assert.equal(owner2Invoices.length, 1);
+  assert.equal(owner2Invoices[0].id, 'INV-STORED-V2');
+  assert.equal(owner2Invoices[0].venueId, 'venue-2');
+
+  // Owner 2 explicitly requests venue-1 invoice: rejected with forbidden
+  await rejects(sStored.billing.invoices({ venueId: 'venue-1' }), 'forbidden');
 });
 
 test('owner analytics derives booking value, collections, refunds, and supports venue/sport/date filters', async () => {

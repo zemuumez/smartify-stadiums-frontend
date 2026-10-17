@@ -477,3 +477,12 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Configured ESLint override in eslint.config.mjs for CommonJS test files (tests/**/*.cjs) to eliminate no-require-imports errors.
       - Added regression tests in frontend/tests/finance-admin.test.cjs covering unauthorized update attempts, foreign booking linkage, mismatched venue/booking linkage, and sanitized update responses.
       - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 29 (Milestone M5 Correction 2: Close Cross-Venue Invoice Access and Tenant Authorization):
+   1. Strict tenant authorization on owner invoices:
+      - Enforced that /owner/invoices?venueId=... rejects with 403 forbidden if the requested venue does not belong to the authenticated owner.
+      - Scoped both stored and generated subscription invoices strictly to matching owned venues (targetVenueIds.includes(i.venueId) && venueIds.includes(i.venueId)), preventing cross-tenant leakage of stored records.
+   2. Regression test with stored multi-owner records:
+      - Added regression test in frontend/tests/finance-admin.test.cjs with pre-seeded stored invoices for both owner-1 (Bambis Meda) and owner-2 (Unity Sports Complex).
+      - Verified that each owner receives only their respective stored invoice, and explicit cross-venue queries are rejected with 403 forbidden.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.

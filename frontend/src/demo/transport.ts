@@ -1174,10 +1174,13 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
 
       if (path.startsWith('/owner/invoices') && method === 'GET') {
         const venueParam = url.searchParams.get('venueId');
+        if (venueParam && !venueIds.includes(venueParam)) {
+          throw new ServiceError('forbidden', 403);
+        }
         const targetVenueIds = venueParam ? [venueParam] : venueIds;
         const matchingVenues = state.venues.filter(v => targetVenueIds.includes(v.id) && venueIds.includes(v.id));
 
-        const stored = state.invoices.filter(i => targetVenueIds.includes(i.venueId));
+        const stored = state.invoices.filter(i => targetVenueIds.includes(i.venueId) && venueIds.includes(i.venueId));
         if (stored.length > 0) return stored;
 
         return matchingVenues.map(venue => ({
