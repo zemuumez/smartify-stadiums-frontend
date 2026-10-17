@@ -6,19 +6,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
   ChevronDown,
-  Sparkles,
-  Zap,
-  Building2,
-  Shield,
   ShieldCheck,
-  PhoneCall,
   ArrowUpRight,
   Star,
-  Camera,
-  Layers,
-  HelpCircle
 } from "lucide-react";
 import { FadeUp, ScaleIn } from "@/components/ui/AnimatedSection";
+import { useI18n } from "@/i18n/provider";
 
 const plans = [
   {
@@ -94,6 +87,7 @@ const faqs = [
 ];
 
 export default function PricingPage() {
+  const { t } = useI18n();
   const [annual, setAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -105,18 +99,22 @@ export default function PricingPage() {
         <div className="spotnow-container text-center max-w-3xl mx-auto">
           <FadeUp>
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider text-[#2d6a4f] bg-[#f0faf4] border border-[#2d6a4f]/15 mb-4">
-              <ShieldCheck size={13} /> Transparent Venue Plans
+              <ShieldCheck size={13} /> {t("pricingTitle")}
             </div>
 
             <h1
               className="text-[#111] font-black leading-tight mb-4 tracking-tight"
               style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}
             >
-              Simple, Predictable Plans
+              {t("pricingTitle")}
             </h1>
 
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-6 max-w-2xl mx-auto">
+              {t("pricingProvisionalNotice")}
+            </div>
+
             <p className="text-[#6a6a6a] text-base sm:text-lg leading-relaxed mb-8 max-w-xl mx-auto font-medium">
-              Choose the plan that matches your stadium facility. All plans include ULS quality certification, an official microsite, and automated Telebirr booking sync.
+              {t("pricingDescription")}
             </p>
 
             {/* Monthly / Annual Toggle */}

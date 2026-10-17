@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ArrowUpRight, MapPin, Rocket, GraduationCap, Globe } from "lucide-react";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
+import { useI18n } from "@/i18n/provider";
 
 const openings = [
   {
@@ -64,6 +65,8 @@ const teamColors: Record<string, string> = {
 };
 
 export default function CareersPage() {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
@@ -82,6 +85,9 @@ export default function CareersPage() {
               <br />
               With Us
             </h1>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-6 max-w-2xl">
+              {t("careersNotice")}
+            </div>
             <p className="text-[#7a7a7a] text-xl max-w-lg leading-relaxed">
               We&apos;re a small, driven team building the infrastructure that will power sports in Ethiopia for a generation. Come help us do it.
             </p>

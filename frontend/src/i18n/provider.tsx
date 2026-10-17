@@ -34,6 +34,7 @@ export function useLanguage() {
     },
   };
 }
+export const useI18n = useLanguage;
 export function LanguageSwitcher() {
   const { locale, setLocale, t } = useLanguage();
   return <label className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex items-center gap-2 rounded-2xl border border-emerald-900/20 bg-white px-3 text-sm text-slate-900 shadow-lg lg:bottom-4">

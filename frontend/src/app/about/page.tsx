@@ -4,36 +4,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Globe, Users, Shield, Zap, Target, Heart,
-  ArrowRight, Camera, Video, CheckCircle2,
-  TrendingUp, Smartphone, Award, Search, Building2,
+  Globe, Shield, Zap, Target, Heart,
+  ArrowRight, Camera,
+  Smartphone, Search, Building2,
   Trophy, Film, Activity, ShieldCheck
 } from "lucide-react";
-import { FadeUp, SlideIn, ScaleIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
+import { FadeUp, SlideIn, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
+import { useI18n } from "@/i18n/provider";
 
 const stats = [
-  { value: "50+",  label: "Stadiums Connected" },
-  { value: "10K+", label: "Active Players" },
-  { value: "6",    label: "Sports Supported" },
-  { value: "5K+",  label: "Matches Recorded" },
-];
-
-const values = [
-  {
-    icon: <Target size={28} style={{ color: "#2d6a4f" }} />,
-    title: "Innovation",
-    desc: "We bring cutting-edge AI camera systems and digital infrastructure tools to Ethiopian sports, making professional broadcast quality accessible to every stadium.",
-  },
-  {
-    icon: <Heart size={28} style={{ color: "#2d6a4f" }} />,
-    title: "Community",
-    desc: "Sports are about people. We build tools that strengthen the bond between players, teams, and stadiums across every city and sub-city in Ethiopia.",
-  },
-  {
-    icon: <Shield size={28} style={{ color: "#2d6a4f" }} />,
-    title: "Trust",
-    desc: "Our ULS verification badge ensures every listed stadium meets rigorous quality, safety, and technology standards before players can book.",
-  },
+  { value: "6",    labelKey: "partnerStadiumsCount" as const },
+  { value: "6",    labelKey: "sportsSupportedCount" as const },
+  { value: "100%", labelKey: "verifiedGuaranteeCount" as const },
+  { value: "4K",   labelKey: "cameraPilotCount" as const },
 ];
 
 const differentiators = [
@@ -48,6 +31,26 @@ const differentiators = [
 ];
 
 export default function AboutPage() {
+  const { t } = useI18n();
+
+  const values = [
+    {
+      icon: <Target size={28} style={{ color: "#2d6a4f" }} />,
+      title: t("innovation"),
+      desc: t("innovationDesc"),
+    },
+    {
+      icon: <Heart size={28} style={{ color: "#2d6a4f" }} />,
+      title: t("community"),
+      desc: t("communityDesc"),
+    },
+    {
+      icon: <Shield size={28} style={{ color: "#2d6a4f" }} />,
+      title: t("trust"),
+      desc: t("trustDesc"),
+    },
+  ];
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
@@ -72,17 +75,15 @@ export default function AboutPage() {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="max-w-2xl"
           >
-            <div className="text-xs font-bold tracking-widest uppercase text-[#74c69d] mb-4">About Us</div>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#74c69d] mb-4">{t("about")}</div>
             <h1
               className="text-white font-black leading-tight mb-6"
               style={{ fontSize: "clamp(2.6rem, 6vw, 4rem)", letterSpacing: "-0.025em" }}
             >
-              Building Ethiopia&apos;s
-              <br />
-              <span style={{ color: "#74c69d" }}>Smart Sports Future</span>
+              {t("aboutHeroTitle")}
             </h1>
             <p className="text-white/75 text-xl leading-relaxed">
-              ET Smart Fields is on a mission to digitize and elevate sports infrastructure across Ethiopia, connecting players, stadiums, and technology in one seamless platform.
+              {t("aboutHeroSubtitle")}
             </p>
           </motion.div>
         </div>
@@ -93,19 +94,18 @@ export default function AboutPage() {
         <div className="spotnow-container">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <SlideIn direction="left">
-              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Our Mission</div>
+              <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">{t("ourMission")}</div>
               <h2 className="heading-xl mb-6">
-                Making Sports Accessible
-                <br />to Every Ethiopian
+                {t("ourMissionHeading")}
               </h2>
               <p className="text-[#7a7a7a] text-lg leading-relaxed mb-5">
-                We believe every athlete in Ethiopia, whether a footballer in Bole, a basketball player in Kirkos, or a volleyball team in Gondar, deserves access to quality facilities, fair pricing, and the ability to relive their best moments through technology.
+                {t("missionText1")}
               </p>
               <p className="text-[#7a7a7a] leading-relaxed mb-8">
-                Founded in Addis Ababa by Unity Link Solutions, ET Smart Fields is Ethiopia&apos;s first integrated multi-sport infrastructure platform. We provide stadiums with modern booking systems, AI-powered camera technology, and professional microsites, all under one roof.
+                {t("missionText2")}
               </p>
               <Link href="/auth/register/owner" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
-                Register Your Stadium <ArrowRight size={16} />
+                {t("partner")} <ArrowRight size={16} />
               </Link>
             </SlideIn>
 
@@ -113,18 +113,22 @@ export default function AboutPage() {
               <div className="grid grid-cols-2 gap-4">
                 {stats.map((s) => (
                   <div
-                    key={s.label}
+                    key={s.labelKey}
                     className="photo-card p-8 text-center"
                   >
                     <div className="text-4xl font-black mb-2" style={{ color: "#2d6a4f" }}>{s.value}</div>
-                    <div className="text-sm text-[#7a7a7a] font-medium">{s.label}</div>
+                    <div className="text-sm text-[#7a7a7a] font-medium">{t(s.labelKey)}</div>
                   </div>
                 ))}
+              </div>
+              <div className="text-[11px] text-[#8a8a8a] mt-4 font-medium text-center">
+                {t("pilotCatalogNotice")}
               </div>
             </SlideIn>
           </div>
         </div>
       </section>
+
 
       {/* ── WHAT WE DO ── */}
       <section className="py-24" style={{ backgroundColor: "#f4f3ef" }}>
@@ -288,10 +292,10 @@ export default function AboutPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/register/owner" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
-                Register Your Stadium <ArrowRight size={16} />
+                {t("partner")} <ArrowRight size={16} />
               </Link>
               <Link href="/stadiums" className="btn-ghost-white" style={{ paddingTop: "1rem", paddingBottom: "1rem" }}>
-                Find Stadiums
+                {t("venues")}
               </Link>
             </div>
           </FadeUp>

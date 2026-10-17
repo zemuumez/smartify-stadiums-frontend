@@ -1,10 +1,17 @@
 "use client";
 
+import { useI18n } from "@/i18n/provider";
+
 export default function PrivacyPage() {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen bg-white pt-32 pb-24">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-black text-slate-900 mb-8">Privacy Policy</h1>
+        <h1 className="text-4xl font-black text-slate-900 mb-6">Privacy Policy</h1>
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-8">
+          {t("privacyPolicyDraftNotice")}
+        </div>
         <div className="prose prose-slate max-w-none space-y-8">
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-3">1. Information We Collect</h2>
