@@ -74,22 +74,18 @@ export default function CareersPage() {
       <section className="pt-40 pb-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Careers</div>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">{t("careersTitle")}</div>
             <h1
               className="text-[#111] font-black leading-tight mb-6"
               style={{ fontSize: "clamp(2.4rem, 6vw, 3.8rem)", letterSpacing: "-0.025em" }}
             >
-              Build Ethiopia&apos;s
-              <br />
-              <span style={{ color: "#2d6a4f" }}>Sports Future</span>
-              <br />
-              With Us
+              {t("careersHeroTitle")}
             </h1>
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-6 max-w-2xl">
               {t("careersNotice")}
             </div>
             <p className="text-[#7a7a7a] text-xl max-w-lg leading-relaxed">
-              We&apos;re a small, driven team building the infrastructure that will power sports in Ethiopia for a generation. Come help us do it.
+              {t("careersHeroSubtitle")}
             </p>
           </motion.div>
         </div>
@@ -99,16 +95,16 @@ export default function CareersPage() {
       <section className="py-20" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Why ET Smart Fields</div>
-            <h2 className="heading-xl">Work That Matters</h2>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">{t("whyJoinTitle")}</div>
+            <h2 className="heading-xl">{t("whyJoinHeading")}</h2>
           </FadeUp>
 
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { icon: <MapPin size={24} style={{ color: "#2d6a4f" }} />, title: "Real Impact", desc: "Your work directly enables thousands of Ethiopian athletes to play, record, and share their sport." },
-              { icon: <Rocket size={24} style={{ color: "#2d6a4f" }} />, title: "Early Stage", desc: "Join early and have real ownership over product decisions, architecture, and team culture." },
-              { icon: <GraduationCap size={24} style={{ color: "#2d6a4f" }} />, title: "Grow Fast", desc: "We invest in your growth through conferences, courses, and a dedicated learning budget." },
-              { icon: <Globe size={24} style={{ color: "#2d6a4f" }} />, title: "Mission-Driven", desc: "We're building infrastructure that has never existed in Ethiopia. That's a rare opportunity." },
+              { icon: <MapPin size={24} style={{ color: "#2d6a4f" }} />, title: t("realImpact"), desc: t("realImpactDesc") },
+              { icon: <Rocket size={24} style={{ color: "#2d6a4f" }} />, title: t("earlyStage"), desc: t("earlyStageDesc") },
+              { icon: <GraduationCap size={24} style={{ color: "#2d6a4f" }} />, title: t("growFast"), desc: t("growFastDesc") },
+              { icon: <Globe size={24} style={{ color: "#2d6a4f" }} />, title: t("missionDriven"), desc: t("missionDrivenDesc") },
             ].map((c) => (
               <StaggerItem key={c.title}>
                 <div className="photo-card p-7 h-full flex flex-col justify-between">
@@ -130,8 +126,8 @@ export default function CareersPage() {
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Open Positions</div>
-            <h2 className="heading-xl">We&apos;re Hiring</h2>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">{t("openPositions")}</div>
+            <h2 className="heading-xl">{t("weAreHiring")}</h2>
           </FadeUp>
 
           <StaggerChildren className="space-y-4">
@@ -166,7 +162,7 @@ export default function CareersPage() {
                     href="/contact"
                     className="btn-arrow flex-shrink-0"
                     style={{ background: "#2d6a4f" }}
-                    aria-label={`Apply for ${role.title}`}
+                    aria-label={`${t("applyForRole")}: ${role.title}`}
                   >
                     <ArrowUpRight size={18} />
                   </Link>
@@ -184,12 +180,12 @@ export default function CareersPage() {
       >
         <div className="relative z-10 max-w-3xl mx-auto px-4 text-center">
           <FadeUp>
-            <h2 className="text-white font-black text-4xl mb-4">Don&apos;t See Your Role?</h2>
+            <h2 className="text-white font-black text-4xl mb-4">{t("dontSeeRole")}</h2>
             <p className="text-white/65 text-lg mb-10 max-w-md mx-auto">
-              We&apos;re always looking for exceptional people. Send us your CV and tell us how you&apos;d contribute.
+              {t("dontSeeRoleDesc")}
             </p>
             <Link href="/contact" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
-              Send an Open Application <ArrowRight size={16} />
+              {t("sendOpenApplication")} <ArrowRight size={16} />
             </Link>
           </FadeUp>
         </div>
