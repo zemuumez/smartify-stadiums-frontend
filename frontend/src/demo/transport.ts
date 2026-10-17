@@ -462,7 +462,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       return deriveBookingFinancialSummary(booking, state.transactions);
     }
     if (parts[0] === 'bookings' && parts[2] === 'simulate-gateway' && method === 'POST') {
-      const user = account();
+      const user = requireActiveAccount();
+      if (isLive) throw new ServiceError('forbidden', 403);
       const booking = state.bookings.find(item => item.id === parts[1]);
       if (!booking) throw new ServiceError('not_found', 404);
       if (booking.playerId !== user.id && user.role !== 'admin' && !state.venues.some(v => v.id === booking.venueId && v.ownerId === user.id)) {
@@ -471,17 +472,26 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       const input = options.body as GatewaySimulationInput;
       if (!['telebirr_gateway', 'cbe_birr'].includes(input.method)) throw new ServiceError('validation', 422);
 
-      const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
-      if (summaryBefore.outstandingMinor <= 0) throw new ServiceError('conflict', 409);
+      const key = options.idempotencyKey ? `${user.id}:gw:${options.idempotencyKey}` : null;
+      const fingerprint = JSON.stringify({
+        bookingId: booking.id,
+        method: input.method,
+        simulateOutcome: input.simulateOutcome || 'success',
+      });
 
-      if (options.idempotencyKey) {
-        const key = `${user.id}:gw:${options.idempotencyKey}`;
+      if (key) {
         const previous = state.idempotency[key];
         if (previous) {
-          const prevTx = state.transactions.find(t => t.id === previous.bookingId);
+          if (previous.fingerprint !== fingerprint) {
+            throw new ServiceError('conflict', 409);
+          }
+          const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
           if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
         }
       }
+
+      const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
+      if (summaryBefore.outstandingMinor <= 0) throw new ServiceError('conflict', 409);
 
       if (input.simulateOutcome === 'failure') {
         const tx: PaymentTransaction = {
@@ -500,8 +510,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         };
         state.transactions.push(tx);
         booking.paymentStatus = 'failed';
-        if (options.idempotencyKey) {
-          state.idempotency[`${user.id}:gw:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
         }
         audit(`gateway.payment_failed: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
         persist();
@@ -525,8 +535,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
       };
       state.transactions.push(tx);
       booking.paymentStatus = deriveBookingFinancialSummary(booking, state.transactions).paymentStatus;
-      if (options.idempotencyKey) {
-        state.idempotency[`${user.id}:gw:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+      if (key) {
+        state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
       }
       audit(`gateway.payment_succeeded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
       persist();
@@ -1071,6 +1081,27 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!booking) throw new ServiceError('not_found', 404);
         owned(booking.venueId);
         const input = options.body as SettleBookingInput;
+
+        const key = options.idempotencyKey ? `${user.id}:settle:${options.idempotencyKey}` : null;
+        const fingerprint = JSON.stringify({
+          bookingId: booking.id,
+          amountMinor: input.amountMinor,
+          method: input.method,
+          reference: input.reference?.trim() || null,
+          notes: input.notes?.trim() || null,
+        });
+
+        if (key) {
+          const previous = state.idempotency[key];
+          if (previous) {
+            if (previous.fingerprint !== fingerprint) {
+              throw new ServiceError('conflict', 409);
+            }
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
         if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
           throw new ServiceError('validation', 422);
         }
@@ -1081,15 +1112,6 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
         if (input.amountMinor > summaryBefore.outstandingMinor) {
           throw new ServiceError('validation', 422);
-        }
-
-        if (options.idempotencyKey) {
-          const key = `${user.id}:settle:${options.idempotencyKey}`;
-          const previous = state.idempotency[key];
-          if (previous) {
-            const prevTx = state.transactions.find(t => t.id === previous.bookingId);
-            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
-          }
         }
 
         const tx: PaymentTransaction = {
@@ -1110,8 +1132,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         state.transactions.push(tx);
         const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
         booking.paymentStatus = summaryAfter.paymentStatus;
-        if (options.idempotencyKey) {
-          state.idempotency[`${user.id}:settle:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
         }
         audit(`settlement.recorded: ${tx.amountMinor} ETB via ${tx.method}`, tx.id);
         persist();
@@ -1123,6 +1145,26 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         if (!booking) throw new ServiceError('not_found', 404);
         owned(booking.venueId);
         const input = options.body as RefundBookingInput;
+
+        const key = options.idempotencyKey ? `${user.id}:refund:${options.idempotencyKey}` : null;
+        const fingerprint = JSON.stringify({
+          bookingId: booking.id,
+          amountMinor: input.amountMinor,
+          reason: input.reason?.trim() || null,
+          originalTransactionId: input.originalTransactionId || null,
+        });
+
+        if (key) {
+          const previous = state.idempotency[key];
+          if (previous) {
+            if (previous.fingerprint !== fingerprint) {
+              throw new ServiceError('conflict', 409);
+            }
+            const prevTx = state.transactions.find(t => t.id === previous.bookingId || t.id === previous.transactionId);
+            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
+          }
+        }
+
         if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !input.reason?.trim()) {
           throw new ServiceError('validation', 422);
         }
@@ -1130,15 +1172,6 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         const summaryBefore = deriveBookingFinancialSummary(booking, state.transactions);
         if (input.amountMinor > summaryBefore.netCollectedMinor) {
           throw new ServiceError('validation', 422);
-        }
-
-        if (options.idempotencyKey) {
-          const key = `${user.id}:refund:${options.idempotencyKey}`;
-          const previous = state.idempotency[key];
-          if (previous) {
-            const prevTx = state.transactions.find(t => t.id === previous.bookingId);
-            if (prevTx) return { transaction: prevTx, summary: deriveBookingFinancialSummary(booking, state.transactions) };
-          }
         }
 
         const tx: PaymentTransaction = {
@@ -1159,8 +1192,8 @@ export function createDemoTransport(storage?: DemoStorage, config?: { isLive?: b
         state.transactions.push(tx);
         const summaryAfter = deriveBookingFinancialSummary(booking, state.transactions);
         booking.paymentStatus = summaryAfter.paymentStatus;
-        if (options.idempotencyKey) {
-          state.idempotency[`${user.id}:refund:${options.idempotencyKey}`] = { fingerprint: JSON.stringify(input), bookingId: tx.id };
+        if (key) {
+          state.idempotency[key] = { fingerprint, bookingId: tx.id, transactionId: tx.id };
         }
         audit(`refund.recorded: ${tx.amountMinor} ETB reason: ${input.reason}`, tx.id);
         persist();

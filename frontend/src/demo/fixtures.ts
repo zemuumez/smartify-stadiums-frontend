@@ -64,7 +64,7 @@ export interface DemoState {
   eventRegistrations: EventRegistration[]; cameras: CameraDevice[];
   media: MediaAsset[]; recordings: MatchRecording[]; entitlements: ReplayEntitlement[]; invoices: Invoice[]; audit: AuditEntry[];
   transactions: PaymentTransaction[]; venueReviews: VenueReviewRecord[]; supportCases: SupportCase[];
-  idempotency: Record<string, { fingerprint: string; bookingId: string }>;
+  idempotency: Record<string, { fingerprint: string; bookingId: string; transactionId?: string }>;
 }
 export const commercialPolicy: CommercialPolicy = { subscriptionPriceMinor: null, bookingCommissionPercent: null, currency: 'ETB' };
 export function createFixtures(): DemoState {

@@ -113,43 +113,76 @@ test('overpayment is strictly rejected with validation error', async () => {
 test('settlement and refund mutations are idempotent and prevent double-execution', async () => {
   const s = setup();
   s.transport.selectAccount('player-1');
-  const booking = await s.bookings.create(input());
+  const booking = await s.bookings.create(input()); // 300,000 minor total
 
   s.transport.selectAccount('owner-1');
   const idempotencyKey = 'key-settle-12345';
+  
+  // Full settlement of the total amount (300,000 minor)
   const settleA = await s.billing.settleBooking(
     booking.id,
-    { amountMinor: 150000, method: 'cash' },
+    { amountMinor: 300000, method: 'cash' },
     idempotencyKey
   );
-  assert.equal(settleA.summary.collectedMinor, 150000);
+  assert.equal(settleA.summary.collectedMinor, 300000);
+  assert.equal(settleA.summary.outstandingMinor, 0);
 
-  // Re-submitting with identical idempotencyKey
+  // Repeating identical full settlement with same idempotencyKey: MUST return original transaction, NOT 422
   const settleB = await s.billing.settleBooking(
     booking.id,
-    { amountMinor: 150000, method: 'cash' },
+    { amountMinor: 300000, method: 'cash' },
     idempotencyKey
   );
   assert.equal(settleB.transaction.id, settleA.transaction.id);
-  assert.equal(settleB.summary.collectedMinor, 150000); // Did not double to 300000
+  assert.equal(settleB.summary.collectedMinor, 300000);
+  assert.equal(settleB.summary.outstandingMinor, 0);
 
-  // Refund idempotency
+  // Reusing the same idempotencyKey with a CHANGED payload (e.g. different amount or method): MUST reject with conflict 409
+  await rejects(
+    s.billing.settleBooking(
+      booking.id,
+      { amountMinor: 150000, method: 'cash' },
+      idempotencyKey
+    ),
+    'conflict'
+  );
+  await rejects(
+    s.billing.settleBooking(
+      booking.id,
+      { amountMinor: 300000, method: 'pos' },
+      idempotencyKey
+    ),
+    'conflict'
+  );
+
+  // Full refund idempotency
   const refundKey = 'key-refund-67890';
   const refundA = await s.billing.refundBooking(
     booking.id,
-    { amountMinor: 50000, reason: 'Customer requested 1 hour cancellation' },
+    { amountMinor: 300000, reason: 'Full weather cancellation' },
     refundKey
   );
-  assert.equal(refundA.summary.refundedMinor, 50000);
-  assert.equal(refundA.summary.netCollectedMinor, 100000);
+  assert.equal(refundA.summary.refundedMinor, 300000);
+  assert.equal(refundA.summary.netCollectedMinor, 0);
 
+  // Repeating identical full refund: MUST return original transaction, NOT 422
   const refundB = await s.billing.refundBooking(
     booking.id,
-    { amountMinor: 50000, reason: 'Customer requested 1 hour cancellation' },
+    { amountMinor: 300000, reason: 'Full weather cancellation' },
     refundKey
   );
   assert.equal(refundB.transaction.id, refundA.transaction.id);
-  assert.equal(refundB.summary.refundedMinor, 50000); // Did not double to 100000
+  assert.equal(refundB.summary.refundedMinor, 300000);
+
+  // Reusing refundKey with changed reason or amount: MUST reject with conflict 409
+  await rejects(
+    s.billing.refundBooking(
+      booking.id,
+      { amountMinor: 100000, reason: 'Full weather cancellation' },
+      refundKey
+    ),
+    'conflict'
+  );
 });
 
 test('refund limits are enforced against net collected funds and preserve correction records', async () => {
@@ -303,20 +336,57 @@ test('simulated gateway payments support telebirr and cbe_birr with explicit suc
   assert.equal(failRes.summary.outstandingMinor, 300000);
   assert.equal(failRes.summary.paymentStatus, 'failed');
 
-  // Retry with success
-  const successRes = await s.billing.simulateGateway(booking.id, {
-    method: 'cbe_birr',
-    simulateOutcome: 'success',
-  });
+  // Retry with success using an idempotency key
+  const gwKey = 'gw-idem-key-1';
+  const successRes = await s.billing.simulateGateway(
+    booking.id,
+    {
+      method: 'cbe_birr',
+      simulateOutcome: 'success',
+    },
+    gwKey
+  );
   assert.equal(successRes.transaction.status, 'succeeded');
   assert.equal(successRes.summary.outstandingMinor, 0);
   assert.equal(successRes.summary.netCollectedMinor, 300000);
   assert.equal(successRes.summary.paymentStatus, 'paid');
 
-  // Attempting gateway simulation when balance is 0 is rejected with conflict
+  // Retrying the exact same successful payment with identical idempotency key returns the original transaction
+  const retrySuccess = await s.billing.simulateGateway(
+    booking.id,
+    {
+      method: 'cbe_birr',
+      simulateOutcome: 'success',
+    },
+    gwKey
+  );
+  assert.equal(retrySuccess.transaction.id, successRes.transaction.id);
+  assert.equal(retrySuccess.summary.outstandingMinor, 0);
+
+  // Attempting gateway simulation with the same key but changed method rejects with conflict
+  await rejects(
+    s.billing.simulateGateway(
+      booking.id,
+      { method: 'telebirr_gateway', simulateOutcome: 'success' },
+      gwKey
+    ),
+    'conflict'
+  );
+
+  // Attempting gateway simulation with a NEW key when balance is 0 is rejected with conflict
   await rejects(
     s.billing.simulateGateway(booking.id, { method: 'telebirr_gateway', simulateOutcome: 'success' }),
     'conflict'
+  );
+
+  // Live mode rejects simulated payment gateway with forbidden
+  const tLive = createDemoTransport(undefined, { isLive: true });
+  const sLive = { ...createServices(tLive), transport: tLive };
+  tLive.selectAccount('player-1');
+  const liveBooking = await sLive.bookings.create(input({ date: '2026-11-01' }));
+  await rejects(
+    sLive.billing.simulateGateway(liveBooking.id, { method: 'cbe_birr', simulateOutcome: 'success' }),
+    'forbidden'
   );
 });
 

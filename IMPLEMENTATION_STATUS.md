@@ -486,3 +486,14 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Added regression test in frontend/tests/finance-admin.test.cjs with pre-seeded stored invoices for both owner-1 (Bambis Meda) and owner-2 (Unity Sports Complex).
       - Verified that each owner receives only their respective stored invoice, and explicit cross-venue queries are rejected with 403 forbidden.
       - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.
+
+- Step 30 (Milestone M5 Correction 3: Correct Financial Idempotency, Request Fingerprinting, and Retry Key Preservation):
+   1. Prioritized idempotency resolution & fingerprint validation:
+      - In frontend/src/demo/transport.ts, restructured settlement (/owner/bookings/:id/settle), refund (/owner/bookings/:id/refund), and gateway simulation (/bookings/:id/simulate-gateway) handlers: authenticated caller and evaluated idempotency keys prior to evaluating changing balances.
+      - Generated canonical request fingerprints (bookingId, amount, payment method, reference, notes, and outcome); verified previous fingerprint matches incoming payload and rejected alterations with 409 conflict.
+      - Enabled seamless retries of full settlements, which previously failed with 422 because outstanding balance had reduced to 0.
+   2. Preservation of retry keys on failure:
+      - In frontend/src/components/booking-financial-modals.tsx, preserved idempotency keys across transport failures in SettlementModal, ReceiptModal, and SimulateGatewayModal so subsequent retry attempts safely reuse the identical key.
+   3. Verification & tests:
+      - Added regression tests in frontend/tests/finance-admin.test.cjs covering full-settlement idempotency, payload-change conflict rejection, and gateway simulation retries.
+      - 97/97 unit tests pass (npm test); scoped ESLint passes with 0 errors and 0 warnings.

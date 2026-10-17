@@ -128,8 +128,7 @@ export function SettlementModal({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setSubmitError(msg);
-      // Reset idempotency key on failure so the user can retry with a fresh key
-      idempotencyKeyRef.current = null;
+      // Preserve idempotency key on failure so subsequent retries use the identical key
     } finally {
       setBusy(false);
     }
@@ -345,7 +344,7 @@ export function ReceiptModal({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setRefundError(msg);
-      refundIdempotencyRef.current = null;
+      // Preserve idempotency key on failure so subsequent retries use the identical key
     } finally {
       setRefundBusy(false);
     }
@@ -640,7 +639,7 @@ export function SimulateGatewayModal({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
-      idempotencyKeyRef.current = null;
+      // Preserve idempotency key on failure so subsequent retries use the identical key
     } finally {
       setBusy(false);
     }
