@@ -180,12 +180,12 @@ The verification architecture is automated via checked-in continuous integration
   1. **Dependency Installation**: `npm ci` with lockfile caching.
   2. **Scoped Linting**: `npm run lint:scoped` across all 19 domain components, services, demo adapters, localization dictionaries, and browser test suites.
   3. **Unit & Integration Suite**: `npm test` compiling test TypeScript and running 99/99 service tests.
-  4. **Production Build**: `npm run build` compiling Turbopack bundle with explicit test environment flags (`NEXT_PUBLIC_APP_ENV=test`).
-  5. **Automated Server & E2E Browser Runner**: `node tests/run-all-e2e.mjs` starts the production/test server, waits for health check on port 3000, executes all 5 browser suites + accessibility performance suite sequentially, and gracefully terminates the background server.
+  4. **Production Build**: `npm run build` compiling Turbopack bundle with explicit demo mode configuration (`NEXT_PUBLIC_DATA_MODE=demo NEXT_PUBLIC_APP_ENV=test`).
+  5. **Automated Server & E2E Browser Runner**: `node tests/run-all-e2e.mjs` starts the production/test server with `NEXT_PUBLIC_DATA_MODE=demo`, waits for health check on port 3000, executes all 5 browser suites + accessibility performance suite sequentially, and gracefully terminates the background server.
   6. **Failure Artifact Retention**: `actions/upload-artifact@v4` with `if: always()` uploads the entire `frontend/.test-artifacts` directory with a 14-day retention period.
 
 ### Clean-Checkout & Local Reproduction Instructions
-To reproduce the full verification suite on a fresh clone without an existing development server:
+To reproduce the full verification suite on a fresh clone without an existing development server or `.env.local`:
 ```bash
 # 1. Clone repository and navigate to frontend directory
 git clone <repo-url>
@@ -195,13 +195,13 @@ cd smartify-stadiums-frontend/frontend
 npm ci
 
 # 3. Execute combined static checks and unit tests
-npm run ci
+NEXT_PUBLIC_DATA_MODE=demo npm run ci
 
 # 4. Execute automated end-to-end browser suites (auto-starts server & runs all suites)
-npm run test:ci:e2e
+NEXT_PUBLIC_DATA_MODE=demo npm run test:ci:e2e
 
 # Or run the complete end-to-end CI pipeline in a single command:
-npm run ci:full
+NEXT_PUBLIC_DATA_MODE=demo npm run ci:full
 ```
 
 ### Machine-Agnostic Environment Adaptation

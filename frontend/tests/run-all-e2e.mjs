@@ -51,6 +51,7 @@ async function main() {
       env: {
         ...process.env,
         PORT: '3000',
+        NEXT_PUBLIC_DATA_MODE: process.env.NEXT_PUBLIC_DATA_MODE || 'demo',
         NEXT_PUBLIC_APP_ENV: 'test',
       },
     });
@@ -82,6 +83,7 @@ async function main() {
           env: {
             ...process.env,
             ARTIFACT_DIR: artifactDir,
+            NEXT_PUBLIC_DATA_MODE: process.env.NEXT_PUBLIC_DATA_MODE || 'demo',
           },
         });
         proc.on('close', code => resolve(code ?? 1));
