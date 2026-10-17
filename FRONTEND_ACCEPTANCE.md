@@ -107,18 +107,22 @@ Every route defined under `frontend/src/app` has been audited for route paramete
 
 ### Viewport Responsiveness
 - **Desktop (1280px - 1920px)**: Multi-column grids, split navigation, sticky filters, responsive side panels.
-- **Tablet (768px - 1024px)**: 2-column card reflows, collapsible drawer navigation, adapted booking matrix.
+- **Tablet (768px Viewport - iPad Baseline)**:
+  - Validated via automated CDP execution in `tests/verify-a11y-performance.mjs`.
+  - Directory (`/stadiums`), microsite (`/s/unity-complex`), and owner dashboard (`/dashboard/bookings`) reflow cleanly with `scrollWidth === clientWidth === 753px` (0px horizontal overflow).
 - **Mobile (390px Viewport - iPhone Baseline)**:
-  - Validated via Chrome DevTools Emulation in `tests/verify-*-e2e.mjs`.
-  - Exact check: `scrollWidth === clientWidth === 390` verified across directory, player bookings, owner dashboard, support conversations, and microsites.
-  - Zero horizontal overflow or clipped text.
+  - Validated via Chrome DevTools Emulation in `tests/verify-*-e2e.mjs` and `verify-a11y-performance.mjs`.
+  - Exact check: `scrollWidth === clientWidth === 390px` verified across directory, player bookings, owner dashboard, support conversations, and microsites. Zero horizontal overflow or clipped text.
+- **200% Zoom Scaling & Layout Expansion**:
+  - Validated via automated CDP execution in `tests/verify-a11y-performance.mjs`.
+  - Public directory (`/stadiums`) and player bookings (`/bookings`) expand without collision: `scrollWidth === clientWidth === 1265px` (0px horizontal overflow).
 
 ### Keyboard Navigation & Dialog Focus Management
-- Modal dialogs utilize [useModalKeyboard](file:///C:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/components/booking-list.tsx#L30) hook:
-  - Traps `Tab` focus within interactive elements (`button`, `input`, `select`, `textarea`, `[href]`).
-  - Automatically focuses the first interactive control on mount (10ms autofocus timer).
-  - Listens for `Escape` keydown, stops propagation, and invokes clean dismissal.
-  - Restores previous DOM element focus upon unmounting.
+- Modal dialogs utilize [useModalKeyboard](file:///C:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/components/booking-list.tsx#L30) hook, verified by automated CDP assertions in `tests/verify-a11y-performance.mjs`:
+  - **Focus Trapping**: Traps `Tab` focus strictly within interactive elements (`button`, `input`, `select`, `textarea`, `[href]`).
+  - **Initial Focus**: Automatically moves focus into the first interactive control inside the dialog upon opening.
+  - **Escape Dismissal**: Listens for `Escape` keydown, stops propagation, and triggers clean dismissal.
+  - **Focus Restoration**: Automatically restores active DOM element focus back to the triggering control upon dialog unmount (verified: `document.activeElement === triggerBtn`).
 - In-page navigation and filter pills support native keyboard activation (`Enter`, `Space`) with explicit `aria-pressed` states.
 
 ### Touch Targets & Form Ergonomics
@@ -189,17 +193,31 @@ The verification architecture is completely reproducible across local workstatio
 
 ## 7. Performance & Quality Measurements
 
-| Measurement Dimension | Observed Metric | Benchmark / Requirement | Status |
+### Mobile Performance under Documented Conditions
+- **Emulated Environment**: Viewport 390x844 (iPhone baseline, 3x device pixel ratio), 4x CPU slowdown, Fast 3G cellular network (40ms RTT, 1.6 Mbps download throughput, 750 kbps upload throughput).
+- **Execution Script**: `tests/verify-a11y-performance.mjs` (automated CDP navigation timing recording).
+- **Recorded Results**:
+
+| Page / Route | Role / Type | TTFB | DOM Interactive | DOM Content Loaded | Full Load Event | Horizontal Overflow |
+|---|---|---|---|---|---|---|
+| `/` | Landing (Public) | **308 ms** | **988 ms** | **989 ms** | **1,150 ms** | **0 px** |
+| `/stadiums` | Directory (Public) | **239 ms** | **701 ms** | **701 ms** | **1,574 ms** | **0 px** |
+| `/s/bambis-meda` | Microsite (Public) | **111 ms** | **966 ms** | **966 ms** | **1,286 ms** | **0 px** |
+| `/bookings` | Player Bookings (Auth) | **92 ms** | **328 ms** | **329 ms** | **803 ms** | **0 px** |
+| `/dashboard/bookings` | Owner Schedule (Auth) | **114 ms** | **336 ms** | **337 ms** | **678 ms** | **0 px** |
+
+### Quality & Accessibility Evidence Verification
+
+| Measurement Dimension | Observed Evidence / Metric | Benchmark / Requirement | Status |
 |---|---|---|---|
-| Turbopack Production Build Time | **3.6s** | < 10.0s | Exceeded |
-| TypeScript Typecheck Time | **3.5s** | < 8.0s | Exceeded |
-| Static Page Generation (43 routes) | **516ms** | < 2.0s | Exceeded |
-| Unit Test Suite (99 tests) | **571ms** | < 1.5s | Exceeded |
-| First Load JS (Shared Chunk) | **~125 KB** | < 200 KB | Passed |
-| Mobile Viewport Horizontal Overflow | **0 px** (`scrollWidth === clientWidth`) | 0 px | Passed |
-| Touch Target Minimum Height | **44 px** (`min-h-11`) | >= 44 px | Passed |
-| Modal Autofocus Latency | **10 ms** | < 50 ms | Passed |
-| History Stack Trap Overhead | **0 orphan entries** | 0 orphan entries | Passed |
+| Keyboard Focus Restoration | **100% verified** (`activeElement === triggerBtn` upon Escape dismissal) | Must return focus to trigger | Passed |
+| Dialog Focus Trapping | **100% trapped** (`Tab` cycles strictly inside `[role="dialog"]`) | No focus escape | Passed |
+| Tablet Reflow (768px Viewport) | **0 px overflow** (`scrollWidth === clientWidth === 753px`) | 0 px | Passed |
+| 200% Zoom Layout Expansion | **0 px overflow** (`scrollWidth === clientWidth === 1265px`) | 0 px | Passed |
+| Mobile Viewport Horizontal Overflow | **0 px** (`scrollWidth === clientWidth === 390px`) | 0 px | Passed |
+| Touch Target Minimum Height | **44 px** (`min-h-11` on all buttons, links, inputs) | >= 44 px | Passed |
+| Unit & Integration Test Suite | **99/99 passed** in 571 ms | 100% passing | Passed |
+| Production Turbopack Compilation | **2.9s build**, 43 static routes generated in 527 ms | Clean build | Passed |
 
 ---
 
