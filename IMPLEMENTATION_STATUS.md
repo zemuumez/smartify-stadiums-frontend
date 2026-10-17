@@ -560,4 +560,23 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
       - Updated frontend/src/components/support-modals.tsx, frontend/src/components/owner-panels.tsx, and frontend/src/components/admin-panels.tsx to reference localized message keys for all placeholders, headings, subtitles, selection prompts, and message counters.
       - Verified dictionary parity with npm test (English and Amharic have identical nonempty message keys passes); scoped ESLint passed with 0 errors and 0 warnings.
 
+- Step 36 (Milestone M5 Follow-up 3: Strict Browser E2E Test Suite Substantiation and Mandatory Assertions):
+   1. Headless browser CDP error handling & fast fail:
+      - Updated CDPClient.evaluate in frontend/tests/verify-finance-admin-e2e.mjs to inspect res?.exceptionDetails and throw an immediate Error on any unhandled in-browser exception, preventing silent failures.
+      - Introduced a strict assert helper throwing on false conditions across every journey; eliminated all passive logging in favor of mandatory checks.
+   2. Full lifecycle interactions and verifiable assertions:
+      - Journey 1 (Owner Manual Settlement & Refund Lifecycle): Tested settlement overpayment rejection (displaying application-level overpayment validation error); recorded 500 ETB settlement; opened receipts modal; issued actual 100 ETB refund with reason; verified ledger displays both collection and refund rows with updated 400 ETB net collections. Added noValidate to settlement and refund forms in frontend/src/components/booking-financial-modals.tsx and exposed transaction notes/reason in the ledger table.
+      - Journey 2 (Simulated Gateway Failure & UI Retry): Simulated payment failure on booking card; verified status transitioned to 'failed'; clicked newly visible 'Pay online (Simulated)' button on failed booking; simulated successful collection; verified status updated to 'paid'; asserted receipts ledger contains exactly 2 transaction attempts (1 failed attempt, 1 success) with net collection of 1,500.00 ETB without duplicate charges.
+      - Journey 3 (Analytics Dashboards & Timezone Verification): Verified owner analytics Addis Ababa timezone notice; toggled metric date basis to 'transaction_date' and asserted selection state; verified admin platform analytics and gross/net revenue totals; asserted non-admin tenant denial (forbidden).
+      - Journey 4 (Venue Review Moderation): Submitted suspension reason and suspended active venue-1; asserted status updated to 'suspended' and displayed venue suspension notice; opened review history and asserted suspension record with reason; submitted reinstatement reason and reinstated venue-1; asserted status returned to 'active'.
+      - Journey 5 (Account Moderation & Self-Lockout Guard): Verified admin self-suspension button is disabled and displays warning notice; submitted moderation reason and suspended non-admin player-2; asserted status updated to 'suspended' and displayed account suspension notice; reinstated player-2 and asserted status returned to 'active'.
+      - Journey 6 (Support Workflows, Tenant Isolation & Sanitization): Player submitted inquiry on booking card; owner-1 replied publicly and verified message appeared in conversation; verified tenant isolation (unrelated owner-2 denied access and does not see venue-1 cases); admin posted internal staff note (highlighted with amber badge) and public reply; verified player-1 and owner-1 views contain all public replies while internal staff note is completely sanitized and absent.
+      - Journey 7 (Mobile Viewport & Amharic Localization): Emulated 390x844 mobile viewport; verified owner support panel, open conversation view, reply textarea placeholder, and reply button in Amharic; opened create case modal and verified Amharic categories, subject placeholder, and description placeholder; verified player mobile bookings view, opened player support modal, and verified Amharic title, placeholders, and buttons.
+   3. Verification evidence:
+      - All 7 journeys fully substantiated and passed (node tests/verify-finance-admin-e2e.mjs exited with 0).
+      - 7 screenshot artifacts updated in brain storage: finance_journey_1_settlement_receipts.png, finance_journey_2_player_gateway_simulation.png, finance_journey_3_analytics_dashboard.png, finance_journey_4_venue_review_moderation.png, finance_journey_5_account_moderation.png, finance_journey_6_support_workflow_sanitization.png, and finance_journey_7_mobile_amharic.png.
+      - 99/99 unit and integration tests passed (npm test).
+      - Scoped ESLint passed with 0 errors and 0 warnings.
+      - Production build passed (npm run build).
+
 

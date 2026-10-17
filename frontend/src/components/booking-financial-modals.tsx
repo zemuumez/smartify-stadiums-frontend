@@ -174,7 +174,7 @@ export function SettlementModal({
         ) : query.error ? (
           <ServiceErrorMessage error={query.error} retry={query.reload} />
         ) : financials ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-slate-500 block">{t('bookingValue')}</span>
@@ -472,7 +472,7 @@ export function ReceiptModal({
                 )}
 
                 {showRefundForm && (
-                  <form onSubmit={handleRefund} className="space-y-3 pt-2 border-t border-rose-200">
+                  <form onSubmit={handleRefund} noValidate className="space-y-3 pt-2 border-t border-rose-200">
                     {refundError && (
                       <p className="text-xs text-rose-800 bg-rose-100 p-2 rounded-lg font-medium">
                         {refundError}
@@ -592,7 +592,7 @@ export function ReceiptModal({
                               </span>
                             </td>
                             <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px] max-w-[150px] truncate">
-                              {tx.reference || '—'}
+                              {tx.reference || tx.notes || '—'}
                             </td>
                           </tr>
                         );
