@@ -9,7 +9,16 @@
     "lint": "eslint",
     "test": "tsc -p tsconfig.tests.json && node --test tests/*.test.cjs",
     "test:e2e": "node tests/verify-journeys-e2e.mjs",
-    "test:cms": "node tests/verify-cms-e2e.mjs"
+    "test:cms": "node tests/verify-cms-e2e.mjs",
+    "test:teams": "node tests/verify-teams-events-e2e.mjs",
+    "test:media": "node tests/verify-camera-media-e2e.mjs",
+    "test:browser:all": "node tests/verify-journeys-e2e.mjs && node tests/verify-cms-e2e.mjs && node tests/verify-teams-events-e2e.mjs && node tests/verify-camera-media-e2e.mjs && node tests/verify-finance-admin-e2e.mjs && node tests/verify-a11y-performance.mjs",
+    "test:ci:e2e": "node tests/run-all-e2e.mjs",
+    "test:a11y-perf": "node tests/verify-a11y-performance.mjs",
+    "test:all": "npm test && npm run test:browser:all",
+    "lint:scoped": "eslint src/components/access-gate.tsx src/components/admin-panels.tsx src/components/analytics-dashboard.tsx src/components/auth-form.tsx src/components/booking-financial-modals.tsx src/components/booking-form.tsx src/components/booking-list.tsx src/components/camera-admin.tsx src/components/marketplace.tsx src/components/match-replay.tsx src/components/microsite-editor.tsx src/components/owner-panels.tsx src/components/service-state.tsx src/components/site-content-editor.tsx src/components/support-modals.tsx src/components/team-panels.tsx src/components/venue-administration.tsx src/components/venue-site.tsx src/components/workspace-shell.tsx src/services src/demo src/i18n tests/*.mjs",
+    "ci": "npm run lint:scoped && npm test && npm run build",
+    "ci:full": "npm run ci && npm run test:ci:e2e"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

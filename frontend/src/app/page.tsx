@@ -167,7 +167,7 @@ export default function HomePage() {
                     <Activity size={16} />
                   </span>
                   <span className="text-xs font-black text-[#111] uppercase tracking-wider">
-                    50+ Fields
+                    6 Partner Venues
                   </span>
                 </div>
 

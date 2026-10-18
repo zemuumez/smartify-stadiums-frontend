@@ -3,14 +3,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const chromePath = process.env.CHROME_BIN ||
-  (process.platform === 'win32'
-    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-    : (process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : 'google-chrome'));
+function findChrome() {
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+  if (process.platform === 'win32') {
+    const candidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+    return candidates[0];
+  }
+  if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+  return 'google-chrome';
+}
 
-const artifactDir = process.env.ARTIFACT_DIR || 'C:\\Users\\USER\\.gemini\\antigravity-ide\\brain\\029216c7-1f48-4c02-bbd3-70b84f3c51e7';
+const chromePath = findChrome();
+const artifactDir = process.env.ARTIFACT_DIR || path.join(process.cwd(), '.test-artifacts');
 const profileDir = path.join(os.tmpdir(), 'smartify-stadiums-e2e-profile');
 
 class CDPClient {
@@ -181,8 +194,143 @@ export async function runBrowserJourneysTest() {
       mobile: false
     });
 
+    // =========================================================================
+    // JOURNEY 0: PUBLIC DISCOVERY, BASKETBALL SEARCH & CONTEXTUAL SIGN-IN
+    // =========================================================================
+    console.log('\n[JOURNEY 0] Public Discovery & Contextual Sign-In Flow...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/stadiums' });
+    await sleep(2000);
+    await client.evaluate(`
+      (() => {
+        sessionStorage.clear();
+        localStorage.clear();
+        localStorage.setItem('etsf-locale', 'en');
+      })()
+    `);
+    await client.send('Page.navigate', { url: 'http://localhost:3000/stadiums' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    // Filter by Basketball
+    const discoveryFilter = await client.evaluate(`
+      (() => {
+        const sportButtons = Array.from(document.querySelectorAll('button'));
+        const bballBtn = sportButtons.find(b => b.textContent && b.textContent.trim() === 'Basketball');
+        if (bballBtn) bballBtn.click();
+        return { clicked: !!bballBtn };
+      })()
+    `);
+    await sleep(800);
+
+    // Verify Unity Sports Complex is visible in the filtered results
+    const unityVisible = await client.evaluate(`
+      (() => {
+        const text = document.body.textContent || '';
+        return text.includes('Unity Sports Complex');
+      })()
+    `);
+    if (!unityVisible) {
+      throw new Error(`Journey 0 assertion failed: Unity Sports Complex not visible after Basketball filter: ${JSON.stringify(discoveryFilter)}`);
+    }
+
+    // Navigate to Unity Sports Complex microsite directly
+    await client.send('Page.navigate', { url: 'http://localhost:3000/s/unity-complex' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const micrositeCheck = await client.evaluate(`
+      (() => {
+        const h1 = document.querySelector('h1')?.textContent || '';
+        return { h1, hasUnity: h1.includes('Unity Sports Complex') };
+      })()
+    `);
+    if (!micrositeCheck.hasUnity) {
+      throw new Error(`Journey 0 assertion failed: Unity Sports Complex microsite title missing: ${JSON.stringify(micrositeCheck)}`);
+    }
+
+    // Contextual booking with return URL when signed out
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings/new?venue=unity-complex&field=field-3&date=2026-10-25' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    // Complete sign-in through the actual UI return-to link
+    const clickSignIn = await client.evaluate(`
+      (() => {
+        const link = Array.from(document.querySelectorAll('a')).find(a => a.href && a.href.includes('/auth/login') && a.search.includes('returnTo'));
+        if (!link) return { error: 'Sign in link with returnTo not found on unauthenticated booking page' };
+        link.click();
+        return { clicked: true, href: link.href };
+      })()
+    `);
+    console.log('  Journey 0 clicked sign-in link:', clickSignIn);
+    if (clickSignIn.error) {
+      throw new Error(`Journey 0 assertion failed: ${clickSignIn.error}`);
+    }
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const loginPageCheck = await client.evaluate(`
+      (() => ({
+        url: window.location.href,
+        hasReturnTo: window.location.search.includes('returnTo') && window.location.search.includes('unity-complex')
+      }))()
+    `);
+    console.log('  Journey 0 login page state:', loginPageCheck);
+    if (!loginPageCheck.hasReturnTo) {
+      throw new Error(`Journey 0 assertion failed: Expected /auth/login with returnTo parameter: ${JSON.stringify(loginPageCheck)}`);
+    }
+
+    // Complete sign-in through the UI by clicking the Abebe Kebede (player) demo button
+    const demoLoginClick = await client.evaluate(`
+      (() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const demoBtn = buttons.find(b => b.textContent && b.textContent.includes('Abebe Kebede'));
+        if (!demoBtn) return { error: 'Abebe Kebede demo button not found on /auth/login' };
+        demoBtn.click();
+        return { clicked: true };
+      })()
+    `);
+    console.log('  Journey 0 selected Abebe Kebede demo account:', demoLoginClick);
+    if (demoLoginClick.error) {
+      throw new Error(`Journey 0 assertion failed: ${demoLoginClick.error}`);
+    }
+    await sleep(2500);
+    await waitForLoading(client);
+
+    const bookingContextCheck = await client.evaluate(`
+      (() => {
+        const url = window.location.href;
+        const fieldSelect = document.querySelector('select');
+        const sportSelect = Array.from(document.querySelectorAll('select')).find(s => s.closest('label')?.textContent?.includes('Sport') || s.value === 'volleyball');
+        const dateInput = document.querySelector('input[type="date"]');
+        const text = document.body.textContent || '';
+        const venuePreserved = text.includes('Unity Sports Complex') || url.includes('venue=unity-complex');
+        const courtPreserved = fieldSelect ? fieldSelect.value === 'field-3' : false;
+        const sportPreserved = sportSelect ? sportSelect.value === 'volleyball' : false;
+        const datePreserved = dateInput ? dateInput.value === '2026-10-25' : false;
+        return {
+          url,
+          venuePreserved,
+          courtPreserved,
+          courtValue: fieldSelect ? fieldSelect.value : null,
+          sportPreserved,
+          sportValue: sportSelect ? sportSelect.value : null,
+          datePreserved,
+          dateValue: dateInput ? dateInput.value : null,
+        };
+      })()
+    `);
+    console.log('  Journey 0 preserved booking context check:', bookingContextCheck);
+    if (!bookingContextCheck.venuePreserved || !bookingContextCheck.courtPreserved || !bookingContextCheck.sportPreserved || !bookingContextCheck.datePreserved) {
+      throw new Error(`Journey 0 assertion failed: Booking context not preserved across UI sign-in: ${JSON.stringify(bookingContextCheck)}`);
+    }
+
+    const shot0Path = path.join(artifactDir, 'journey_0_discovery_signin_preserved.png');
+    await client.captureScreenshot(shot0Path);
+    console.log('  ✓ Screenshot captured (discovery & signin):', shot0Path);
+
     // STEP 0: Set clean demo session for owner-1 (Fatima Hassan, Bambis Meda Stadium)
-    console.log('[STEP 0] Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis Meda Stadium)...');
+    console.log('\n[STEP 0] Setup pristine demo session for owner-1 (Fatima Hassan @ Bambis Meda Stadium)...');
     await client.send('Page.navigate', { url: 'http://localhost:3000/auth/login' });
     await sleep(1500);
 
@@ -691,6 +839,243 @@ export async function runBrowserJourneysTest() {
     const shot7Path = path.join(artifactDir, 'journey_7_player_view.png');
     await client.captureScreenshot(shot7Path);
     console.log('  ✓ Screenshot captured (player view):', shot7Path);
+
+    // =========================================================================
+    // JOURNEY 8: PLAYER BOOKING & CANCELLATION LIFECYCLE
+    // =========================================================================
+    console.log('\n[JOURNEY 8] Player Booking Creation & Cancellation Lifecycle...');
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings/new?venue=unity-complex&field=field-3&date=2026-10-26' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const slotSelect = await client.evaluate(`
+      (() => {
+        const radios = Array.from(document.querySelectorAll('input[name="start"]'));
+        if (radios.length === 0) return { error: 'No start slot radio buttons available', body: document.body.innerText.slice(0, 300) };
+        const radio = radios[0];
+        const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked');
+        if (descriptor) descriptor.set.call(radio, true);
+        radio.click();
+        radio.dispatchEvent(new Event('click', { bubbles: true }));
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+        const submitBtn = document.querySelector('button[type="submit"]');
+        return { clickedRadio: true, submitDisabled: submitBtn ? submitBtn.disabled : null };
+      })()
+    `);
+    console.log('  Selected start slot for booking:', slotSelect);
+    if (slotSelect.error) {
+      throw new Error(`Journey 8 assertion failed: ${slotSelect.error}`);
+    }
+    await sleep(800);
+
+    const submitAction = await client.evaluate(`
+      (() => {
+        const form = document.querySelector('form');
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.type === 'submit');
+        if (!form || !btn) return { error: 'No form or submit button found' };
+        if (btn.disabled) return { error: 'Submit button remains disabled after slot selection' };
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          btn.click();
+        }
+        return { submitted: true };
+      })()
+    `);
+    console.log('  Submitted reservation form:', submitAction);
+    if (submitAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${submitAction.error}`);
+    }
+    await sleep(2500);
+    await waitForLoading(client);
+
+    const postSubmitState = await client.evaluate(`
+      (() => ({
+        url: window.location.href,
+        hasError: !!document.querySelector('[role="alert"]'),
+        alertText: document.querySelector('[role="alert"]')?.textContent,
+        bodySnippet: document.body.innerText.slice(0, 300)
+      }))()
+    `);
+    console.log('  Post-submit form state:', postSubmitState);
+    const createdBookingId = postSubmitState.url.includes('/bookings/')
+      ? postSubmitState.url.split('/bookings/')[1].split('?')[0].split('#')[0].trim()
+      : '';
+    console.log('  Captured created booking ID:', createdBookingId);
+    if (!createdBookingId) {
+      throw new Error(`Journey 8 assertion failed: Created booking ID was not captured. Post-submit URL was: ${postSubmitState.url}`);
+    }
+
+    // Navigate to player's bookings list
+    await client.send('Page.navigate', { url: 'http://localhost:3000/bookings' });
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const bookingsPageCheck = await client.evaluate(`
+      (() => ({
+        url: window.location.href,
+        text: document.body.innerText.slice(0, 400),
+        buttons: Array.from(document.querySelectorAll('button')).map(b => b.textContent?.trim())
+      }))()
+    `);
+    console.log('  /bookings page state:', bookingsPageCheck);
+
+    const cancelAction = await client.evaluate(`
+      ((targetId) => {
+        const cards = Array.from(document.querySelectorAll('article.panel'));
+        const targetCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!targetCard) return { error: 'Target booking card with ID ' + targetId + ' not found on /bookings', totalCards: cards.length };
+        const cancelBtn = Array.from(targetCard.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Cancel reservation'));
+        if (!cancelBtn) return { error: 'Cancel reservation button not found inside target card ' + targetId };
+        cancelBtn.click();
+        return { clickedCancel: true, targetId };
+      })('${createdBookingId}')
+    `);
+    console.log('  Cancel button clicked:', cancelAction);
+    if (cancelAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${cancelAction.error}`);
+    }
+    await sleep(800);
+
+    const confirmAction = await client.evaluate(`
+      (() => {
+        const confirmBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent && b.textContent.trim() === 'Confirm');
+        if (!confirmBtn) return { error: 'No Confirm button found in cancel prompt' };
+        confirmBtn.click();
+        return { clickedConfirm: true };
+      })()
+    `);
+    console.log('  Confirm cancellation clicked:', confirmAction);
+    if (confirmAction.error) {
+      throw new Error(`Journey 8 assertion failed: ${confirmAction.error}`);
+    }
+    await sleep(2000);
+    await waitForLoading(client);
+
+    const cancelledBadgeCheck = await client.evaluate(`
+      ((targetId) => {
+        const cards = Array.from(document.querySelectorAll('article.panel'));
+        const targetCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!targetCard) return { error: 'Target card not found after cancellation', targetId };
+        const badges = Array.from(targetCard.querySelectorAll('span, div')).map(el => el.textContent?.trim());
+        const hasCancelled = badges.some(t => t === 'Cancelled' || t === 'ተሰርዟል');
+        return { hasCancelled, targetId, cardSnippet: targetCard.textContent.slice(0, 150) };
+      })('${createdBookingId}')
+    `);
+    console.log('  Cancelled badge check:', cancelledBadgeCheck);
+    if (cancelledBadgeCheck.error || !cancelledBadgeCheck.hasCancelled) {
+      throw new Error(`Journey 8 assertion failed: Cancelled badge not found on target booking ${createdBookingId}: ${JSON.stringify(cancelledBadgeCheck)}`);
+    }
+
+    const shot8Path = path.join(artifactDir, 'journey_8_booking_cancelled.png');
+    await client.captureScreenshot(shot8Path);
+    console.log('  ✓ Screenshot captured (booking cancelled):', shot8Path);
+
+    // Assert same booking's owner-calendar status
+    console.log('  Verifying owner calendar status for cancelled booking...');
+    await client.evaluate(`
+      (() => {
+        sessionStorage.setItem('etsf-demo-session-v1', 'owner-2');
+      })()
+    `);
+    await client.send('Page.navigate', { url: 'http://localhost:3000/dashboard/bookings' });
+    await sleep(2000);
+    await waitForLoading(client);
+    await exposeServicesToWindow(client);
+
+    // Switch owner calendar date to 2026-10-26
+    await client.evaluate(`
+      (() => {
+        const dateInput = document.querySelector('input[type="date"]');
+        if (dateInput) {
+          const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+          if (descriptor) descriptor.set.call(dateInput, '2026-10-26');
+          dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+          dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      })()
+    `);
+    await sleep(1500);
+    await waitForLoading(client);
+
+    const ownerCalendarCheck = await client.evaluate(`
+      ((targetId) => {
+        const cards = Array.from(document.querySelectorAll('article.panel'));
+        const matchingCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!matchingCard) return { foundCard: false, targetId, totalCards: cards.length };
+        const cardText = matchingCard.textContent || '';
+        const hasCancelled = cardText.includes('Cancelled') || cardText.includes('ተሰርዟል');
+        return {
+          foundCard: true,
+          targetId,
+          hasCancelled,
+          cardSnippet: cardText.slice(0, 200)
+        };
+      })('${createdBookingId}')
+    `);
+    console.log('  Owner calendar cancellation check:', ownerCalendarCheck);
+    if (!ownerCalendarCheck.foundCard) {
+      throw new Error(`Journey 8 assertion failed: Target booking ${createdBookingId} not found in owner calendar: ${JSON.stringify(ownerCalendarCheck)}`);
+    }
+    if (!ownerCalendarCheck.hasCancelled) {
+      throw new Error(`Journey 8 assertion failed: Owner calendar does not reflect Cancelled status for booking ${createdBookingId}: ${JSON.stringify(ownerCalendarCheck)}`);
+    }
+
+    // Assert restored court availability
+    console.log('  Verifying restored court availability for 2026-10-26...');
+    const availabilityCheck = await client.evaluate(`
+      (async () => {
+        try {
+          const slots = await window.__SERVICES__.bookingsService.availability('field-3', '2026-10-26');
+          const slot7 = slots.find(s => s.startHour === 7);
+          return {
+            totalSlots: slots.length,
+            slot7Available: slot7 ? slot7.available : null,
+            allSlotsAvailable: slots.every(s => s.available)
+          };
+        } catch (err) {
+          return { error: err.message };
+        }
+      })()
+    `);
+    console.log('  Restored availability check:', availabilityCheck);
+    if (!availabilityCheck.slot7Available) {
+      throw new Error(`Journey 8 assertion failed: Court availability was not restored upon cancellation: ${JSON.stringify(availabilityCheck)}`);
+    }
+
+    // Assert unchanged financial ledger (unpaid booking, no fake refund, net collected = 0)
+    console.log('  Verifying financial ledger integrity...');
+    const financialCheck = await client.evaluate(`
+      (async () => {
+        try {
+          const fin = await window.__SERVICES__.billingService.bookingFinancials('${createdBookingId}');
+          return {
+            paymentStatus: fin.paymentStatus,
+            netCollectedMinor: fin.netCollectedMinor,
+            refundedMinor: fin.refundedMinor,
+            outstandingMinor: fin.outstandingMinor
+          };
+        } catch (err) {
+          return { error: err.message };
+        }
+      })()
+    `);
+    console.log('  Financial ledger check:', financialCheck);
+    if (financialCheck.paymentStatus !== 'unpaid' || financialCheck.netCollectedMinor !== 0 || financialCheck.refundedMinor !== 0) {
+      throw new Error(`Journey 8 assertion failed: Financial ledger altered unexpectedly on unpaid cancelled booking: ${JSON.stringify(financialCheck)}`);
+    }
 
     client.close();
     proc.kill();

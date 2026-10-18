@@ -4,57 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ArrowUpRight, MapPin, Rocket, GraduationCap, Globe } from "lucide-react";
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
-
-const openings = [
-  {
-    title: "Backend Engineer",
-    team: "Engineering",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Go", "PostgreSQL", "REST API"],
-    desc: "Build and scale the ET Smart Fields booking engine, camera pipeline, and analytics backend using Go and PostgreSQL.",
-  },
-  {
-    title: "Frontend Engineer",
-    team: "Engineering",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Next.js", "TypeScript", "Framer Motion"],
-    desc: "Build stunning, performant web experiences for players and stadium owners using Next.js, TypeScript, and Tailwind CSS.",
-  },
-  {
-    title: "Field Operations Manager",
-    team: "Operations",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Camera Install", "Stadium Relations", "Field QA"],
-    desc: "Onboard new stadiums, manage AI camera installations, and ensure ULS verification standards are met across all partner venues.",
-  },
-  {
-    title: "Sales & Partnerships Lead",
-    team: "Growth",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["B2B Sales", "Partnerships", "Stadium Outreach"],
-    desc: "Grow our stadium network by building relationships with venue owners across Addis Ababa, Dire Dawa, and beyond.",
-  },
-  {
-    title: "AI Camera Technician",
-    team: "Operations",
-    type: "Full-time",
-    location: "Field-based, Ethiopia",
-    tags: ["RTMP", "Camera Hardware", "Networking"],
-    desc: "Install, configure, and maintain AI camera systems (Veo Cam, SporPin X200, Hikvision) at ET Smart Fields partner stadiums.",
-  },
-  {
-    title: "Product Designer (UI/UX)",
-    team: "Design",
-    type: "Full-time",
-    location: "Addis Ababa / Remote",
-    tags: ["Figma", "UX Research", "Design Systems"],
-    desc: "Design beautiful, intuitive experiences for our player app, stadium dashboard, and microsite editor across web and mobile.",
-  },
-];
+import { useI18n } from "@/i18n/provider";
 
 const teamColors: Record<string, string> = {
   Engineering: "#2d6a4f",
@@ -64,6 +14,65 @@ const teamColors: Record<string, string> = {
 };
 
 export default function CareersPage() {
+  const { t } = useI18n();
+
+  const openings = [
+    {
+      title: t("roleBackendTitle"),
+      teamKey: "Engineering",
+      team: t("teamEngineering"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Go", "PostgreSQL", "REST API"],
+      desc: t("roleBackendDesc"),
+    },
+    {
+      title: t("roleFrontendTitle"),
+      teamKey: "Engineering",
+      team: t("teamEngineering"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Next.js", "TypeScript", "Modern CSS"],
+      desc: t("roleFrontendDesc"),
+    },
+    {
+      title: t("roleOpsTitle"),
+      teamKey: "Operations",
+      team: t("teamOperations"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Camera Install", "Stadium Relations", "Field QA"],
+      desc: t("roleOpsDesc"),
+    },
+    {
+      title: t("roleSalesTitle"),
+      teamKey: "Growth",
+      team: t("teamGrowth"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["B2B Sales", "Partnerships", "Stadium Outreach"],
+      desc: t("roleSalesDesc"),
+    },
+    {
+      title: t("roleTechTitle"),
+      teamKey: "Operations",
+      team: t("teamOperations"),
+      type: t("fullTime"),
+      location: t("ethiopiaField"),
+      tags: ["RTMP", "Camera Hardware", "Networking"],
+      desc: t("roleTechDesc"),
+    },
+    {
+      title: t("roleDesignTitle"),
+      teamKey: "Design",
+      team: t("teamDesign"),
+      type: t("fullTime"),
+      location: t("addisRemote"),
+      tags: ["Figma", "UX Research", "Design Systems"],
+      desc: t("roleDesignDesc"),
+    },
+  ];
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
 
@@ -71,19 +80,18 @@ export default function CareersPage() {
       <section className="pt-40 pb-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">Careers</div>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-4">{t("careersTitle")}</div>
             <h1
               className="text-[#111] font-black leading-tight mb-6"
               style={{ fontSize: "clamp(2.4rem, 6vw, 3.8rem)", letterSpacing: "-0.025em" }}
             >
-              Build Ethiopia&apos;s
-              <br />
-              <span style={{ color: "#2d6a4f" }}>Sports Future</span>
-              <br />
-              With Us
+              {t("careersHeroTitle")}
             </h1>
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-6 max-w-2xl">
+              {t("careersNotice")}
+            </div>
             <p className="text-[#7a7a7a] text-xl max-w-lg leading-relaxed">
-              We&apos;re a small, driven team building the infrastructure that will power sports in Ethiopia for a generation. Come help us do it.
+              {t("careersHeroSubtitle")}
             </p>
           </motion.div>
         </div>
@@ -93,16 +101,16 @@ export default function CareersPage() {
       <section className="py-20" style={{ backgroundColor: "#f4f3ef" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Why ET Smart Fields</div>
-            <h2 className="heading-xl">Work That Matters</h2>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">{t("whyJoinTitle")}</div>
+            <h2 className="heading-xl">{t("whyJoinHeading")}</h2>
           </FadeUp>
 
           <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { icon: <MapPin size={24} style={{ color: "#2d6a4f" }} />, title: "Real Impact", desc: "Your work directly enables thousands of Ethiopian athletes to play, record, and share their sport." },
-              { icon: <Rocket size={24} style={{ color: "#2d6a4f" }} />, title: "Early Stage", desc: "Join early and have real ownership over product decisions, architecture, and team culture." },
-              { icon: <GraduationCap size={24} style={{ color: "#2d6a4f" }} />, title: "Grow Fast", desc: "We invest in your growth through conferences, courses, and a dedicated learning budget." },
-              { icon: <Globe size={24} style={{ color: "#2d6a4f" }} />, title: "Mission-Driven", desc: "We're building infrastructure that has never existed in Ethiopia. That's a rare opportunity." },
+              { icon: <MapPin size={24} style={{ color: "#2d6a4f" }} />, title: t("realImpact"), desc: t("realImpactDesc") },
+              { icon: <Rocket size={24} style={{ color: "#2d6a4f" }} />, title: t("earlyStage"), desc: t("earlyStageDesc") },
+              { icon: <GraduationCap size={24} style={{ color: "#2d6a4f" }} />, title: t("growFast"), desc: t("growFastDesc") },
+              { icon: <Globe size={24} style={{ color: "#2d6a4f" }} />, title: t("missionDriven"), desc: t("missionDrivenDesc") },
             ].map((c) => (
               <StaggerItem key={c.title}>
                 <div className="photo-card p-7 h-full flex flex-col justify-between">
@@ -124,8 +132,8 @@ export default function CareersPage() {
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <FadeUp className="mb-12">
-            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">Open Positions</div>
-            <h2 className="heading-xl">We&apos;re Hiring</h2>
+            <div className="text-xs font-bold tracking-widest uppercase text-[#2d6a4f] mb-3">{t("openPositions")}</div>
+            <h2 className="heading-xl">{t("weAreHiring")}</h2>
           </FadeUp>
 
           <StaggerChildren className="space-y-4">
@@ -136,7 +144,7 @@ export default function CareersPage() {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span
                         className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full text-white"
-                        style={{ background: teamColors[role.team] || "#2d6a4f" }}
+                        style={{ background: teamColors[role.teamKey] || "#2d6a4f" }}
                       >
                         {role.team}
                       </span>
@@ -160,7 +168,7 @@ export default function CareersPage() {
                     href="/contact"
                     className="btn-arrow flex-shrink-0"
                     style={{ background: "#2d6a4f" }}
-                    aria-label={`Apply for ${role.title}`}
+                    aria-label={`${t("applyForRole")}: ${role.title}`}
                   >
                     <ArrowUpRight size={18} />
                   </Link>
@@ -178,12 +186,12 @@ export default function CareersPage() {
       >
         <div className="relative z-10 max-w-3xl mx-auto px-4 text-center">
           <FadeUp>
-            <h2 className="text-white font-black text-4xl mb-4">Don&apos;t See Your Role?</h2>
+            <h2 className="text-white font-black text-4xl mb-4">{t("dontSeeRole")}</h2>
             <p className="text-white/65 text-lg mb-10 max-w-md mx-auto">
-              We&apos;re always looking for exceptional people. Send us your CV and tell us how you&apos;d contribute.
+              {t("dontSeeRoleDesc")}
             </p>
             <Link href="/contact" className="btn-primary btn-primary-lg" style={{ background: "#2d6a4f" }}>
-              Send an Open Application <ArrowRight size={16} />
+              {t("sendOpenApplication")} <ArrowRight size={16} />
             </Link>
           </FadeUp>
         </div>

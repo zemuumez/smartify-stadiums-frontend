@@ -3,13 +3,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const chromePath = process.env.CHROME_BIN ||
-  (process.platform === 'win32'
-    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-    : (process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : 'google-chrome'));
+function findChrome() {
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+  if (process.platform === 'win32') {
+    const candidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+    return candidates[0];
+  }
+  if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+  return 'google-chrome';
+}
 
+const chromePath = findChrome();
 const artifactDir = process.env.ARTIFACT_DIR || path.join(process.cwd(), '.test-artifacts');
 const profileDir = path.join(os.tmpdir(), 'smartify-stadiums-cms-profile');
 

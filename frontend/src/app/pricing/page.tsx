@@ -6,96 +6,90 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
   ChevronDown,
-  Sparkles,
-  Zap,
-  Building2,
-  Shield,
   ShieldCheck,
-  PhoneCall,
   ArrowUpRight,
   Star,
-  Camera,
-  Layers,
-  HelpCircle
 } from "lucide-react";
 import { FadeUp, ScaleIn } from "@/components/ui/AnimatedSection";
-
-const plans = [
-  {
-    name: "Starter",
-    tagline: "Single Pitch Entry",
-    desc: "Perfect for a single community pitch getting started with digital bookings and verified listings.",
-    etb: "2,500",
-    annualEtb: "2,000",
-    popular: false,
-    fields: "1 Field",
-    cameras: "1 Camera Compatible",
-    storage: "100 GB Cloud",
-    features: [
-      "Dedicated official stadium site",
-      "Telebirr & CBE automated payments",
-      "Real-time calendar & conflict engine",
-      "SMS booking confirmations to players",
-      "ULS quality compliance verification",
-      "Standard platform support",
-    ],
-  },
-  {
-    name: "Professional",
-    tagline: "High-Traffic Venues",
-    desc: "Designed for growing sports centers with multiple pitches, night floodlights, and 4K AI cameras.",
-    etb: "7,500",
-    annualEtb: "6,000",
-    popular: true,
-    badge: "Most Popular Choice",
-    fields: "Up to 5 Fields",
-    cameras: "Up to 4 AI Veo Cameras",
-    storage: "1 TB Match Storage",
-    features: [
-      "Everything in Starter included",
-      "Automated 4K Veo AI match recording",
-      "Player highlight reel & goal clipping",
-      "Weekly revenue analytics & payouts",
-      "Multi-field schedule coordination",
-      "Custom tournament bracket manager",
-      "Priority WhatsApp & phone hotline",
-    ],
-  },
-  {
-    name: "Enterprise",
-    tagline: "Sports Complexes & Academies",
-    desc: "Comprehensive solution for large sports complexes, municipal grounds, and academy chains.",
-    etb: "20,000",
-    annualEtb: "16,000",
-    popular: false,
-    fields: "Unlimited Fields",
-    cameras: "Unlimited Cameras",
-    storage: "10 TB Archive",
-    features: [
-      "Everything in Professional included",
-      "Autonomous 24/7 live match broadcast",
-      "Custom domain & full white-labeling",
-      "Dedicated stadium account manager",
-      "On-site camera installation & audit",
-      "99.9% uptime SLA guarantee",
-      "Direct API integrations & reporting",
-      "24/7 dedicated enterprise response",
-    ],
-  },
-];
-
-const faqs = [
-  { q: "Is there a free trial?", a: "Yes — every stadium plan comes with a 14-day free trial. You can test the microsite, calendar sync, and booking system with zero risk." },
-  { q: "What is the 5% platform commission?", a: "On bookings processed via Telebirr or CBE Birr, a small 5% platform fee applies to cover instant gateway synchronization, automated SMS dispatch, and server operations." },
-  { q: "Can I change or upgrade my plan later?", a: "Absolutely. You can upgrade, downgrade, or switch between monthly and annual billing at any time directly from your Stadium Owner Dashboard." },
-  { q: "What payment methods are supported for subscriptions?", a: "We support Telebirr, CBE Birr, Chapa, Mastercard/Visa, and direct bank invoices for annual plans." },
-  { q: "Is AI camera hardware included?", a: "AI recording software and cloud processing pipelines are included in Professional and Enterprise tiers. Hardware mounting and calibration are handled by certified local partners." },
-  { q: "Can I cancel anytime?", a: "Yes. You can cancel your subscription at any time with no lock-in contracts." },
-];
+import { useI18n } from "@/i18n/provider";
 
 export default function PricingPage() {
+  const { t } = useI18n();
   const [annual, setAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  const plans = [
+    {
+      name: t("planStarterName"),
+      tagline: t("planStarterTagline"),
+      desc: t("planStarterDesc"),
+      etb: "2,500",
+      annualEtb: "2,000",
+      popular: false,
+      fields: t("singleFieldSpec"),
+      cameras: t("singleCameraSpec"),
+      storage: t("starterStorageSpec"),
+      features: [
+        t("featStadiumSite"),
+        t("featTelebirrCbe"),
+        t("featCalendarEngine"),
+        t("featSmsConfirmations"),
+        t("featUlsCompliance"),
+        t("featStandardSupport"),
+      ],
+    },
+    {
+      name: t("planProfessionalName"),
+      tagline: t("planProfessionalTagline"),
+      desc: t("planProfessionalDesc"),
+      etb: "7,500",
+      annualEtb: "6,000",
+      popular: true,
+      badge: t("mostPopularChoice"),
+      fields: t("multiFieldsSpec"),
+      cameras: t("multiCamerasSpec"),
+      storage: t("proStorageSpec"),
+      features: [
+        t("featStarterIncluded"),
+        t("featAiRecording"),
+        t("featHighlightReel"),
+        t("featRevenueAnalytics"),
+        t("featMultiFieldCoord"),
+        t("featTournamentBracket"),
+        t("featPrioritySupport"),
+      ],
+    },
+    {
+      name: t("planEnterpriseName"),
+      tagline: t("planEnterpriseTagline"),
+      desc: t("planEnterpriseDesc"),
+      etb: "20,000",
+      annualEtb: "16,000",
+      popular: false,
+      fields: t("unlimitedFieldsSpec"),
+      cameras: t("unlimitedCamerasSpec"),
+      storage: t("enterpriseStorageSpec"),
+      features: [
+        t("featProIncluded"),
+        t("featBroadcastStreaming"),
+        t("featCustomDomain"),
+        t("featAccountManager"),
+        t("featOnsiteAudit"),
+        t("featUptimeSla"),
+        t("featApiIntegrations"),
+        t("featEnterpriseResponse"),
+      ],
+    },
+  ];
+
+  const faqs = [
+    { q: t("faqTrialQ"), a: t("faqTrialA") },
+    { q: t("faqCommissionQ"), a: t("faqCommissionA") },
+    { q: t("faqUpgradeQ"), a: t("faqUpgradeA") },
+    { q: t("faqPaymentsQ"), a: t("faqPaymentsA") },
+    { q: t("faqHardwareQ"), a: t("faqHardwareA") },
+    { q: t("faqCancelQ"), a: t("faqCancelA") },
+  ];
 
   return (
     <div className="min-h-screen pt-28 pb-24" style={{ backgroundColor: "#f4f3ef" }}>
@@ -105,18 +99,22 @@ export default function PricingPage() {
         <div className="spotnow-container text-center max-w-3xl mx-auto">
           <FadeUp>
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider text-[#2d6a4f] bg-[#f0faf4] border border-[#2d6a4f]/15 mb-4">
-              <ShieldCheck size={13} /> Transparent Venue Plans
+              <ShieldCheck size={13} /> {t("pricingTitle")}
             </div>
 
             <h1
               className="text-[#111] font-black leading-tight mb-4 tracking-tight"
               style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}
             >
-              Simple, Predictable Plans
+              {t("pricingTitle")}
             </h1>
 
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold leading-relaxed mb-6 max-w-2xl mx-auto">
+              {t("pricingProvisionalNotice")}
+            </div>
+
             <p className="text-[#6a6a6a] text-base sm:text-lg leading-relaxed mb-8 max-w-xl mx-auto font-medium">
-              Choose the plan that matches your stadium facility. All plans include ULS quality certification, an official microsite, and automated Telebirr booking sync.
+              {t("pricingDescription")}
             </p>
 
             {/* Monthly / Annual Toggle */}
@@ -127,7 +125,7 @@ export default function PricingPage() {
                   !annual ? "bg-[#2d6a4f] text-white shadow-sm" : "text-[#5a5a5a] hover:text-[#111]"
                 }`}
               >
-                Monthly Billing
+                {t("monthlyBilling")}
               </button>
               <button
                 onClick={() => setAnnual(true)}
@@ -135,9 +133,9 @@ export default function PricingPage() {
                   annual ? "bg-[#2d6a4f] text-white shadow-sm" : "text-[#5a5a5a] hover:text-[#111]"
                 }`}
               >
-                Annual Billing
+                {t("annualBilling")}
                 <span className="px-2 py-0.5 rounded-full bg-[#f0faf4] text-[#2d6a4f] text-[10px] font-black">
-                  Save 20%
+                  {t("save20")}
                 </span>
               </button>
             </div>
@@ -164,7 +162,7 @@ export default function PricingPage() {
                     <div className="flex items-center justify-between mb-4">
                       {plan.popular ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#74c69d] text-[#1a4731] shadow-sm">
-                          <Star size={11} className="fill-[#1a4731]" /> Most Popular
+                          <Star size={11} className="fill-[#1a4731]" /> {t("mostPopularChoice")}
                         </span>
                       ) : (
                         <span className="text-[11px] font-bold text-[#7a7a7a] uppercase tracking-wider">
@@ -188,11 +186,14 @@ export default function PricingPage() {
                           {annual ? plan.annualEtb : plan.etb}
                         </span>
                         <span className={`text-xs font-semibold ${plan.popular ? "text-white/70" : "text-[#7a7a7a]"}`}>
-                          ETB / month
+                          {t("etbPerMonth")}
                         </span>
                       </div>
                       <div className={`text-[11px] mt-1 ${plan.popular ? "text-white/60" : "text-[#8a8a8a]"}`}>
-                        {annual ? "Billed annually (Save 20%)" : "Billed monthly, cancel anytime"}
+                        {annual ? t("billedAnnuallySave20") : t("billedMonthlyCancelAnytime")}
+                      </div>
+                      <div className={`text-[10px] mt-1 italic ${plan.popular ? "text-white/50" : "text-[#9a9a9a]"}`}>
+                        {t("planProvisionalRateNotice")}
                       </div>
                     </div>
 
@@ -204,7 +205,7 @@ export default function PricingPage() {
                     >
                       <div>
                         <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
-                          Fields
+                          {t("fieldsCountLabel")}
                         </div>
                         <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
                           {plan.fields}
@@ -212,7 +213,7 @@ export default function PricingPage() {
                       </div>
                       <div className={`border-x ${plan.popular ? "border-white/15" : "border-black/10"}`}>
                         <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
-                          Cameras
+                          {t("camerasCountLabel")}
                         </div>
                         <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
                           {plan.cameras}
@@ -220,7 +221,7 @@ export default function PricingPage() {
                       </div>
                       <div>
                         <div className={`text-[9px] font-bold uppercase ${plan.popular ? "text-white/60" : "text-[#7a7a7a]"}`}>
-                          Storage
+                          {t("storageCapacityLabel")}
                         </div>
                         <div className={`text-xs font-black mt-0.5 ${plan.popular ? "text-[#74c69d]" : "text-[#2d6a4f]"}`}>
                           {plan.storage}
@@ -231,7 +232,7 @@ export default function PricingPage() {
                     {/* Features List */}
                     <div className="space-y-3 mb-8">
                       <div className={`text-[11px] font-bold uppercase tracking-wider ${plan.popular ? "text-white/80" : "text-[#111]"}`}>
-                        Included Features:
+                        {t("includedFeatures")}:
                       </div>
                       {plan.features.map((feat) => (
                         <div key={feat} className="flex items-start gap-2.5 text-xs font-medium leading-relaxed">
@@ -257,7 +258,7 @@ export default function PricingPage() {
                         : "bg-[#2d6a4f] text-white hover:bg-[#1a4731]"
                     }`}
                   >
-                    Start 14-Day Free Trial
+                    {t("partner")}
                     <ArrowUpRight size={13} />
                   </Link>
                 </div>
@@ -272,10 +273,10 @@ export default function PricingPage() {
         <div className="spotnow-container max-w-3xl mx-auto">
           <FadeUp className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-black text-[#111] mb-2 tracking-tight">
-              Frequently Asked Questions
+              {t("faqTitle")}
             </h2>
             <p className="text-xs sm:text-sm text-[#7a7a7a]">
-              Have questions about stadium onboarding and platform fees? We&apos;ve got answers.
+              {t("faqSubtitle")}
             </p>
           </FadeUp>
 

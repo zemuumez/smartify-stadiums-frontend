@@ -10,7 +10,7 @@ export function createAuthService(transport: Transport) {
     requestOTP: (phone: string, purpose = 'login') => transport.request<void>('/auth/request-otp', { method: 'POST', body: { phone: normalizePhone(phone), purpose } }),
     login: (phone: string, code: string) => transport.request<Account>('/auth/login', { method: 'POST', body: { phone: normalizePhone(phone), code } }),
     register: (phone: string, code: string, full_name: string, role: Exclude<Role, 'admin'>) => transport.request<Account>('/auth/register', { method: 'POST', body: { phone: normalizePhone(phone), code, full_name, role } }),
-    current: () => transport.request<Account>('/users/me'),
+    current: (signal?: AbortSignal) => transport.request<Account>('/users/me', { signal }),
     logout: () => transport.request<void>('/auth/logout', { method: 'POST' }),
   };
 }
