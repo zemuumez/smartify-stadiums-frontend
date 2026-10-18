@@ -236,33 +236,68 @@ export async function runA11yAndPerformanceSuite() {
     const traversalResults = [];
 
     async function stepTab(shiftKey = false) {
+      if (shiftKey) {
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          windowsVirtualKeyCode: 16,
+          nativeVirtualKeyCode: 16,
+          modifiers: 8,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'Tab',
+          code: 'Tab',
+          windowsVirtualKeyCode: 9,
+          nativeVirtualKeyCode: 9,
+          modifiers: 8,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'Tab',
+          code: 'Tab',
+          windowsVirtualKeyCode: 9,
+          nativeVirtualKeyCode: 9,
+          modifiers: 8,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          windowsVirtualKeyCode: 16,
+          nativeVirtualKeyCode: 16,
+          modifiers: 0,
+        });
+      } else {
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'Tab',
+          code: 'Tab',
+          windowsVirtualKeyCode: 9,
+          nativeVirtualKeyCode: 9,
+          text: '\t',
+          unmodifiedText: '\t',
+          modifiers: 0,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'Tab',
+          code: 'Tab',
+          windowsVirtualKeyCode: 9,
+          nativeVirtualKeyCode: 9,
+          modifiers: 0,
+        });
+      }
+      await sleep(150);
+
       return await client.evaluate(`
-        ((shift) => {
+        (() => {
           const modal = document.querySelector('[role="dialog"]');
           if (!modal) return { error: 'Modal dialog not found' };
           const focusables = Array.from(
             modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
           );
-          const activeBefore = document.activeElement;
-          const ev = new KeyboardEvent('keydown', {
-            key: 'Tab',
-            code: 'Tab',
-            keyCode: 9,
-            which: 9,
-            shiftKey: shift,
-            bubbles: true,
-            cancelable: true
-          });
-          const notCancelled = (activeBefore || window).dispatchEvent(ev);
-          if (notCancelled) {
-            const idx = focusables.indexOf(activeBefore);
-            if (idx !== -1) {
-              const nextIdx = shift ? idx - 1 : idx + 1;
-              if (nextIdx >= 0 && nextIdx < focusables.length) {
-                focusables[nextIdx].focus();
-              }
-            }
-          }
           const activeAfter = document.activeElement;
           return {
             isInsideModal: !!activeAfter && modal.contains(activeAfter),
@@ -273,7 +308,7 @@ export async function runA11yAndPerformanceSuite() {
             isFirst: activeAfter === focusables[0],
             isLast: activeAfter === focusables[focusables.length - 1],
           };
-        })(${shiftKey})
+        })()
       `);
     }
 
@@ -294,37 +329,57 @@ export async function runA11yAndPerformanceSuite() {
       throw new Error(`A11y focus setup failed: ${JSON.stringify(initialStatus)}`);
     }
 
-    // Step forward through elements using Tab keyboard events and assert active element after each step
-    for (let step = 0; step < initialStatus.count - 1; step++) {
+    // Step forward through elements using browser-level Tab key events
+    // Assert containment and forward advancement on each keypress until the last focusable element is reached
+    let currentForwardIndex = initialStatus.activeIndex;
+    let forwardSteps = 0;
+    while (!traversalResults.some(r => r.isLast) && forwardSteps < 20) {
       const stepRes = await stepTab(false);
+      forwardSteps++;
       if (!stepRes.isInsideModal) {
-        throw new Error(`A11y focus containment broken on forward Tab step ${step}: focus left modal: ${JSON.stringify(stepRes)}`);
+        throw new Error(`A11y focus containment broken on forward Tab step ${forwardSteps}: focus left modal: ${JSON.stringify(stepRes)}`);
       }
-      traversalResults.push({ step: `forward_tab_${step}`, ...stepRes });
+      if (stepRes.activeIndex < currentForwardIndex) {
+        throw new Error(`A11y focus advancement regressed on forward Tab step ${forwardSteps}: index went from ${currentForwardIndex} to ${stepRes.activeIndex}`);
+      }
+      currentForwardIndex = stepRes.activeIndex;
+      traversalResults.push({ step: `forward_tab_${forwardSteps}`, ...stepRes });
     }
 
-    // Next Tab from last element must wrap around to first element
+    const lastStep = traversalResults[traversalResults.length - 1];
+    if (!lastStep?.isLast) {
+      throw new Error(`A11y focus traversal did not reach the last focusable element within ${forwardSteps} Tab presses`);
+    }
+
+    // Next Tab from last element must wrap around to first element (boundary wrapping)
     const wrapForwardRes = await stepTab(false);
     console.log('  Wrap forward result (last -> first):', wrapForwardRes);
-    if (!wrapForwardRes.isInsideModal || !wrapForwardRes.isFirst) {
-      throw new Error(`A11y focus wrap forward failed: expected first element, got index ${wrapForwardRes.activeIndex}: ${JSON.stringify(wrapForwardRes)}`);
+    if (!wrapForwardRes.isInsideModal || !wrapForwardRes.isFirst || wrapForwardRes.activeIndex !== 0) {
+      throw new Error(`A11y focus wrap forward failed: expected first element (index 0), got index ${wrapForwardRes.activeIndex}: ${JSON.stringify(wrapForwardRes)}`);
     }
     traversalResults.push({ step: 'wrap_forward', ...wrapForwardRes });
 
-    // Shift+Tab from first element must wrap backward to last element
+    // Shift+Tab from first element must wrap backward to last element (boundary wrapping)
     const wrapBackwardRes = await stepTab(true);
     console.log('  Wrap backward result (first -> last):', wrapBackwardRes);
-    if (!wrapBackwardRes.isInsideModal || !wrapBackwardRes.isLast) {
-      throw new Error(`A11y focus wrap backward failed: expected last element, got index ${wrapBackwardRes.activeIndex}: ${JSON.stringify(wrapBackwardRes)}`);
+    const expectedLastIndex = initialStatus.count - 1;
+    if (!wrapBackwardRes.isInsideModal || !wrapBackwardRes.isLast || wrapBackwardRes.activeIndex !== expectedLastIndex) {
+      throw new Error(`A11y focus wrap backward failed: expected last element (index ${expectedLastIndex}), got index ${wrapBackwardRes.activeIndex}: ${JSON.stringify(wrapBackwardRes)}`);
     }
     traversalResults.push({ step: 'wrap_backward', ...wrapBackwardRes });
 
-    // Step backward using Shift+Tab keyboard events and assert active element after each step
-    for (let step = 0; step < Math.min(3, initialStatus.count - 1); step++) {
+    // Step backward using browser-level Shift+Tab key events
+    // Assert containment and backward advancement on each keypress
+    let currentBackwardIndex = wrapBackwardRes.activeIndex;
+    for (let step = 0; step < Math.min(4, initialStatus.count - 1); step++) {
       const stepRes = await stepTab(true);
       if (!stepRes.isInsideModal) {
         throw new Error(`A11y focus containment broken on backward Shift+Tab step ${step}: focus left modal: ${JSON.stringify(stepRes)}`);
       }
+      if (stepRes.activeIndex > currentBackwardIndex) {
+        throw new Error(`A11y focus backward advancement regressed on step ${step}: index went from ${currentBackwardIndex} to ${stepRes.activeIndex}`);
+      }
+      currentBackwardIndex = stepRes.activeIndex;
       traversalResults.push({ step: `backward_shift_tab_${step}`, ...stepRes });
     }
 
