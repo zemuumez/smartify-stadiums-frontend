@@ -64,6 +64,11 @@ function useModalKeyboard(isOpen: boolean, onClose: () => void) {
         }
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
+        if (!containerRef.current.contains(document.activeElement)) {
+          event.preventDefault();
+          first.focus();
+          return;
+        }
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last.focus();
@@ -434,7 +439,7 @@ function BookingCard({
   const canModify = booking.status === 'confirmed' && booking.paymentStatus === 'unpaid' && isFutureBooking(booking);
 
   return (
-    <article className="panel">
+    <article className="panel" data-booking-id={booking.id}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href={`${owner ? '/dashboard' : ''}/bookings/${booking.id}`} className="text-lg font-bold hover:underline">

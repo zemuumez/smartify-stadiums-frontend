@@ -902,6 +902,9 @@ export async function runBrowserJourneysTest() {
       ? postSubmitState.url.split('/bookings/')[1].split('?')[0].split('#')[0].trim()
       : '';
     console.log('  Captured created booking ID:', createdBookingId);
+    if (!createdBookingId) {
+      throw new Error(`Journey 8 assertion failed: Created booking ID was not captured. Post-submit URL was: ${postSubmitState.url}`);
+    }
 
     // Navigate to player's bookings list
     await client.send('Page.navigate', { url: 'http://localhost:3000/bookings' });
@@ -918,12 +921,19 @@ export async function runBrowserJourneysTest() {
     console.log('  /bookings page state:', bookingsPageCheck);
 
     const cancelAction = await client.evaluate(`
-      (() => {
-        const cancelButtons = Array.from(document.querySelectorAll('button')).filter(b => b.textContent && b.textContent.includes('Cancel reservation'));
-        if (cancelButtons.length === 0) return { error: 'No cancel reservation button found on /bookings' };
-        cancelButtons[0].click();
-        return { clickedCancel: true };
-      })()
+      ((targetId) => {
+        const cards = Array.from(document.querySelectorAll('article.panel'));
+        const targetCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!targetCard) return { error: 'Target booking card with ID ' + targetId + ' not found on /bookings', totalCards: cards.length };
+        const cancelBtn = Array.from(targetCard.querySelectorAll('button')).find(b => b.textContent && b.textContent.includes('Cancel reservation'));
+        if (!cancelBtn) return { error: 'Cancel reservation button not found inside target card ' + targetId };
+        cancelBtn.click();
+        return { clickedCancel: true, targetId };
+      })('${createdBookingId}')
     `);
     console.log('  Cancel button clicked:', cancelAction);
     if (cancelAction.error) {
@@ -947,15 +957,22 @@ export async function runBrowserJourneysTest() {
     await waitForLoading(client);
 
     const cancelledBadgeCheck = await client.evaluate(`
-      (() => {
-        const badges = Array.from(document.querySelectorAll('span, div')).map(el => el.textContent?.trim());
+      ((targetId) => {
+        const cards = Array.from(document.querySelectorAll('article.panel'));
+        const targetCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!targetCard) return { error: 'Target card not found after cancellation', targetId };
+        const badges = Array.from(targetCard.querySelectorAll('span, div')).map(el => el.textContent?.trim());
         const hasCancelled = badges.some(t => t === 'Cancelled' || t === 'ተሰርዟል');
-        return { hasCancelled };
-      })()
+        return { hasCancelled, targetId, cardSnippet: targetCard.textContent.slice(0, 150) };
+      })('${createdBookingId}')
     `);
     console.log('  Cancelled badge check:', cancelledBadgeCheck);
-    if (!cancelledBadgeCheck.hasCancelled) {
-      throw new Error(`Journey 8 assertion failed: Cancelled badge not found after cancellation: ${JSON.stringify(cancelledBadgeCheck)}`);
+    if (cancelledBadgeCheck.error || !cancelledBadgeCheck.hasCancelled) {
+      throw new Error(`Journey 8 assertion failed: Cancelled badge not found on target booking ${createdBookingId}: ${JSON.stringify(cancelledBadgeCheck)}`);
     }
 
     const shot8Path = path.join(artifactDir, 'journey_8_booking_cancelled.png');
@@ -990,21 +1007,30 @@ export async function runBrowserJourneysTest() {
     await waitForLoading(client);
 
     const ownerCalendarCheck = await client.evaluate(`
-      (() => {
+      ((targetId) => {
         const cards = Array.from(document.querySelectorAll('article.panel'));
-        const matchingCard = cards.find(card => card.textContent && (card.textContent.includes('Volleyball court') || (createdBookingId && card.innerHTML.includes(createdBookingId))));
-        const cardText = matchingCard ? matchingCard.textContent : '';
+        const matchingCard = cards.find(card =>
+          card.getAttribute('data-booking-id') === targetId ||
+          card.textContent.includes(targetId) ||
+          card.querySelector('a[href*="' + targetId + '"]')
+        );
+        if (!matchingCard) return { foundCard: false, targetId, totalCards: cards.length };
+        const cardText = matchingCard.textContent || '';
         const hasCancelled = cardText.includes('Cancelled') || cardText.includes('ተሰርዟል');
         return {
-          foundCard: !!matchingCard,
+          foundCard: true,
+          targetId,
           hasCancelled,
           cardSnippet: cardText.slice(0, 200)
         };
-      })()
+      })('${createdBookingId}')
     `);
     console.log('  Owner calendar cancellation check:', ownerCalendarCheck);
+    if (!ownerCalendarCheck.foundCard) {
+      throw new Error(`Journey 8 assertion failed: Target booking ${createdBookingId} not found in owner calendar: ${JSON.stringify(ownerCalendarCheck)}`);
+    }
     if (!ownerCalendarCheck.hasCancelled) {
-      throw new Error(`Journey 8 assertion failed: Owner calendar does not reflect Cancelled status: ${JSON.stringify(ownerCalendarCheck)}`);
+      throw new Error(`Journey 8 assertion failed: Owner calendar does not reflect Cancelled status for booking ${createdBookingId}: ${JSON.stringify(ownerCalendarCheck)}`);
     }
 
     // Assert restored court availability
