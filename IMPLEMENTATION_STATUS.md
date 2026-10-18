@@ -674,6 +674,29 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
        - Production build: passed cleanly.
        - Headless Chrome test suites (verify-journeys-e2e, verify-a11y-performance, etc.) verified passing.
 
+- Step 41 (Milestone M6 Acceptance Corrections Follow-up — Signature, Localization, A11y & Cancellation):
+    1. Fix contact service signature (commit 54b8aef):
+       - Added optional `signal?: AbortSignal` to `authService.current` in `auth.service.ts` and forwarded it to transport (`transport.request<Account>('/users/me', { signal })`).
+       - Updated `deps.auth.current` in `fetchTeamDetailData` (`teams.service.ts`) to accept optional `signal?: AbortSignal`.
+       - Fixed production build compilation failure; `npm run build` now compiles cleanly (43 static routes).
+    2. Finish public localization and remove conflicting commercial claims (commit 3ef9763):
+       - Added translated plan names, taglines, descriptions, specs, features, and FAQs to `en.ts` and `am.ts` (100% dictionary parity maintained across all keys).
+       - Removed conflicting commercial claims from `/pricing`: eliminated hardcoded statement that a 5% commission applies, replacing it with an explanation that platform commissions and subscription fees are provisional and unset during the pilot onboarding phase. Added explicit illustrative estimate notice on pricing cards.
+       - Fully localized `/careers`: moved job openings into component to consume translated titles, teams, types, locations, and descriptions.
+    3. Remove accessibility-test bypasses (commit e880ac2):
+       - In `tests/verify-a11y-performance.mjs`: removed `btn.click()` fallback in the Enter test; modal trigger strictly verified via native keyboard Enter key dispatch.
+       - Implemented real step-by-step keyboard Tab / Shift+Tab traversal, asserting `document.activeElement` after each step, ensuring forward wrap from last to first element, backward wrap from first to last element, and focus containment (`modal.contains(document.activeElement) === true`).
+       - Strengthened `useModalKeyboard` focus containment guard in `booking-list.tsx`.
+    4. Match cancellation evidence to exact booking (commit 6f13553):
+       - In `tests/verify-journeys-e2e.mjs` (Journey 8): asserted `createdBookingId` captured from submission URL is non-empty; passed it explicitly into browser evaluation contexts `((targetId) => { ... })('${createdBookingId}')`.
+       - Required exact match on `createdBookingId` (`data-booking-id`, textContent, or link href) without fallback to "Volleyball court".
+       - Scoped player `/bookings` cancellation button click, cancellation badge verification, and owner calendar check strictly to that exact booking ID.
+    5. Verification:
+       - Scoped lint: 0 errors, 0 warnings.
+       - Unit tests: 99/99 passed with 100% dictionary parity.
+       - Production build: compiles cleanly with 0 errors across 43 static pages.
+
+
 
 
 

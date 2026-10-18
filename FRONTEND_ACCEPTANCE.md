@@ -122,7 +122,7 @@ Every route defined under `frontend/src/app` has been audited for route paramete
 - Modal dialogs utilize [useModalKeyboard](file:///C:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/components/booking-list.tsx#L30) hook, verified by automated CDP assertions in `tests/verify-a11y-performance.mjs`:
   - **Keyboard Activation**: Trigger controls are activated via native keyboard `Enter` dispatch, ensuring accessibility without mouse dependence.
   - **Initial Focus**: Automatically moves focus into the first interactive control inside the dialog upon opening.
-  - **Tab & Shift+Tab Trapping**: Traps focus strictly within dialog interactive elements. Forward `Tab` on the last element wraps around to the first element; backward `Shift+Tab` on the first element wraps around to the last element. Asserted: `forwardWrapped === true`, `backwardWrapped === true`, `allInside === true`.
+  - **Tab & Shift+Tab Trapping**: Traps focus strictly within dialog interactive elements via actual keyboard event traversal without synthetic bypasses. Asserts `document.activeElement` after each step, forward `Tab` from last element wrapping to first (`forwardWrapped === true`), and backward `Shift+Tab` from first element wrapping to last (`backwardWrapped === true`). Asserted: `allStepsContained === true`.
   - **Escape Dismissal**: Listens for `Escape` keydown, stops propagation, and triggers clean dismissal.
   - **Focus Restoration**: Automatically restores active DOM element focus back to the triggering control upon dialog unmount (verified: `document.activeElement === triggerBtn`).
 - In-page navigation and filter pills support native keyboard activation (`Enter`, `Space`) with explicit `aria-pressed` states.
