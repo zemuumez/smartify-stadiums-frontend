@@ -208,19 +208,6 @@ export async function runA11yAndPerformanceSuite() {
       windowsVirtualKeyCode: 13,
       nativeVirtualKeyCode: 13,
     });
-    // Synthetic keyboard activation fallback if headless Chrome does not dispatch click automatically
-    await client.evaluate(`
-      (() => {
-        if (!document.querySelector('[role="dialog"]')) {
-          const btn = document.getElementById('trigger-walkin-btn');
-          if (btn) {
-            btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-            btn.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-            btn.click();
-          }
-        }
-      })()
-    `);
     await sleep(800);
 
     // Verify modal is open and initial focus has moved inside the dialog
@@ -244,49 +231,110 @@ export async function runA11yAndPerformanceSuite() {
       throw new Error(`A11y focus trap failed: Focus did not move inside dialog: ${JSON.stringify(modalFocusCheck)}`);
     }
 
-    // Exercise and assert Tab and Shift+Tab keyboard focus containment inside the modal
-    console.log('  Exercising and asserting Tab / Shift+Tab keyboard focus containment...');
-    const tabContainmentCheck = await client.evaluate(`
+    // Exercise and assert Tab and Shift+Tab keyboard focus containment inside the modal step-by-step
+    console.log('  Exercising and asserting Tab / Shift+Tab keyboard focus containment step-by-step...');
+    const traversalResults = [];
+
+    async function stepTab(shiftKey = false) {
+      return await client.evaluate(`
+        ((shift) => {
+          const modal = document.querySelector('[role="dialog"]');
+          if (!modal) return { error: 'Modal dialog not found' };
+          const focusables = Array.from(
+            modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+          );
+          const activeBefore = document.activeElement;
+          const ev = new KeyboardEvent('keydown', {
+            key: 'Tab',
+            code: 'Tab',
+            keyCode: 9,
+            which: 9,
+            shiftKey: shift,
+            bubbles: true,
+            cancelable: true
+          });
+          const notCancelled = (activeBefore || window).dispatchEvent(ev);
+          if (notCancelled) {
+            const idx = focusables.indexOf(activeBefore);
+            if (idx !== -1) {
+              const nextIdx = shift ? idx - 1 : idx + 1;
+              if (nextIdx >= 0 && nextIdx < focusables.length) {
+                focusables[nextIdx].focus();
+              }
+            }
+          }
+          const activeAfter = document.activeElement;
+          return {
+            isInsideModal: !!activeAfter && modal.contains(activeAfter),
+            activeTag: activeAfter ? activeAfter.tagName : null,
+            activeId: activeAfter ? activeAfter.id : null,
+            activeIndex: focusables.indexOf(activeAfter),
+            totalFocusables: focusables.length,
+            isFirst: activeAfter === focusables[0],
+            isLast: activeAfter === focusables[focusables.length - 1],
+          };
+        })(${shiftKey})
+      `);
+    }
+
+    const initialStatus = await client.evaluate(`
       (() => {
         const modal = document.querySelector('[role="dialog"]');
-        if (!modal) return { error: 'Modal dialog not found' };
         const focusables = Array.from(
           modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
         );
-        if (focusables.length < 2) {
-          return { error: 'Insufficient focusable elements inside dialog to test wrap-around', count: focusables.length };
-        }
-
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-
-        // 1. Forward Tab wrap: Focus the last element, simulate Tab keydown
-        last.focus();
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', keyCode: 9, which: 9, bubbles: true }));
-        const forwardWrapped = document.activeElement === first;
-
-        // 2. Backward Shift+Tab wrap: Focus the first element, simulate Shift+Tab keydown
-        first.focus();
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', keyCode: 9, which: 9, shiftKey: true, bubbles: true }));
-        const backwardWrapped = document.activeElement === last;
-
-        // 3. Traversal check: verify every focusable is strictly contained within modal
-        const allInside = focusables.every(el => modal.contains(el));
-
         return {
-          focusableCount: focusables.length,
-          forwardWrapped,
-          backwardWrapped,
-          allInside,
-          firstTag: first.tagName,
-          lastTag: last.tagName
+          count: focusables.length,
+          activeIndex: focusables.indexOf(document.activeElement),
+          isInside: modal.contains(document.activeElement)
         };
       })()
     `);
-    console.log('  Tab / Shift+Tab focus containment check:', tabContainmentCheck);
-    if (tabContainmentCheck.error || !tabContainmentCheck.forwardWrapped || !tabContainmentCheck.backwardWrapped || !tabContainmentCheck.allInside) {
-      throw new Error(`A11y Tab/Shift+Tab focus containment assertion failed: ${JSON.stringify(tabContainmentCheck)}`);
+    if (!initialStatus.isInside || initialStatus.count < 2) {
+      throw new Error(`A11y focus setup failed: ${JSON.stringify(initialStatus)}`);
     }
+
+    // Step forward through elements using Tab keyboard events and assert active element after each step
+    for (let step = 0; step < initialStatus.count - 1; step++) {
+      const stepRes = await stepTab(false);
+      if (!stepRes.isInsideModal) {
+        throw new Error(`A11y focus containment broken on forward Tab step ${step}: focus left modal: ${JSON.stringify(stepRes)}`);
+      }
+      traversalResults.push({ step: `forward_tab_${step}`, ...stepRes });
+    }
+
+    // Next Tab from last element must wrap around to first element
+    const wrapForwardRes = await stepTab(false);
+    console.log('  Wrap forward result (last -> first):', wrapForwardRes);
+    if (!wrapForwardRes.isInsideModal || !wrapForwardRes.isFirst) {
+      throw new Error(`A11y focus wrap forward failed: expected first element, got index ${wrapForwardRes.activeIndex}: ${JSON.stringify(wrapForwardRes)}`);
+    }
+    traversalResults.push({ step: 'wrap_forward', ...wrapForwardRes });
+
+    // Shift+Tab from first element must wrap backward to last element
+    const wrapBackwardRes = await stepTab(true);
+    console.log('  Wrap backward result (first -> last):', wrapBackwardRes);
+    if (!wrapBackwardRes.isInsideModal || !wrapBackwardRes.isLast) {
+      throw new Error(`A11y focus wrap backward failed: expected last element, got index ${wrapBackwardRes.activeIndex}: ${JSON.stringify(wrapBackwardRes)}`);
+    }
+    traversalResults.push({ step: 'wrap_backward', ...wrapBackwardRes });
+
+    // Step backward using Shift+Tab keyboard events and assert active element after each step
+    for (let step = 0; step < Math.min(3, initialStatus.count - 1); step++) {
+      const stepRes = await stepTab(true);
+      if (!stepRes.isInsideModal) {
+        throw new Error(`A11y focus containment broken on backward Shift+Tab step ${step}: focus left modal: ${JSON.stringify(stepRes)}`);
+      }
+      traversalResults.push({ step: `backward_shift_tab_${step}`, ...stepRes });
+    }
+
+    const tabContainmentCheck = {
+      forwardWrapped: wrapForwardRes.isFirst,
+      backwardWrapped: wrapBackwardRes.isLast,
+      allStepsContained: traversalResults.every(r => r.isInsideModal),
+      stepCount: traversalResults.length
+    };
+    console.log('  Tab / Shift+Tab step-by-step traversal check:', tabContainmentCheck);
     evidence.keyboardFocusContainment = { passed: true, ...tabContainmentCheck };
 
     // Capture screenshot of opened modal with focus inside
