@@ -6,57 +6,6 @@ import { ArrowRight, ArrowUpRight, MapPin, Rocket, GraduationCap, Globe } from "
 import { FadeUp, StaggerChildren, StaggerItem } from "@/components/ui/AnimatedSection";
 import { useI18n } from "@/i18n/provider";
 
-const openings = [
-  {
-    title: "Backend Engineer",
-    team: "Engineering",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Go", "PostgreSQL", "REST API"],
-    desc: "Build and scale the ET Smart Fields booking engine, camera pipeline, and analytics backend using Go and PostgreSQL.",
-  },
-  {
-    title: "Frontend Engineer",
-    team: "Engineering",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Next.js", "TypeScript", "Framer Motion"],
-    desc: "Build stunning, performant web experiences for players and stadium owners using Next.js, TypeScript, and Tailwind CSS.",
-  },
-  {
-    title: "Field Operations Manager",
-    team: "Operations",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["Camera Install", "Stadium Relations", "Field QA"],
-    desc: "Onboard new stadiums, manage AI camera installations, and ensure ULS verification standards are met across all partner venues.",
-  },
-  {
-    title: "Sales & Partnerships Lead",
-    team: "Growth",
-    type: "Full-time",
-    location: "Addis Ababa",
-    tags: ["B2B Sales", "Partnerships", "Stadium Outreach"],
-    desc: "Grow our stadium network by building relationships with venue owners across Addis Ababa, Dire Dawa, and beyond.",
-  },
-  {
-    title: "AI Camera Technician",
-    team: "Operations",
-    type: "Full-time",
-    location: "Field-based, Ethiopia",
-    tags: ["RTMP", "Camera Hardware", "Networking"],
-    desc: "Install, configure, and maintain AI camera systems (Veo Cam, SporPin X200, Hikvision) at ET Smart Fields partner stadiums.",
-  },
-  {
-    title: "Product Designer (UI/UX)",
-    team: "Design",
-    type: "Full-time",
-    location: "Addis Ababa / Remote",
-    tags: ["Figma", "UX Research", "Design Systems"],
-    desc: "Design beautiful, intuitive experiences for our player app, stadium dashboard, and microsite editor across web and mobile.",
-  },
-];
-
 const teamColors: Record<string, string> = {
   Engineering: "#2d6a4f",
   Operations: "#1e6091",
@@ -66,6 +15,63 @@ const teamColors: Record<string, string> = {
 
 export default function CareersPage() {
   const { t } = useI18n();
+
+  const openings = [
+    {
+      title: t("roleBackendTitle"),
+      teamKey: "Engineering",
+      team: t("teamEngineering"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Go", "PostgreSQL", "REST API"],
+      desc: t("roleBackendDesc"),
+    },
+    {
+      title: t("roleFrontendTitle"),
+      teamKey: "Engineering",
+      team: t("teamEngineering"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Next.js", "TypeScript", "Modern CSS"],
+      desc: t("roleFrontendDesc"),
+    },
+    {
+      title: t("roleOpsTitle"),
+      teamKey: "Operations",
+      team: t("teamOperations"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["Camera Install", "Stadium Relations", "Field QA"],
+      desc: t("roleOpsDesc"),
+    },
+    {
+      title: t("roleSalesTitle"),
+      teamKey: "Growth",
+      team: t("teamGrowth"),
+      type: t("fullTime"),
+      location: t("addisAbaba"),
+      tags: ["B2B Sales", "Partnerships", "Stadium Outreach"],
+      desc: t("roleSalesDesc"),
+    },
+    {
+      title: t("roleTechTitle"),
+      teamKey: "Operations",
+      team: t("teamOperations"),
+      type: t("fullTime"),
+      location: t("ethiopiaField"),
+      tags: ["RTMP", "Camera Hardware", "Networking"],
+      desc: t("roleTechDesc"),
+    },
+    {
+      title: t("roleDesignTitle"),
+      teamKey: "Design",
+      team: t("teamDesign"),
+      type: t("fullTime"),
+      location: t("addisRemote"),
+      tags: ["Figma", "UX Research", "Design Systems"],
+      desc: t("roleDesignDesc"),
+    },
+  ];
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f3ef" }}>
@@ -138,7 +144,7 @@ export default function CareersPage() {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span
                         className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full text-white"
-                        style={{ background: teamColors[role.team] || "#2d6a4f" }}
+                        style={{ background: teamColors[role.teamKey] || "#2d6a4f" }}
                       >
                         {role.team}
                       </span>
