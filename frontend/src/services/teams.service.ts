@@ -65,7 +65,7 @@ export interface TeamDetailData {
 export async function fetchTeamDetailData(
   id: string,
   deps: {
-    auth: { current: () => Promise<Account> };
+    auth: { current: (signal?: AbortSignal) => Promise<Account> };
     teams: {
       get: (id: string, signal?: AbortSignal) => Promise<Team>;
       listBookings: (id: string, signal?: AbortSignal) => Promise<TeamMatchDetail[]>;
