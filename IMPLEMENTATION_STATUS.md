@@ -649,5 +649,31 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
        - Production build: passed cleanly.
        - All browser journeys (0 through 8 in verify-journeys-e2e, plus a11y-performance) verified passing.
 
+- Step 40 (Milestone M6 Acceptance Corrections Follow-up — 5 Focused Fixes):
+    1. Clean-checkout CI Configuration (Correction 1, commit c953eee):
+       - Workflow `.github/workflows/ci.yml`: explicitly configured `NEXT_PUBLIC_DATA_MODE: demo` for clean-checkout build and automated browser test steps; configured Node runtime to Node 22 (`node-version: 22`) ensuring native global `WebSocket` support in Node environments.
+       - Test runner `frontend/tests/run-all-e2e.mjs`: injects `NEXT_PUBLIC_DATA_MODE: process.env.NEXT_PUBLIC_DATA_MODE || 'demo'` when spawning Next server process.
+    2. Actual Sign-in & Cancellation Outcomes (Correction 2, commit 42553b0):
+       - Journey 0 in `frontend/tests/verify-journeys-e2e.mjs`: replaced direct session write with actual UI-driven contextual sign-in through the login page (`/auth/login?returnTo=...`), clicking the Abebe Kebede demo sign-in button and asserting preserved return navigation with venue ('Unity Sports Complex'), court ('field-3'), sport ('volleyball'), and date ('2026-10-25').
+       - Journey 8 in `frontend/tests/verify-journeys-e2e.mjs`: added comprehensive assertions beyond the Cancelled badge: confirmed owner calendar status for the cancelled booking on `2026-10-26`, queried `bookingsService.availability` asserting slot 7 availability was immediately restored, and queried `billingService.bookingFinancials` asserting unchanged ledger (`unpaid`, `netCollectedMinor: 0`, `refundedMinor: 0`).
+    3. Mandatory Accessibility Enforcement & Zoom Reflow (Correction 3, commit 31f1913):
+       - Trigger activation in `frontend/tests/verify-a11y-performance.mjs`: changed modal trigger activation from mouse click to native keyboard `Enter` dispatch.
+       - Dialog focus trapping: added automated assertions exercising forward `Tab` wrapping from last to first element, backward `Shift+Tab` wrapping from first to last element, and verified all active elements remain inside the dialog (`forwardWrapped`, `backwardWrapped`, `allInside`).
+       - Zoom reflow enforcement: added mandatory assertion `if (zoomCheck.hasOverflow) throw new Error(...)` asserting `scrollWidth <= clientWidth` (`1265px <= 1265px`, 0px horizontal overflow).
+       - Documented explicit distinction between CSS Zoom reflow (`document.body.style.zoom = '200%'`) and Browser Device Scale Factor (`deviceScaleFactor: 2.0`).
+    4. Public Localization Parity & Contact Page Resilience (Correction 4, commit 3aa004d):
+       - Added 48 bilingual translation keys to `frontend/src/i18n/en.ts` and `frontend/src/i18n/am.ts` covering `/careers`, `/pricing`, `/terms`, `/privacy`, and `/contact`. Verified 100% dictionary parity (99/99 unit tests pass).
+       - Localized public routes with zero raw English strings.
+       - Refactored `frontend/src/app/contact/page.tsx`: converted auth check to `useServiceQuery` cleanly distinguishing 401 unauthenticated guest state from network/server errors, added accessible `<ServiceErrorMessage retry={reload}>`, and bound explicit `<label htmlFor="...">` and `<input id="...">` attributes on all form fields.
+    5. Handoff Reconciliation Against Real Service Exports (Correction 5):
+       - Reconciled Section 3 and Section 8 in `FRONTEND_ACCEPTANCE.md` against actual exported client methods in `frontend/src/services/` (replaced `adminService.reviewCamera` with `mediaService.certifyCamera`, `mediaService.entitlements` with `mediaService.grantReplayEntitlement`, `billingService.settle` with `billingService.settleBooking`, `contentService` with microsite CMS methods `get`, `draft`, `save`, `publish`, `unpublish`, etc.).
+       - Reconciled full service contract inventory table across all 11 singletons and `directoryService`.
+    6. Verification:
+       - Scoped lint: 0 errors, 0 warnings across all modified files.
+       - Unit tests: 99/99 passed with 100% dictionary parity.
+       - Production build: passed cleanly.
+       - Headless Chrome test suites (verify-journeys-e2e, verify-a11y-performance, etc.) verified passing.
+
+
 
 
