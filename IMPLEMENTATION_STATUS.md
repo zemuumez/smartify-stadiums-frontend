@@ -696,6 +696,18 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
        - Unit tests: 99/99 passed with 100% dictionary parity.
        - Production build: compiles cleanly with 0 errors across 43 static pages.
 
+- Step 42 (Milestone M7 Backend, API, Database, Concurrency & Security Architecture Design):
+    1. Branch Initialization:
+       - Created and checked out dedicated branch `codex/backend-architecture` derived from verified M6 baseline commit `6ea859b`.
+    2. Comprehensive Architecture Specification (`BACKEND_ARCHITECTURE.md`):
+       - Delivered authoritative, production-grade backend architecture specification covering all 5 core deliverables:
+         a. API contracts, authentication & tenant authorization: standardized REST envelope & RFC 7807 error format, Ethiopian phone OTP lifecycle (Argon2id hashing, rate limiting, single-use, attempt caps), sliding session tokens in secure HTTP-only cookies, tenant subdomain routing (`*.smartifystadiums.et`), and PostgreSQL Row-Level Security (RLS) enforcement.
+         b. Database schema, booking concurrency & idempotency: complete PostgreSQL 16 + PostGIS relational DDL across 11 core tables, integer minor units (`hourly_rate_minor`, `total_minor`), multi-sport shared physical court model, mathematical exclusion constraints (`EXCLUDE USING gist`) preventing double-bookings and closure conflicts, and dedicated atomic idempotency store.
+         c. Payment ledger, webhooks, reconciliation & refunds: immutable append-only ledger (`payment_transactions`), dynamic derivation function (`compute_booking_financials`), Ethiopian payment gateway webhook handlers (Telebirr, CBE Birr, Chapa) with HMAC-SHA256 signature verification, replay attack prevention, and strict refund bounds (`refund <= net_collected`). Commercial policy remains explicitly provisional and unapproved.
+         d. Private media, consent, retention & processing queues: hardware camera certification protocol (`pending` -> `passed`), heartbeat telemetry monitoring, minor/academy guardian consent enforcement, automated face-blurring pipeline, signed private streaming URLs (60-minute expiry), and Redis Asynq priority queues with 30-day retention lifecycles.
+         e. Deployment, observability, backups & integration acceptance tests: containerized topology, JSON structured logging with correlation IDs, Prometheus metrics, liveness/readiness probes, continuous WAL archiving with PITR, zero-downtime expand-and-contract migrations, and 8 automated integration acceptance test specifications (Testcontainers Go).
+    3. Status:
+       - Architectural specification completed and ready for formal founder/lead review prior to backend implementation.
 
 
 
