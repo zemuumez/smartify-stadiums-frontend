@@ -1255,20 +1255,20 @@ Different Ethiopian payment gateways mandate distinct cryptographic and verifica
    - Heartbeat updates `last_heartbeat` and records telemetry: CPU temperature, storage remaining, dropped frames.
    - Background worker flags cameras with missing heartbeats (> 90s) as `offline`.
 
-### 6.2 Privacy Consent & Minor Protection Pipeline
-The platform enforces strict Ethiopian data privacy and minor protection standards:
+### 6.2 Privacy Consent & Verifiable Consent Evidence
+The platform enforces strict Ethiopian data privacy, minor protection, and participant consent standards:
 
 ```mermaid
 stateDiagram-v2
     [*] --> Scheduled: Booking Confirmed
     Scheduled --> Recording: Match Start Hour
     Recording --> Uploading: Match End Hour
-    Uploading --> Processing: Chunks Ingested to S3
+    Uploading --> Processing: Chunks Ingested to Private S3
     
     state Processing {
-        [*] --> Transcoding: HLS 1080p/720p/480p
-        Transcoding --> FaceBlurring: Detect Non-Consenting Faces
-        FaceBlurring --> Completed: Blur Applied
+        [*] --> Transcoding: HLS Multi-Bitrate Ingestion
+        Transcoding --> FaceBlurringWorker: AI Detection & Blur Pipeline
+        FaceBlurringWorker --> BlurVerified: Trusted Worker Cryptographic Attestation
     }
     
     Processing --> Ready: Video Ready (Private)
@@ -1276,31 +1276,94 @@ stateDiagram-v2
     state ConsentGate <<choice>>
     Ready --> ConsentGate: Owner Requests Publication
     
-    ConsentGate --> Public: Consent Granted & Blur Completed
+    ConsentGate --> Public: Verifiable Consent Granted & Worker Blur Verified
     ConsentGate --> Blocked: Consent Denied or Minor Missing Guardian Consent
     
-    Public --> Private: Consent Revoked by Any Participant (Immediate Takedown)
+    Public --> Private: Consent Revoked by Any Participant (Instant Edge Revocation)
 ```
 
-1. **Pre-Publication Consent Verification**:
-   - Every participant in a fixture booking can grant or deny recording consent.
-   - If a booking is tagged as a youth, school, or academy fixture, `guardianConsentStatus` MUST be verified as `granted`.
-   - If any participant marks consent as `denied` or guardian consent is missing, publication action is strictly blocked with HTTP 403 `CONSENT_REQUIREMENT_UNMET`.
-2. **Automated Face-Blurring Pipeline**:
-   - Background worker runs automated face detection across all match footage.
-   - Non-consenting participants and background spectators are blurred using Gaussian kernel filters in FFmpeg.
-   - `face_blur_status` transitions from `pending` -> `processing` -> `completed`.
-3. **Instant Revocation & Takedown Hook**:
-   - A participant may revoke consent at any time post-match via the support portal or privacy controls.
-   - Revocation triggers an immediate atomic update: `visibility = 'private'`, sets `consent_status = 'revoked'`, and purges CDN cache edge points within 15 seconds.
+#### 1. Verifiable Consent Evidence Standards
+Consent cannot be satisfied by an unverified boolean toggle. The `privacy_consent_records` audit log requires immutable cryptographic proof:
+- **Evidence Types**:
+  - `sms_otp`: Participant verified via 6-digit SMS OTP to their registered phone number. Evidence record stores `evidence_hash = SHA256(phone + otp_session_id + signed_at)`.
+  - `guardian_consent`: Required for minor participants (`is_minor == true`). Requires guardian phone verification via SMS OTP, recorded with guardian identity and timestamp.
+  - `digital_signature`: Participant cryptographically signs consent waiver with web crypto key.
+- **Audit Immutability**: Every consent record captures `evidence_type`, `evidence_hash`, `ip_address`, `user_agent`, and `signed_at`. Revocations permanently append `revoked_at` and `revocation_reason` without altering the historical grant record.
 
-### 6.3 Secure Replay Streaming & Access Entitlements
-1. **Private S3 Storage Buckets**:
-   - Master MP4 and HLS directory manifests (`index.m3u8`, `segment_*.ts`) reside in private S3 buckets. Public read ACLs are completely disabled.
-2. **Signed Streaming URLs**:
-   - When an entitled player clicks "Match Replay", API verifies entitlement in `replay_entitlements`.
-   - API issues an asymmetric HMAC-signed playback manifest URL expiring in 3,600 seconds (60 minutes).
-   - Video streaming manifests include tokenized segments, preventing unauthorized hotlinking or scraping.
+#### 2. Trusted Worker Authority for Face Blurring
+- **Strict Worker Authority**: Venue owners and administrative users **cannot establish completed face blurring by declaration**. An owner clicking "Mark Blur Completed" is strictly prohibited.
+- **Worker Attestation Workflow**:
+  1. The owner may only request processing via `POST /api/v1/owner/recordings/:id/process-blur` (setting `face_blur_status = 'pending'`).
+  2. The Asynq worker pulls the task into `queue:media`.
+  3. Automated computer vision worker runs face detection across all video frames, applying Gaussian blur filters to non-consenting participants and spectators.
+  4. The worker authenticates via internal worker mTLS and service token (`role = 'system_worker'`) to call:
+     `POST /internal/v1/workers/recordings/:id/blur-complete`
+     Payload: `{ "workerId": "cv-worker-04", "model": "yolov8-face-v2", "facesDetected": 1420, "blurredFrames": 8940, "sha256": "e3b0c442...", "outputStorageKey": "recordings/rec_123/master_blurred.m3u8" }`.
+  5. Only this internal worker endpoint has authority to transition `face_blur_status = 'completed'`. Any attempt by an owner or client to bypass worker attestation is rejected with HTTP 403 `WORKER_AUTHORITY_REQUIRED`.
+
+### 6.3 Media Revocation & Edge Stream Token Validation
+A critical security vulnerability occurs if an application simply changes a database row to `private` while previously issued 60-minute playback URLs remain valid at the CDN or browser level. 
+
+To guarantee that **previously issued playback URLs become unusable within < 1 second of consent revocation**, the architecture establishes an **Authenticated Media Edge Gateway**:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player as Participant / Guardian
+    actor Viewer as Authorized Viewer
+    participant API as Smartify Core API
+    participant Redis as Redis Edge Cache
+    participant Edge as Media Edge Gateway / Streaming Proxy
+    participant S3 as Private Storage Bucket
+    
+    Viewer->>Edge: GET /stream/rec_123/index.m3u8?ticket=jwt_token
+    Edge->>Redis: Check EXISTS media:revoked:rec_123
+    Redis-->>Edge: False (Active)
+    Edge->>S3: Fetch and return signed index.m3u8
+    
+    Note over Viewer,Edge: Video playing (fetches 2-second .ts chunks)
+    Viewer->>Edge: GET /stream/rec_123/segment_001.ts?ticket=jwt_token
+    Edge->>S3: Stream chunk 1
+    
+    rect rgb(255, 240, 240)
+    Note over Player,Redis: Participant Revokes Consent Mid-Stream
+    Player->>API: POST /api/v1/recordings/rec_123/consent/revoke
+    API->>API: UPDATE privacy_consent_records SET status = 'revoked'
+    API->>API: UPDATE match_recordings SET visibility = 'private', consent_status = 'revoked'
+    API->>Redis: SET media:revoked:rec_123 1 EX 86400
+    API->>Redis: PUBLISH media:revocations rec_123
+    end
+    
+    rect rgb(255, 230, 230)
+    Note over Viewer,Edge: Next Segment Request (2 seconds later)
+    Viewer->>Edge: GET /stream/rec_123/segment_002.ts?ticket=jwt_token
+    Edge->>Redis: Check EXISTS media:revoked:rec_123
+    Redis-->>Edge: True (Revoked!)
+    Edge-->>Viewer: 403 Forbidden {"code": "MEDIA_REVOKED"}
+    end
+```
+
+#### 1. Playback URL Architecture & Correct Cryptographic Terminology
+- **Cryptographic Terminology Correction**: The term "asymmetric HMAC" is an oxymoron; HMAC is strictly a **symmetric-key** algorithm using a shared secret. The streaming architecture uses:
+  - **Symmetric HMAC-SHA256**: For high-throughput edge ticket signatures generated by the API and verified by the Media Edge Gateway using a shared cluster secret (`STREAM_SIGNING_SECRET`).
+  - **Asymmetric Cryptography (Ed25519 / RSA)**: Reserved for inter-service worker authentication, Telebirr payload signatures, and admin certificate generation.
+- **Short-Lived Streaming Tickets**:
+  - The API issues a streaming ticket valid for maximum 10 minutes (600 seconds), containing `recording_id`, `entitled_user_id`, and `exp`.
+  - Video manifests dynamically embed this signed ticket into every relative segment URL (`segment_001.ts?ticket=...`).
+
+#### 2. Immediate Revocation Enforcement Across Manifests and Segments
+1. **Zero Direct S3 Access**: Public access and presigned direct S3 URLs are completely disabled. S3 is accessible exclusively by the Media Edge Gateway over private VPC endpoints.
+2. **Edge Revocation Check on Every Chunk**:
+   - The Media Edge Gateway terminates all HLS traffic.
+   - For **every** request—both master manifests (`index.m3u8`) and individual video transport chunks (`segment_*.ts` requested every 2–4 seconds during playback)—the gateway verifies:
+     a) Ticket signature and expiration (`exp > now()`).
+     b) Instant Redis lookup: `EXISTS media:revoked:{recording_id}`.
+3. **Instant Takedown Guarantee (< 1s)**:
+   - When consent is revoked, the API immediately executes:
+     `SET media:revoked:{recording_id} 1 EX 86400`
+     and broadcasts the event across all Edge Gateway instances via Redis Pub/Sub.
+   - Any currently playing stream halts at the very next segment request (within 2–4 seconds maximum), and all subsequent manifest fetches return HTTP 403 Forbidden.
+   - Cache purge hooks immediately invalidate cached CDN copies of the manifest.
 
 ### 6.4 Retention & Queue Architecture
 - **Queue Engine**: Redis-backed `asynq` providing priority queues:
