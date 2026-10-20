@@ -1130,43 +1130,115 @@ To prevent concurrent refund requests from overdrafting collected funds:
    - Upon provider success callback: updated to `status = 'succeeded'`.
    - Upon provider failure or permanent rejection: updated to `status = 'failed'` (restoring available refundable capacity).
 
-### 5.2 Payment Gateway Webhook Architecture
-Ethiopian mobile money providers (Telebirr, CBE Birr, Chapa) communicate transaction results asynchronously via HTTP callbacks:
+### 5.2 Durable Transactional Webhook Architecture & Provider-Specific Verification
+Acknowledging an HTTP webhook before persisting work creates an unrecoverable single point of failure: if the application server or queue crashes after returning HTTP 200, the event is permanently lost because the gateway will never resend it.
+
+To guarantee zero lost payments across Ethiopian mobile money networks, the backend implements the **Durable Transactional Webhook Inbox Pattern**:
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Gateway as Payment Gateway (Telebirr / CBE / Chapa)
-    participant Ingress as API Ingress / Webhook Handler
-    participant Queue as Redis Asynq Worker
-    participant DB as PostgreSQL Ledger
+    participant Ingress as Webhook Ingress Handler
+    participant Inbox as PostgreSQL webhook_inbox
+    participant Dispatcher as Async & Recovery Dispatcher
+    participant Worker as Asynq Background Worker
+    participant ProviderAPI as Gateway Verification API
+    participant Ledger as PostgreSQL Ledger & Bookings
     
-    Gateway->>Ingress: POST /api/v1/webhooks/payments/telebirr (HMAC Signature Header)
-    Note over Ingress: Verify HMAC-SHA256 signature using shared secret
-    alt Invalid Signature
-        Ingress-->>Gateway: 401 Unauthorized (Rejected immediately)
-    else Valid Signature
-        Ingress->>DB: INSERT INTO processed_webhooks (event_id, payload) ON CONFLICT DO NOTHING
+    Gateway->>Ingress: POST /api/v1/webhooks/payments/:provider (Raw Payload + Headers)
+    Note over Ingress: Step 1: Provider-specific cryptographic authentication
+    alt Cryptographic Signature Invalid
+        Ingress-->>Gateway: 401 Unauthorized (Immediate termination)
+    else Signature Valid
+        rect rgb(240, 248, 255)
+        Note over Ingress,Inbox: Step 2: Transactional Persistence BEFORE Acknowledgement
+        Ingress->>Inbox: BEGIN TRANSACTION
+        Ingress->>Inbox: INSERT INTO webhook_inbox (provider, event_type, event_id, payload, raw_headers, status='pending') ON CONFLICT DO NOTHING
+        Ingress->>Inbox: COMMIT TRANSACTION
+        end
         Ingress-->>Gateway: 200 OK {"received": true}
-        Ingress->>Queue: Enqueue PaymentReconciliationJob(eventId)
+        Ingress->>Dispatcher: Signal Inbox Event (in-memory channel / Asynq)
     end
     
-    Queue->>DB: BEGIN TRANSACTION
-    Queue->>DB: INSERT INTO payment_transactions (type='collection', status='succeeded', ...)
-    Queue->>DB: UPDATE bookings SET status = 'confirmed' WHERE id = bookingId
-    Queue->>DB: COMMIT TRANSACTION
+    rect rgb(245, 255, 245)
+    Note over Dispatcher,Worker: Step 3: Reliable Asynchronous Execution & Recovery
+    Dispatcher->>Worker: Enqueue ProcessWebhookInboxTask(inboxId)
+    opt Server Crash Before Enqueue
+        Note over Dispatcher: Periodic Recovery Dispatcher queries unworked 'pending' events
+    end
+    end
+    
+    rect rgb(255, 250, 240)
+    Note over Worker,ProviderAPI: Step 4: Provider-Specific Verification (e.g. Chapa API Verify)
+    Worker->>ProviderAPI: GET /v1/transaction/verify/{tx_ref} (Mandatory Verification)
+    ProviderAPI-->>Worker: 200 OK (Verified: status='success', amount, currency='ETB')
+    end
+    
+    rect rgb(240, 255, 250)
+    Note over Worker,Ledger: Step 5: Idempotent Ledger Update
+    Worker->>Ledger: BEGIN TRANSACTION
+    Worker->>Ledger: Lock booking row FOR UPDATE
+    Worker->>Ledger: INSERT INTO payment_transactions (type='collection', status='succeeded', ...)
+    Worker->>Ledger: UPDATE bookings SET status = 'confirmed'
+    Worker->>Inbox: UPDATE webhook_inbox SET status = 'processed', processed_at = NOW()
+    Worker->>Ledger: COMMIT TRANSACTION
+    end
 ```
 
-1. **Cryptographic Webhook Verification**:
-   - Gateway requests must provide an `X-Signature-SHA256` or equivalent authorization header.
-   - Handler calculates `hmac_sha256(raw_body, gateway_secret)` using constant-time comparison.
-   - Raw request body is validated against replay attacks by inspecting timestamp skews (> 300 seconds rejected).
-2. **Idempotent Delivery Handling**:
-   - `processed_webhooks` table tracks unique `(gateway, event_id)`.
-   - Repeated webhook deliveries from the gateway return HTTP 200 immediately without adding duplicate collections to the ledger.
-3. **Refund Integrity**:
-   - An owner or administrator issuing a refund MUST provide a non-empty `reason`.
-   - Engine verifies `refund_amount <= net_collected_minor`. Any attempt to refund more than net collected funds fails validation with HTTP 422.
+#### 1. Transactional Inbox & Periodic Recovery Dispatcher
+1. **Synchronous Ingress Invariant**:
+   - The handler MUST commit the webhook into `webhook_inbox` with `status = 'pending'` BEFORE returning HTTP 200 to the payment provider.
+   - The unique constraint `(provider, event_id)` discards duplicates at the database layer. Repeated deliveries from the gateway return HTTP 200 immediately without redundant processing.
+2. **Crash-Safe Recovery Dispatcher**:
+   - A background recovery ticker runs every 30 seconds.
+   - Selects stalled inbox items:
+     ```sql
+     SELECT id, provider, event_id, payload, raw_headers 
+     FROM webhook_inbox 
+     WHERE status = 'pending' 
+       AND (last_attempt_at IS NULL OR last_attempt_at < NOW() - INTERVAL '60 seconds')
+       AND attempts < max_attempts
+     LIMIT 50 
+     FOR UPDATE SKIP LOCKED;
+     ```
+   - Enqueues unworked inbox items to the Asynq worker queue, guaranteeing that power cuts, network drops, or worker restarts never orphan a payment.
+
+#### 2. Provider-Specific Verification Protocols
+Different Ethiopian payment gateways mandate distinct cryptographic and verification protocols. The backend avoids generic HMAC assumptions and implements exact provider-specific specifications:
+
+##### A. Chapa (Card & Telebirr/CBE Aggregator)
+- **Signature Authentication**:
+  - Chapa sends request header `Chapa-Signature` (or `x-chapa-signature`).
+  - Handler verifies `HMAC-SHA256(raw_request_body, chapa_webhook_secret)` using constant-time comparison (`subtle.ConstantTimeCompare`).
+- **Mandatory Server-to-Server Verification Call**:
+  - Per official [Chapa Documentation](https://developer.chapa.co/integrations/webhooks), receiving the webhook alone is **insufficient to confirm settlement**.
+  - The worker MUST execute a server-to-server verification call:
+    `GET https://api.chapa.co/v1/transaction/verify/{tx_ref}`
+    Headers: `Authorization: Bearer <CHAPA_SECRET_KEY>`
+  - Worker validates:
+    1. Response HTTP status is 200 and `data.status == 'success'`.
+    2. `data.currency == 'ETB'`.
+    3. `data.amount` equals the expected booking `total_minor / 100.0`.
+    4. `data.tx_ref` matches the booking's `id`.
+
+##### B. Telebirr (Ethio Telecom Direct Integration)
+- **Asymmetric RSA Signature & Decryption**:
+  - Telebirr callbacks deliver payload encrypted via AES and signed via RSA-SHA256 with Ethio Telecom's private key.
+  - Handler decrypts the AES payload key using the platform's private RSA key, then decrypts the payload body using AES-128-CBC.
+  - Verifies the `sign` string against Ethio Telecom's public X.509 certificate using `crypto/rsa` and `crypto/sha256`.
+- **Payload Attribute Verification**:
+  - Validates `tradeStatus == 'Completed'`.
+  - Verifies `totalAmount` matches booking `total_minor / 100.0`.
+  - Confirms `outTradeNo` maps to valid internal booking identifier.
+
+##### C. CBE Birr (Commercial Bank of Ethiopia)
+- **Checksum Verification**:
+  - CBE Birr delivers transaction notifications with a SHA-256 payload checksum (`checkSum`).
+  - Handler computes:
+    $$\text{hash} = \text{SHA256}(\text{transactionId} + \text{amount} + \text{merchantKey} + \text{timestamp})$$
+  - Verifies computed hash against the inbound checksum header.
+  - Confirms `transactionStatus == 'SUCCESS'` and records CBE transaction ID.
 
 ---
 
