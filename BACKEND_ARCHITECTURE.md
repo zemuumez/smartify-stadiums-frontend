@@ -292,13 +292,14 @@ The authentication flow strictly matches the request bodies, methods, and types 
 
 ## 4. Database Schema, Concurrency & Idempotency
 
-### 4.1 Complete Relational DDL (PostgreSQL 16)
-The database design mandates exact foreign key constraints, check constraints, default timestamps in UTC, and integer minor units:
+### 4.1 Complete Relational DDL (PostgreSQL 16+)
+The database schema encompasses the complete set of accepted application workflows (CMS versioning, community teams and rosters, venue events and registrations, customer support threads, privacy consent audit trails, review moderation histories, SaaS invoices, and durable webhook processing).
+
+To strictly guarantee that **a booking's court actually belongs to its venue**, the schema enforces composite uniqueness on `fields(id, venue_id)` and binds `bookings`, `field_closures`, `cameras`, and `match_recordings` via composite foreign keys `(field_id, venue_id) REFERENCES fields(id, venue_id)`.
 
 ```sql
 -- Core Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE EXTENSION IF NOT EXISTS "btree_gist";
 
 -- Enumerated Types
@@ -309,6 +310,7 @@ CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'comple
 CREATE TYPE booking_source AS ENUM ('online', 'walk_in');
 CREATE TYPE transaction_type AS ENUM ('collection', 'refund', 'adjustment', 'payout');
 CREATE TYPE transaction_status AS ENUM ('recorded', 'succeeded', 'failed');
+CREATE TYPE invoice_status AS ENUM ('issued', 'paid', 'overdue', 'waived');
 CREATE TYPE camera_certification AS ENUM ('pending', 'passed', 'failed', 'revoked');
 CREATE TYPE camera_connectivity AS ENUM ('online', 'offline', 'unknown');
 CREATE TYPE recording_status AS ENUM ('scheduled', 'recording', 'uploading', 'processing', 'ready', 'failed');
@@ -318,6 +320,14 @@ CREATE TYPE media_visibility AS ENUM ('private', 'unlisted', 'public');
 CREATE TYPE support_category AS ENUM ('booking', 'payment', 'recording', 'general');
 CREATE TYPE support_priority AS ENUM ('low', 'medium', 'high', 'urgent');
 CREATE TYPE support_status AS ENUM ('open', 'in_progress', 'resolved', 'closed');
+CREATE TYPE team_member_role AS ENUM ('captain', 'member');
+CREATE TYPE join_request_status AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE event_format AS ENUM ('team', 'singles', 'doubles');
+CREATE TYPE event_status AS ENUM ('open', 'ongoing', 'completed', 'cancelled');
+CREATE TYPE event_registration_status AS ENUM ('registered', 'cancelled', 'attended');
+CREATE TYPE review_status AS ENUM ('pending', 'published', 'hidden');
+CREATE TYPE webhook_status AS ENUM ('pending', 'processing', 'processed', 'failed');
+CREATE TYPE idempotency_status AS ENUM ('in_progress', 'completed', 'failed');
 
 -- 1. Users Table
 CREATE TABLE users (
@@ -340,7 +350,8 @@ CREATE TABLE venues (
     name VARCHAR(120) NOT NULL,
     city VARCHAR(60) NOT NULL,
     address TEXT NOT NULL,
-    location GEOGRAPHY(Point, 4326),
+    latitude NUMERIC(10, 7),
+    longitude NUMERIC(10, 7),
     phone VARCHAR(20) NOT NULL,
     email VARCHAR(255) NOT NULL,
     open_hour SMALLINT NOT NULL CHECK (open_hour >= 0 AND open_hour <= 23),
@@ -355,6 +366,7 @@ CREATE TABLE venues (
 );
 
 -- 3. Fields / Courts Table (Physical Inventory)
+-- Composite unique constraint anchors foreign key relationships to prevent cross-venue court leaks
 CREATE TABLE fields (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
@@ -369,14 +381,15 @@ CREATE TABLE fields (
     open_hour SMALLINT NOT NULL CHECK (open_hour >= 0 AND open_hour <= 23),
     close_hour SMALLINT NOT NULL CHECK (close_hour >= 1 AND close_hour <= 24 AND close_hour > open_hour),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_fields_id_venue UNIQUE (id, venue_id)
 );
 
--- 4. Bookings Table (With Strict Physical Exclusion Constraint)
+-- 4. Bookings Table (With Database-Enforced Venue-Court Composite FK and Exclusion Constraint)
 CREATE TABLE bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE RESTRICT,
-    field_id UUID NOT NULL REFERENCES fields(id) ON DELETE RESTRICT,
+    venue_id UUID NOT NULL,
+    field_id UUID NOT NULL,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     sport VARCHAR(30) NOT NULL,
     booking_date DATE NOT NULL,
@@ -395,6 +408,10 @@ CREATE TABLE bookings (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
+    -- Invariant: Court MUST belong to the specified venue
+    CONSTRAINT fk_bookings_field_venue FOREIGN KEY (field_id, venue_id) 
+        REFERENCES fields(id, venue_id) ON DELETE RESTRICT,
+    
     -- Invariant: Walk-in bookings require guest name; Online bookings require registered user_id
     CONSTRAINT chk_booking_attribution CHECK (
         (source = 'walk_in' AND guest_name IS NOT NULL) OR
@@ -402,21 +419,8 @@ CREATE TABLE bookings (
     )
 );
 
--- 5. Field Maintenance Closures Table
-CREATE TABLE field_closures (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
-    field_id UUID NOT NULL REFERENCES fields(id) ON DELETE CASCADE,
-    closure_date DATE NOT NULL,
-    start_hour SMALLINT NOT NULL CHECK (start_hour >= 0 AND start_hour <= 23),
-    end_hour SMALLINT NOT NULL CHECK (end_hour >= 1 AND end_hour <= 24 AND end_hour > start_hour),
-    reason TEXT NOT NULL,
-    created_by UUID NOT NULL REFERENCES users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- Physical Court Double-Booking Exclusion Constraint
--- Prevents any overlapping reservations on the same physical court for active bookings
+-- Prevents overlapping active reservations on the same physical court
 ALTER TABLE bookings
 ADD CONSTRAINT no_overlapping_court_bookings
 EXCLUDE USING gist (
@@ -426,7 +430,23 @@ EXCLUDE USING gist (
 )
 WHERE (status IN ('pending', 'confirmed'));
 
--- 6. Payment Transactions Table (Append-Only Ledger)
+-- 5. Field Maintenance Closures Table (Enforces Venue-Court Composite FK)
+CREATE TABLE field_closures (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    venue_id UUID NOT NULL,
+    field_id UUID NOT NULL,
+    closure_date DATE NOT NULL,
+    start_hour SMALLINT NOT NULL CHECK (start_hour >= 0 AND start_hour <= 23),
+    end_hour SMALLINT NOT NULL CHECK (end_hour >= 1 AND end_hour <= 24 AND end_hour > start_hour),
+    reason TEXT NOT NULL,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    CONSTRAINT fk_closures_field_venue FOREIGN KEY (field_id, venue_id) 
+        REFERENCES fields(id, venue_id) ON DELETE CASCADE
+);
+
+-- 6. Payment Transactions Table (Append-Only Financial Ledger)
 CREATE TABLE payment_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE RESTRICT,
@@ -444,11 +464,157 @@ CREATE TABLE payment_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 7. Autonomous Cameras Table
-CREATE TABLE cameras (
+-- 7. Monthly Venue Invoices Table
+CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    invoice_number VARCHAR(60) UNIQUE NOT NULL,
+    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE RESTRICT,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    tier VARCHAR(40) NOT NULL,
+    amount_minor BIGINT NOT NULL CHECK (amount_minor >= 0),
+    commission_minor BIGINT NOT NULL DEFAULT 0 CHECK (commission_minor >= 0),
+    total_minor BIGINT NOT NULL CHECK (total_minor >= 0),
+    status invoice_status NOT NULL DEFAULT 'issued',
+    due_date DATE NOT NULL,
+    paid_at TIMESTAMPTZ,
+    payment_reference VARCHAR(120),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 8. CMS Working Draft & Published State Table
+CREATE TABLE microsite_content (
+    venue_id UUID PRIMARY KEY REFERENCES venues(id) ON DELETE CASCADE,
+    hero_title VARCHAR(150),
+    hero_subtitle TEXT,
+    about_text TEXT,
+    primary_sport VARCHAR(30),
+    primary_color VARCHAR(10) DEFAULT '#1a4329',
+    secondary_color VARCHAR(10) DEFAULT '#22c55e',
+    badge_text VARCHAR(60),
+    perks JSONB DEFAULT '[]'::jsonb,
+    features JSONB DEFAULT '[]'::jsonb,
+    rules JSONB DEFAULT '[]'::jsonb,
+    cancellation_policy TEXT,
+    social_links JSONB DEFAULT '{}'::jsonb,
+    is_published BOOLEAN NOT NULL DEFAULT false,
+    published_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 9. CMS Immutable Version History Table
+CREATE TABLE microsite_versions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
-    field_id UUID NOT NULL REFERENCES fields(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    content JSONB NOT NULL,
+    published_by UUID NOT NULL REFERENCES users(id),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_venue_version UNIQUE (venue_id, version_number)
+);
+
+-- 10. Community Teams Table
+CREATE TABLE teams (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    sport VARCHAR(30) NOT NULL,
+    city VARCHAR(60) NOT NULL,
+    description TEXT,
+    crest_url TEXT,
+    captain_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    is_open BOOLEAN NOT NULL DEFAULT true,
+    max_members SMALLINT NOT NULL DEFAULT 20 CHECK (max_members >= 2 AND max_members <= 100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 11. Team Memberships Table
+CREATE TABLE team_members (
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role team_member_role NOT NULL DEFAULT 'member',
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (team_id, user_id)
+);
+
+-- 12. Team Join Requests Table
+CREATE TABLE team_join_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status join_request_status NOT NULL DEFAULT 'pending',
+    message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by UUID REFERENCES users(id),
+    CONSTRAINT uq_team_user_pending_request UNIQUE (team_id, user_id)
+);
+
+-- 13. Venue Tournaments & Community Events Table
+CREATE TABLE venue_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+    title VARCHAR(150) NOT NULL,
+    sport VARCHAR(30) NOT NULL,
+    event_date DATE NOT NULL,
+    event_time VARCHAR(20) NOT NULL,
+    spots INTEGER NOT NULL CHECK (spots > 0),
+    format event_format NOT NULL DEFAULT 'team',
+    entry_fee_minor BIGINT NOT NULL DEFAULT 0 CHECK (entry_fee_minor >= 0),
+    prize_pool_minor BIGINT NOT NULL DEFAULT 0 CHECK (prize_pool_minor >= 0),
+    description TEXT,
+    status event_status NOT NULL DEFAULT 'open',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 14. Event Registrations Table
+CREATE TABLE event_registrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID NOT NULL REFERENCES venue_events(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
+    participant_name VARCHAR(100) NOT NULL,
+    participant_phone VARCHAR(20) NOT NULL,
+    format event_format NOT NULL DEFAULT 'team',
+    status event_registration_status NOT NULL DEFAULT 'registered',
+    idempotency_key UUID UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 15. Support Cases Table
+CREATE TABLE support_cases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_number VARCHAR(40) UNIQUE NOT NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    venue_id UUID REFERENCES venues(id) ON DELETE SET NULL,
+    category support_category NOT NULL DEFAULT 'general',
+    priority support_priority NOT NULL DEFAULT 'medium',
+    status support_status NOT NULL DEFAULT 'open',
+    subject VARCHAR(200) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 16. Support Messages Table
+CREATE TABLE support_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    case_id UUID NOT NULL REFERENCES support_cases(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES users(id),
+    sender_role user_role NOT NULL,
+    message TEXT NOT NULL,
+    attachments JSONB DEFAULT '[]'::jsonb,
+    is_internal BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 17. Autonomous Cameras Table (Enforces Venue-Court Composite FK)
+CREATE TABLE cameras (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    venue_id UUID NOT NULL,
+    field_id UUID NOT NULL,
     device_serial VARCHAR(80) UNIQUE NOT NULL,
     model VARCHAR(80) NOT NULL,
     rtmp_stream_url TEXT,
@@ -459,14 +625,16 @@ CREATE TABLE cameras (
     last_heartbeat TIMESTAMPTZ,
     telemetry JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_cameras_field_venue FOREIGN KEY (field_id, venue_id) 
+        REFERENCES fields(id, venue_id) ON DELETE CASCADE
 );
 
--- 8. Match Recordings Table
+-- 18. Match Recordings Table (Enforces Venue-Court Composite FK)
 CREATE TABLE match_recordings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE RESTRICT,
-    field_id UUID NOT NULL REFERENCES fields(id) ON DELETE RESTRICT,
+    venue_id UUID NOT NULL,
+    field_id UUID NOT NULL,
     booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
     camera_id UUID REFERENCES cameras(id) ON DELETE SET NULL,
     title VARCHAR(150) NOT NULL,
@@ -481,10 +649,30 @@ CREATE TABLE match_recordings (
     retention_days INTEGER NOT NULL DEFAULT 30,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_recordings_field_venue FOREIGN KEY (field_id, venue_id) 
+        REFERENCES fields(id, venue_id) ON DELETE RESTRICT
 );
 
--- 9. Replay Entitlements Table
+-- 19. Privacy Consent Evidence Log Table (Immutable Audit Records)
+CREATE TABLE privacy_consent_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recording_id UUID NOT NULL REFERENCES match_recordings(id) ON DELETE CASCADE,
+    participant_user_id UUID REFERENCES users(id),
+    participant_phone VARCHAR(20) NOT NULL,
+    consent_type VARCHAR(20) NOT NULL DEFAULT 'player',
+    status consent_status NOT NULL DEFAULT 'pending',
+    evidence_type VARCHAR(40) NOT NULL,
+    evidence_hash VARCHAR(64) NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    signed_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    revocation_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 20. Replay Entitlements Table
 CREATE TABLE replay_entitlements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recording_id UUID NOT NULL REFERENCES match_recordings(id) ON DELETE CASCADE,
@@ -495,7 +683,43 @@ CREATE TABLE replay_entitlements (
     CONSTRAINT uq_recording_user_entitlement UNIQUE (recording_id, user_id)
 );
 
--- 10. Commercial Policies Table (Configurable & Provisional)
+-- 21. Customer Reviews Table
+CREATE TABLE venue_reviews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+    rating NUMERIC(2, 1) NOT NULL CHECK (rating >= 1.0 AND rating <= 5.0),
+    comment TEXT,
+    status review_status NOT NULL DEFAULT 'published',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 22. Venue Review Moderation Audit History Table
+CREATE TABLE venue_review_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    review_id UUID NOT NULL REFERENCES venue_reviews(id) ON DELETE CASCADE,
+    actor_id UUID NOT NULL REFERENCES users(id),
+    previous_status review_status NOT NULL,
+    new_status review_status NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 23. Administrative Audit Events Table (Immutable Security Log)
+CREATE TABLE admin_audit_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    actor_id UUID NOT NULL REFERENCES users(id),
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(60) NOT NULL,
+    entity_id UUID NOT NULL,
+    changes JSONB DEFAULT '{}'::jsonb,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 24. Commercial Policies Table (Configurable & Provisional)
 CREATE TABLE commercial_policies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     venue_id UUID REFERENCES venues(id) ON DELETE CASCADE,
@@ -506,16 +730,36 @@ CREATE TABLE commercial_policies (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 11. Idempotency Keys Storage Table
+-- 25. Idempotency Records Table (Scoped to user_id, operation, key)
 CREATE TABLE idempotency_records (
-    key UUID PRIMARY KEY,
+    key UUID NOT NULL,
     user_id UUID NOT NULL REFERENCES users(id),
-    request_path VARCHAR(255) NOT NULL,
+    operation_name VARCHAR(80) NOT NULL,
     request_hash VARCHAR(64) NOT NULL,
+    status idempotency_status NOT NULL DEFAULT 'in_progress',
     response_status INTEGER,
     response_body JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NOT NULL
+    expires_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, operation_name, key)
+);
+
+-- 26. Transactional Webhook Inbox Table
+CREATE TABLE webhook_inbox (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider VARCHAR(40) NOT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    event_id VARCHAR(120) NOT NULL,
+    payload JSONB NOT NULL,
+    raw_headers JSONB NOT NULL,
+    status webhook_status NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts SMALLINT NOT NULL DEFAULT 5,
+    error_message TEXT,
+    last_attempt_at TIMESTAMPTZ,
+    processed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_webhook_provider_event UNIQUE (provider, event_id)
 );
 
 -- Indices for Production High-Velocity Queries
@@ -526,6 +770,10 @@ CREATE INDEX idx_transactions_venue ON payment_transactions (venue_id);
 CREATE INDEX idx_recordings_booking ON match_recordings (booking_id);
 CREATE INDEX idx_fields_venue_active ON fields (venue_id) WHERE active = true;
 CREATE INDEX idx_closures_lookup ON field_closures (field_id, closure_date);
+CREATE INDEX idx_webhook_inbox_pending ON webhook_inbox (status, created_at) WHERE status = 'pending';
+CREATE INDEX idx_invoices_venue ON invoices (venue_id, status);
+CREATE INDEX idx_team_members_user ON team_members (user_id);
+CREATE INDEX idx_events_venue ON venue_events (venue_id, event_date);
 ```
 
 ### 4.2 Booking Concurrency Architecture
