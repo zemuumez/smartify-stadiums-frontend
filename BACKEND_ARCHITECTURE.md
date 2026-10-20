@@ -83,52 +83,106 @@ To eliminate discrepancies between frontend TypeScript contracts ([contracts.ts]
 
 ## 3. API Contracts, Authentication & Tenant Authorization
 
-### 3.1 Standard API Envelope & Error Format
-All HTTP REST APIs adhere to standardized JSON envelopes with RFC 7807 Problem Details for HTTP errors:
+### 3.1 Standard API Envelope, Bare DTOs & Error Format
+The frontend HTTP transport (`frontend/src/services/http.ts`) invokes `return await response.json() as T` directly without unwrapping an outer wrapper. To maintain strict compatibility with the founder-approved frontend services and prevent runtime client deserialization crashes:
 
-```json
-{
-  "success": true,
-  "data": { ... },
-  "meta": {
-    "requestId": "req_01JAX89Y7BZ91A20",
-    "timestamp": "2026-10-20T00:30:00.000Z"
-  }
-}
-```
-
-Error format (RFC 7807):
-```json
-{
-  "type": "https://api.smartifystadiums.et/errors/conflict",
-  "title": "Conflict",
-  "status": 409,
-  "detail": "This action conflicts with an existing reservation or state. Refresh and try again.",
-  "instance": "/bookings",
-  "code": "SLOT_ALREADY_RESERVED",
-  "requestId": "req_01JAX89Y7BZ91A20"
-}
-```
+1. **Bare Response DTOs (Default / Native Contract)**:
+   - Successful REST responses return the raw entity or collection DTO directly matching the TypeScript interfaces in [`contracts.ts`](file:///C:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/services/contracts.ts):
+     - Single entities (`Account`, `Venue`, `Booking`, `Field`, `Microsite`): returned as top-level JSON objects `{ ... }`.
+     - Entity collections (`Venue[]`, `Field[]`, `Booking[]`, `Invoice[]`): returned as top-level JSON arrays `[ ... ]`.
+     - Operations yielding no content (`logout`, `cancel`, `request-otp`): returned as HTTP 204 No Content (or HTTP 200 `{}`).
+2. **Optional Envelope Adapter (`X-API-Envelope: true`)**:
+   - For external or third-party integrators requesting envelope wrapping, setting header `X-API-Envelope: true` causes the API gateway to wrap responses into `{ "success": true, "data": T, "meta": { "requestId": "req_...", "timestamp": "..." } }`. The native Next.js frontend omits this header and consumes bare DTOs.
+3. **Error Format (RFC 7807 Problem Details)**:
+   - On non-2xx HTTP responses, the backend emits RFC 7807 Problem Details:
+     ```json
+     {
+       "type": "https://api.smartifystadiums.et/errors/conflict",
+       "title": "Conflict",
+       "status": 409,
+       "detail": "This court reservation conflicts with an existing booking or maintenance closure.",
+       "instance": "/bookings",
+       "code": "SLOT_ALREADY_RESERVED",
+       "requestId": "req_01JAX89Y7BZ91A20"
+     }
+     ```
+   - Frontend `http.ts` catches `!response.ok` and transforms the HTTP status code via `statusCode(response.status)` into typed client `ServiceError` instances (`validation` for 400, `unauthorized` for 401, `forbidden` for 403, `not_found` for 404, `conflict` for 409, `rate_limited` for 429, `server` for 500+).
+4. **CSRF Protection & Token Contract (`/auth/csrf`)**:
+   - Before any state-modifying HTTP request (`POST`, `PUT`, `PATCH`, `DELETE`), `frontend/src/services/http.ts` automatically issues:
+     `GET /api/v1/auth/csrf` with `{ credentials: 'include', cache: 'no-store' }`.
+   - The backend MUST provide this endpoint and return a bare JSON object:
+     ```json
+     {
+       "token": "csrf_01JAX89Y7BZ91A20_a9f8b2c4e1d3"
+     }
+     ```
+   - The token is cryptographically generated using HMAC-SHA256 bound to the user's session identifier or double-submit CSRF cookie.
+   - The frontend reads `value.token` and attaches header `X-CSRF-Token: <token>`.
+   - The backend CSRF middleware verifies `X-CSRF-Token` against the active session before dispatching mutation handlers. Missing or invalid tokens return HTTP 403 Forbidden with error code `CSRF_TOKEN_INVALID`. Safe idempotent methods (`GET`, `HEAD`, `OPTIONS`) bypass CSRF verification.
 
 ### 3.2 Authentication & Phone OTP Lifecycle
+The authentication flow strictly matches the request bodies, methods, and types in [`auth.service.ts`](file:///C:/Users/USER/Documents/GitHub/smartify-stadiums-frontend/frontend/src/services/auth.service.ts):
+
 1. **Request OTP (`POST /api/v1/auth/request-otp`)**:
-   - Request Body: `{"phone": "+251911223344", "roleIntent": "player"}`.
-   - Validation: Phone number must validate against Ethiopian telecom prefix patterns (`+2519...` or `+2517...`).
-   - Throttling: Redis-backed sliding window rate limiter permits maximum 3 OTP requests per 10 minutes per IP and phone number. 60-second cooldown enforced between requests.
+   - Request Body: `{"phone": "+251911223344", "purpose": "login"}` (or `"register"`).
+   - Phone Normalization: Phone number must validate against Ethiopian telecom prefix patterns (`+2519...` or `+2517...`).
+   - Throttling: Redis-backed sliding window rate limiter permits maximum 3 OTP requests per 10 minutes per IP and phone number. 60-second cooldown enforced between consecutive requests.
    - Generation: Cryptographically secure pseudo-random 6-digit integer string (`crypto/rand`).
-   - Storage: Stored in Redis with key `otp:{phone}` containing Argon2id hash of code, attempt count (max 3), and TTL of 300 seconds (5 minutes). Plaintext OTP is NEVER stored.
-   - Dispatch: Dispatched via Ethio Telecom SMS Gateway over secure TLS webhook.
+   - Storage: Stored in Redis with key `otp:{phone}` containing Argon2id hash of code, attempt count (max 3), purpose, and TTL of 300 seconds (5 minutes). Plaintext OTP is NEVER stored.
+   - Dispatch: Dispatched via Ethio Telecom SMS Gateway over secure TLS webhook. Returns HTTP 200 `{ "status": "sent" }` or HTTP 204.
 2. **Login / Verify OTP (`POST /api/v1/auth/login`)**:
-   - Request Body: `{"phone": "+251911223344", "otp": "482910"}`.
-   - Verification: Compares submitted OTP against hashed value using constant-time comparison (`subtle.ConstantTimeCompare`).
+   - Request Body: `{"phone": "+251911223344", "code": "482910"}` (field name `code`, matching frontend `auth.service.ts`).
+   - Verification: Compares submitted OTP `code` against hashed value using constant-time comparison (`subtle.ConstantTimeCompare`).
    - Protection: Any failed verification increments attempt counter. Reaching 3 failed attempts immediately deletes the Redis key and invalidates the OTP.
    - Successful Session:
-     - Sets secure, encrypted HTTP-only cookie `__Host-etsf-session` with `SameSite=Strict`, `Path=/`, `Secure=true`.
+     - Issues session cookie (see Cookie Architecture below).
      - Generates cryptographically signed JWT containing: `sub` (user UUID), `role` (`player | owner | admin`), `venueId` (if owner), `jti` (session UUID for revocation), `exp` (14 days), `iat`.
-     - Redis maintains session record `session:{userId}:{jti}` for instantaneous server-side session revocation.
-3. **Session Refresh & Bounded Retries**:
-   - Token refresh uses sliding expiration: when remaining lifetime is < 2 days, API responses include a refreshed session cookie.
-   - If session verification fails or user account is suspended by platform admin, middleware returns HTTP 401 with `WWW-Authenticate: Bearer error="invalid_token"`, causing frontend client to clear session and preserve current route via `returnTo`.
+     - Redis stores active session record `session:{userId}:{jti}` with metadata (`ip`, `userAgent`, `createdAt`, `lastActiveAt`).
+     - Response Body: Returns bare `Account` DTO directly:
+       ```json
+       {
+         "id": "usr_01JAX89Y7BZ91A20",
+         "phone": "+251911223344",
+         "full_name": "Abebe Kebede",
+         "role": "player",
+         "email": "abebe@example.com",
+         "is_verified": true,
+         "is_minor": false,
+         "created_at": "2026-10-20T00:30:00.000Z",
+         "status": "active"
+       }
+       ```
+3. **Register (`POST /api/v1/auth/register`)**:
+   - Request Body: `{"phone": "+251911223344", "code": "482910", "full_name": "Abebe Kebede", "role": "player"}` (role strictly `'player' | 'owner'`; `'admin'` cannot be self-registered).
+   - Validates OTP code, creates user record in `users` table, provisions session, and returns bare `Account` DTO.
+4. **Current User (`GET /api/v1/users/me`)**:
+   - Headers: Cookie session (`credentials: 'include'`). Accepts optional `AbortSignal`.
+   - Returns authenticated user's bare `Account` DTO.
+5. **Logout (`POST /api/v1/auth/logout`)**:
+   - Invalidates active session `jti` in Redis, clears the session cookie (`Max-Age=0`), and returns HTTP 204 No Content.
+6. **Cookie Architecture Across Subdomains & Microsites**:
+   - Per RFC 6265bis, cookies with the `__Host-` prefix MUST NOT include a `Domain` attribute and are strictly confined to the exact originating host.
+   - To support both unified same-origin deployments and multi-subdomain SaaS microsites (`unity-complex.smartifystadiums.et`), two deployment modes are specified:
+     - **Mode A (BFF / Same-Origin Reverse Proxy - Default)**: Next.js frontend proxies `/api/*` on `smartifystadiums.et`. Session cookie uses `__Host-etsf-session; Path=/; Secure; HttpOnly; SameSite=Lax`. All path-based microsites (`/s/unity-complex`) share this cookie seamlessly.
+     - **Mode B (Multi-Subdomain SaaS Deployment)**: Direct API calls between custom venue subdomains (`*.smartifystadiums.et`) and `api.smartifystadiums.et`. RFC 6265bis mandates using the `__Secure-` prefix instead of `__Host-` so the cookie can span subdomains:
+       `Set-Cookie: __Secure-etsf-session=<jwt>; Domain=.smartifystadiums.et; Path=/; Secure; HttpOnly; SameSite=Lax`.
+     - The active mode is determined at deploy time via `SESSION_COOKIE_MODE=host|domain`.
+7. **Session Revocation & Instant Suspension Enforcement**:
+   - **Session Revocation**: On logout or explicit session invalidation, `DEL session:{userId}:{jti}` is executed and `jti` is added to a Redis revocation set `revoked:{jti}` with TTL equal to remaining JWT lifetime.
+   - **Administrative Suspension Enforcement**:
+     - When a platform administrator suspends an account (`PATCH /api/v1/admin/users/:id/status` with `status: "suspended"`), the update commits to `users.status = 'suspended'`.
+     - Application immediately purges all active session keys for the user (`session:{userId}:*`).
+     - A Redis tombstone `suspension:{userId}` is written with a 24-hour TTL, and a broadcast event is published via Redis Pub/Sub (`events:user_suspended:{userId}`) to evict all local in-memory JWT caches across all Go worker instances within < 50ms.
+     - Auth middleware checks `user.status` on every authenticated request. Suspended users are immediately denied with HTTP 403 Forbidden:
+       ```json
+       {
+         "type": "https://api.smartifystadiums.et/errors/forbidden",
+         "title": "Account Suspended",
+         "status": 403,
+         "detail": "Your account has been suspended by the platform administrator.",
+         "code": "ACCOUNT_SUSPENDED"
+       }
+       ```
 
 ### 3.3 Multi-Tenant Authorization & Subdomain Routing
 1. **Tenant Context Extraction**:
