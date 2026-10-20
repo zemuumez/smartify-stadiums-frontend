@@ -184,29 +184,116 @@ The authentication flow strictly matches the request bodies, methods, and types 
        }
        ```
 
-### 3.3 Multi-Tenant Authorization & Subdomain Routing
-1. **Tenant Context Extraction**:
-   - Requests entering the API gateway carry either:
-     - Custom subdomain: `https://unity-complex.smartifystadiums.et`
-     - Path-based microsite identifier: `https://smartifystadiums.et/s/unity-complex`
-     - Tenant management header: `X-Venue-Id: venue-2`
-   - Gateway verifies hostname or path against `venues` table. If status is `suspended` or `draft`, access is denied or routed to the unpublish/preview renderer based on caller identity.
-2. **Row-Level Security Enforcement**:
-   - When handling requests on behalf of a authenticated owner, the database connection pool executes:
+### 3.3 Multi-Tenant Authorization & Row-Level Security Architecture
+A supplied HTTP header (such as `X-Venue-Id: venue-2`) or path parameter is **never accepted as proof of tenant authority**. The backend enforces cryptographic authentication, verified database ownership checks, and PostgreSQL Row-Level Security (RLS) configured to prevent cross-tenant data leaks.
+
+#### 1. Authenticated Membership Verification Protocol
+1. **Identity Extraction**: The API gateway extracts and verifies the authenticated caller's identity (`current_user_id` and `current_user_role`) from the cryptographically validated session JWT or cookie.
+2. **Ownership Assertion Check**:
+   - When a request specifies a target venue (via `X-Venue-Id` header, subdomain hostname, or URL path `/owner/stadiums/:id/*`):
+     - If `current_user_role == 'admin'`, the platform administrator bypasses tenant boundaries for support and audit operations.
+     - If `current_user_role == 'owner'`, the application runs a verified authorization check against the database (or verified Redis cache `owner_venues:{userId}:{venueId}`):
+       ```sql
+       SELECT 1 FROM venues 
+       WHERE id = $targetVenueId AND owner_id = $currentUserId AND status != 'suspended';
+       ```
+     - If no matching ownership record exists, or if the venue is suspended, the request is terminated immediately with HTTP 403 Forbidden:
+       ```json
+       {
+         "type": "https://api.smartifystadiums.et/errors/forbidden",
+         "title": "Forbidden",
+         "status": 403,
+         "detail": "You do not have administrative authority over this venue facility.",
+         "code": "VENUE_ACCESS_DENIED"
+       }
+       ```
+3. **Only Upon Verified Ownership** does the application context bind `app.current_tenant_id = targetVenueId`.
+
+#### 2. PostgreSQL RLS Configuration & Restricted Database Roles
+Per official [PostgreSQL Row Security Documentation](https://www.postgresql.org/docs/current/ddl-rowsecurity.html), table owners and superusers bypass RLS by default unless explicitly forced. To ensure bulletproof isolation:
+
+1. **Restricted Non-Superuser Role (`smartify_app`)**:
+   - The Go application connects to PostgreSQL strictly as a non-superuser, unprivileged database role:
      ```sql
-     SET LOCAL app.current_user_id = 'usr_owner_1';
-     SET LOCAL app.current_user_role = 'owner';
-     SET LOCAL app.current_tenant_id = 'venue_1';
+     CREATE ROLE smartify_app LOGIN PASSWORD '...' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+     GRANT USAGE ON SCHEMA public TO smartify_app;
+     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO smartify_app;
      ```
-   - All queries on tables with a `venue_id` column are filtered by RLS:
+   - `smartify_app` does NOT possess the `BYPASSRLS` attribute.
+2. **Forced Row-Level Security (`FORCE ROW LEVEL SECURITY`)**:
+   - Every tenant-scoped table enforces RLS unconditionally, even if queried by table owners:
      ```sql
-     CREATE POLICY venue_isolation_policy ON fields
-     FOR ALL TO application_role
-     USING (
-       app.current_user_role() = 'admin' OR 
-       venue_id = app.current_tenant_id()
-     );
+     ALTER TABLE venues ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE venues FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE fields ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE fields FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE bookings FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE field_closures ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE field_closures FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE payment_transactions FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE invoices FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE microsite_content ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE microsite_content FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE cameras ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE cameras FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE match_recordings ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE match_recordings FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE venue_events ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE venue_events FORCE ROW LEVEL SECURITY;
+
+     ALTER TABLE venue_reviews ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE venue_reviews FORCE ROW LEVEL SECURITY;
      ```
+
+#### 3. Pooled-Connection Isolation via `SET LOCAL`
+In Go connection pooling (`pgxpool`), database connections are reused across independent HTTP requests. Setting global session configuration (`SET app.current_tenant_id = ...`) poses a catastrophic data contamination risk if a connection is returned to the pool without cleanup.
+
+The backend strictly mandates that **all tenant-scoped queries execute inside an explicit transaction block using `SET LOCAL` (or `set_config(..., ..., true)`)**:
+
+```sql
+BEGIN;
+SELECT set_config('app.current_user_id', $1, true);
+SELECT set_config('app.current_user_role', $2, true);
+SELECT set_config('app.current_tenant_id', $3, true);
+
+-- Application executes tenant queries here
+SELECT * FROM fields WHERE active = true;
+
+COMMIT; -- Automatically rolls back and clears app.* variables
+```
+
+Because `is_local = true` is supplied, PostgreSQL automatically scopes the parameters exclusively to the current transaction. When the transaction finishes (`COMMIT` or `ROLLBACK`), the connection returns to the pool clean, preventing cross-request tenant leakage.
+
+#### 4. Actor-Based Read/Write RLS Rules Matrix
+
+| Actor | Target Tables | Allowed Operations | RLS Policy Condition |
+| :--- | :--- | :--- | :--- |
+| **Public / Unauthenticated** | `venues` | `SELECT` | `status = 'active'` |
+| | `fields` | `SELECT` | `active = true AND venue_id IN (SELECT id FROM venues WHERE status = 'active')` |
+| | `microsite_content` | `SELECT` | `is_published = true AND venue_id IN (SELECT id FROM venues WHERE status = 'active')` |
+| | `venue_events` | `SELECT` | `status = 'open'` |
+| | `teams` | `SELECT` | `true` |
+| | `venue_reviews` | `SELECT` | `status = 'published'` |
+| **Player (Authenticated)** | `bookings` | `SELECT` | `user_id = current_setting('app.current_user_id', true)::UUID` |
+| | `bookings` | `INSERT` | `user_id = current_setting('app.current_user_id', true)::UUID` |
+| | `bookings` | `UPDATE` | `user_id = current_setting('app.current_user_id', true)::UUID AND status IN ('pending', 'confirmed')` |
+| | `event_registrations` | `SELECT`, `INSERT` | `user_id = current_setting('app.current_user_id', true)::UUID` |
+| | `support_cases` | `SELECT`, `INSERT` | `user_id = current_setting('app.current_user_id', true)::UUID` |
+| | `support_messages`| `SELECT`, `INSERT` | `case_id IN (SELECT id FROM support_cases WHERE user_id = current_setting('app.current_user_id', true)::UUID) AND is_internal = false` |
+| **Venue Owner (Verified)** | All Venue Tables | `SELECT`, `INSERT`, `UPDATE` | `venue_id = current_setting('app.current_tenant_id', true)::UUID` |
+| **Platform Admin** | All Tables | `ALL` | `current_setting('app.current_user_role', true) = 'admin'` |
 
 ### 3.4 Exhaustive API Contract Endpoints
 
