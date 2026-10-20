@@ -776,45 +776,139 @@ CREATE INDEX idx_team_members_user ON team_members (user_id);
 CREATE INDEX idx_events_venue ON venue_events (venue_id, event_date);
 ```
 
-### 4.2 Booking Concurrency Architecture
-Under peak reservation rushes (e.g. 17:00–21:00 weekday fixtures across Addis Ababa), multiple users often attempt to reserve the same slot concurrently. The system employs a two-tier concurrency control architecture:
+### 4.2 Booking & Maintenance Closure Concurrency Protocol
+Under peak reservation rushes (e.g. 17:00–21:00 weekday fixtures across Addis Ababa) and simultaneous facility management operations, multiple actors may attempt to reserve a court, reschedule an existing fixture, or declare emergency maintenance closures concurrently.
+
+The PostgreSQL GiST exclusion constraint (`no_overlapping_court_bookings`) strictly prevents overlapping records within the `bookings` table itself, but it does **not** prevent a concurrent insert race between `bookings` and `field_closures`. If a player booking and a venue maintenance closure are submitted simultaneously under default `READ COMMITTED` isolation, both validation subqueries can observe an empty slot before either commits, creating a conflicting schedule.
+
+To eliminate this race condition completely, the architecture establishes a **Unified Court-Level Concurrency Protocol**:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor PlayerA as Player A
-    actor PlayerB as Player B
-    participant API as Booking Handler
+    actor Player as Player Booking
+    actor Owner as Venue Maintenance
+    participant API as Application Handler
     participant DB as PostgreSQL Transaction
     
-    PlayerA->>API: POST /bookings (Court 1, 18:00-19:00, Key A)
-    PlayerB->>API: POST /bookings (Court 1, 18:00-19:00, Key B)
+    Player->>API: POST /bookings (Court 1, Date D, 18:00-19:00)
+    Owner->>API: POST /owner/closures (Court 1, Date D, 18:00-20:00)
     
-    API->>DB: BEGIN SERIALIZABLE
-    Note over DB: Check court closures and operating hours
-    DB->>DB: INSERT INTO bookings ... (Player A)
-    DB-->>API: Row Inserted & Exclusion Constraint Verified
+    rect rgb(240, 248, 255)
+    Note over API,DB: Critical Section: Serialized on Parent Physical Court
+    API->>DB: BEGIN TRANSACTION (READ COMMITTED)
+    API->>DB: SELECT id, active FROM fields WHERE id = $fieldId AND venue_id = $venueId FOR UPDATE
+    Note over DB: Locks Court 1 row. Second transaction blocks until commit/rollback.
+    API->>DB: Check closures: NOT EXISTS (SELECT 1 FROM field_closures WHERE field_id = $1 AND ...)
+    API->>DB: Check bookings: NOT EXISTS (SELECT 1 FROM bookings WHERE field_id = $1 AND ...)
+    DB-->>API: Slot is free
+    API->>DB: INSERT INTO bookings ... (Player, status = 'pending')
     API->>DB: COMMIT
-    API-->>PlayerA: 201 Created (Booking Reference Confirmed)
+    end
+    API-->>Player: 201 Created (10-minute pending hold issued)
     
-    API->>DB: BEGIN SERIALIZABLE
-    Note over DB: Insert Player B overlapping int4range(18, 19)
-    DB-->>API: ERROR 23P01 exclusion_violation: no_overlapping_court_bookings
+    rect rgb(255, 240, 240)
+    Note over API,DB: Second Transaction Unblocks & Observes Committed State
+    DB->>DB: SELECT ... FROM fields ... FOR UPDATE completes
+    API->>DB: Check active bookings: SELECT 1 FROM bookings WHERE field_id = $1 AND ...
+    DB-->>API: Found active booking!
     API->>DB: ROLLBACK
-    API-->>PlayerB: 409 Conflict ("This action conflicts with an existing reservation or state.")
+    end
+    API-->>Owner: 409 Conflict ("Cannot create closure: court is booked for 18:00-19:00")
 ```
 
-1. **PostgreSQL Exclusion Constraints (`EXCLUDE USING gist`)**:
-   - `int4range(start_hour, end_hour) WITH &&` guarantees mathematical non-overlap at the storage engine level.
-   - Operates safely across all connection pool workers without requiring distributed Redis locks for correctness.
-   - Enforces conflict across multi-sport reservations on shared physical courts (e.g. basketball booking prevents futsal on Court 1).
-2. **Maintenance Closures Validation**:
-   - Before inserting, an atomic subquery verifies `NOT EXISTS (SELECT 1 FROM field_closures WHERE field_id = $1 AND closure_date = $2 AND int4range(start_hour, end_hour) && int4range($3, $4))`.
-3. **Idempotency Guarantee Mechanism**:
-   - Client sends unique `idempotencyKey` UUID (generated client-side via `crypto.randomUUID()`).
-   - Handler acquires an atomic insert lock in `idempotency_records`.
-   - If key already exists with identical `request_hash`, cached response is returned immediately with `X-Cache-Lookup: HIT`.
-   - If key exists with different payload hash, handler aborts with HTTP 422 `IDEMPOTENCY_PAYLOAD_MISMATCH`.
+#### 1. Three-Tier Concurrency Defense Protocol
+1. **Tier 1 — Parent Asset Row Lock (`FOR UPDATE`)**:
+   Every state-modifying operation on court inventory (`POST /bookings`, `POST /owner/walk-ins`, `POST /bookings/:id/reschedule`, `POST /owner/closures`) MUST first acquire an explicit pessimistic row lock on the physical court record:
+   ```sql
+   SELECT id, venue_id, active, open_hour, close_hour 
+   FROM fields 
+   WHERE id = $field_id AND venue_id = $venue_id 
+   FOR UPDATE;
+   ```
+   Because `fields` is the root physical asset, acquiring `FOR UPDATE` strictly serializes all booking creations, rescheduling attempts, and maintenance closure declarations for that specific physical court across all database connections.
+2. **Tier 2 — Atomic Overlap Verification Inside Critical Section**:
+   - **For Bookings & Rescheduling**:
+     ```sql
+     -- Verify no overlapping maintenance closures
+     SELECT 1 FROM field_closures 
+     WHERE field_id = $1 AND closure_date = $2 
+       AND int4range(start_hour, end_hour) && int4range($3, $4);
+     
+     -- Verify no overlapping active bookings
+     SELECT 1 FROM bookings 
+     WHERE field_id = $1 AND booking_date = $2 
+       AND status IN ('pending', 'confirmed')
+       AND int4range(start_hour, end_hour) && int4range($3, $4);
+     ```
+   - **For Maintenance Closures**:
+     ```sql
+     -- Verify no active or confirmed player bookings exist
+     SELECT id, start_hour, end_hour FROM bookings 
+     WHERE field_id = $1 AND booking_date = $2 
+       AND status IN ('pending', 'confirmed')
+       AND int4range(start_hour, end_hour) && int4range($3, $4);
+     ```
+     If active bookings exist, the closure transaction rolls back and returns HTTP 409 Conflict with the conflicting booking IDs, requiring staff to cancel or reschedule affected fixtures first.
+3. **Tier 3 — GiST Storage Engine Exclusion Constraint**:
+   - `no_overlapping_court_bookings` remains enforced at the storage engine level. Even if application locking were compromised by operational bug, the database engine aborts overlapping active bookings with `SQLSTATE 23P01 (exclusion_violation)`.
+
+#### 2. Transaction Retry & Deadlock Interception Protocol
+- Concurrency conflicts, lock timeouts, or serialization failures (`SQLSTATE 40001` or `40P01`) trigger the application database layer's automated retry policy:
+  - **Strategy**: Truncated exponential backoff with full jitter:
+    $$\text{delay} = \min(\text{max\_delay}, \text{base\_delay} \times 2^{\text{attempt}}) + \text{rand}(0, 25\text{ms})$$
+  - **Parameters**: `base_delay = 50ms`, `max_delay = 500ms`, `max_retries = 3`.
+  - If retries fail or lock timeout (configured at 3000ms via `SET LOCAL lock_timeout = '3s'`) is reached, the handler aborts and emits HTTP 409 Conflict:
+    ```json
+    {
+      "type": "https://api.smartifystadiums.et/errors/conflict",
+      "title": "Conflict",
+      "status": 409,
+      "detail": "Court slot reservation is currently undergoing concurrent modification. Please retry.",
+      "code": "SLOT_LOCK_TIMEOUT"
+    }
+    ```
+
+#### 3. Pending-Hold Expiry Protocol (10-Minute Hold TTL)
+When an online booking is initiated, it is persisted with status `pending`. To prevent abandoned payment flows from indefinitely locking court inventory:
+1. Online reservations enforce a strict **10-minute pending hold window** (`expires_at = created_at + INTERVAL '10 minutes'`).
+2. An asynchronous scheduler worker runs every 60 seconds:
+   ```sql
+   UPDATE bookings 
+   SET status = 'cancelled', updated_at = NOW() 
+   WHERE status = 'pending' 
+     AND created_at < NOW() - INTERVAL '10 minutes' 
+   RETURNING id, field_id, venue_id, booking_date, start_hour, end_hour;
+   ```
+3. The exclusion constraint condition `WHERE (status IN ('pending', 'confirmed'))` immediately ceases to match cancelled holds, instantaneously making the physical court hour available for other players in availability queries.
+
+#### 4. Late-Arriving Payment & Expired Hold Resolution Protocol
+In emerging telecom environments, network delays or delayed mobile money callbacks (e.g. Telebirr, CBE Birr) may deliver payment confirmation **after** the 10-minute pending hold has expired and the booking has been marked `cancelled`:
+1. **Guaranteed Ledger Recording**: The incoming collection webhook is ALWAYS recorded in `payment_transactions` with `status = 'succeeded'` and `raw_payload` logged. Money is NEVER unrecorded.
+2. **Re-Evaluation Under Court Asset Lock**:
+   - The worker acquires the court row lock:
+     `SELECT id FROM fields WHERE id = $fieldId FOR UPDATE;`
+   - Checks if the original slot is still unreserved:
+     ```sql
+     SELECT 1 FROM bookings 
+     WHERE field_id = $fieldId AND booking_date = $date 
+       AND status IN ('pending', 'confirmed') 
+       AND int4range(start_hour, end_hour) && int4range($start, $end);
+     ```
+3. **Branch A — Slot Still Free**:
+   - If no other player has booked the slot and no closure has been registered, the booking is revived:
+     ```sql
+     UPDATE bookings 
+     SET status = 'confirmed', updated_at = NOW() 
+     WHERE id = $bookingId;
+     ```
+   - An SMS confirmation is dispatched to the player with the booking confirmation voucher.
+4. **Branch B — Slot Already Taken by Another Player (Zero Double-Booking Guarantee)**:
+   - Under NO circumstance may the slot be double-booked. The booking remains `cancelled`.
+   - The system initiates an automated resolution:
+     - Enqueues an automated payment reversal / gateway refund task via Asynq.
+     - Issues a customer credit balance voucher credited to the player's account.
+     - Opens an urgent priority record in `support_cases` flagged `Late payment arrived post-cancellation - slot re-assigned`, alerting venue management and platform support.
 
 ---
 
