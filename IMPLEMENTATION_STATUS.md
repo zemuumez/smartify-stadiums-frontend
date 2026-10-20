@@ -706,8 +706,10 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
          c. Payment ledger, webhooks, reconciliation & refunds: immutable append-only ledger (`payment_transactions`), dynamic derivation function (`compute_booking_financials`), Ethiopian payment gateway webhook handlers (Telebirr, CBE Birr, Chapa) with HMAC-SHA256 signature verification, replay attack prevention, and strict refund bounds (`refund <= net_collected`). Commercial policy remains explicitly provisional and unapproved.
          d. Private media, consent, retention & processing queues: hardware camera certification protocol (`pending` -> `passed`), heartbeat telemetry monitoring, minor/academy guardian consent enforcement, automated face-blurring pipeline, signed private streaming URLs (60-minute expiry), and Redis Asynq priority queues with 30-day retention lifecycles.
          e. Deployment, observability, backups & integration acceptance tests: containerized topology, JSON structured logging with correlation IDs, Prometheus metrics, liveness/readiness probes, continuous WAL archiving with PITR, zero-downtime expand-and-contract migrations, and 8 automated integration acceptance test specifications (Testcontainers Go).
-    3. Status:
-       - Architectural specification completed and ready for formal founder/lead review prior to backend implementation.
+    3. Handoff & Review Guide (`BACKEND_HANDOFF.md`):
+       - Created pre-implementation review checklist, architectural decision rationale, and step-by-step M8 roadmap for founder and technical leads.
+    4. Status:
+       - Architectural specification and handoff guide completed, committed, and pushed on `codex/backend-architecture` for review.
 
 
 
