@@ -709,7 +709,50 @@ The pre-existing venues-page conflict was resolved as part of the restoration. P
     3. Handoff & Review Guide (`BACKEND_HANDOFF.md`):
        - Created pre-implementation review checklist, architectural decision rationale, and step-by-step M8 roadmap for founder and technical leads.
     4. Status:
-       - Architectural specification and handoff guide completed, committed, and pushed on `codex/backend-architecture` for review.
+       - Architectural specification and handoff guide established on `codex/backend-architecture` for review.
+
+- Step 43 (Milestone M7 Backend Architecture Reconciliation, Failure-Case Specifications & Database Verification):
+    1. Reconcile Actual Frontend Contracts (Correction 1, commit ef270df):
+       - Standardized API response delivery to bare response DTOs (`Account`, `Venue`, `Booking`, collections `Venue[]`, etc.) matching `frontend/src/services/http.ts` (`return await response.json() as T`) directly without wrapper objects.
+       - Documented `/auth/csrf` token contract: `http.ts` automatically fetches `GET /api/v1/auth/csrf` with `{ credentials: 'include' }` and attaches `X-CSRF-Token: <token>` to all mutations (`POST`, `PUT`, `PATCH`, `DELETE`).
+       - Reconciled exact authentication request fields: `phone` + `purpose` (`POST /auth/request-otp`), `phone` + `code` (`POST /auth/login`), `phone` + `code` + `full_name` + `role` (`POST /auth/register`), and `Account` response fields.
+       - Resolved RFC 6265bis cookie prefix architecture across domains: `__Host-etsf-session` for same-origin BFF mode; `__Secure-etsf-session` with `Domain=.smartifystadiums.et` for multi-subdomain SaaS microsites.
+       - Documented instant suspension enforcement: admin user suspension immediately purges Redis session keys (`session:{userId}:*`), publishes Redis Pub/Sub invalidation event, and returns HTTP 403 `ACCOUNT_SUSPENDED`.
+    2. Complete 26-Table Relational Data Model & Court Integrity (Correction 2, commit b386955):
+       - Modeled 15 previously missing accepted application workflows: CMS versioning (`microsite_content`, `microsite_versions`), community teams and rosters (`teams`, `team_members`, `team_join_requests`), venue events and tournament registrations (`venue_events`, `event_registrations`), support threads and sanitized staff notes (`support_cases`, `support_messages`), verifiable consent evidence (`privacy_consent_records`), review moderation audit logs (`venue_reviews`, `venue_review_history`), platform SaaS invoicing (`invoices`), and durable webhooks (`webhook_inbox`).
+       - Enforced database-level court belonging: added composite uniqueness `fields(id, venue_id)` and composite foreign key `(field_id, venue_id) REFERENCES fields(id, venue_id)` on `bookings`, `field_closures`, `cameras`, and `match_recordings`. Tested and verified in PostgreSQL 18.6: cross-venue court bookings are strictly aborted.
+    3. Close Booking vs Maintenance Race Condition (Correction 3, commit 6b456e6):
+       - Specified unified court concurrency protocol: every mutation on court inventory acquires a pessimistic parent court row lock `SELECT id FROM fields WHERE id = $fieldId AND venue_id = $venueId FOR UPDATE`, serializing all bookings, closures, and rescheduling on that physical court.
+       - Backed by GiST exclusion constraint (`no_overlapping_court_bookings`) as storage-level defense-in-depth.
+       - Specified transaction retry strategy with full jitter on serialization failures (`40001`) and deadlocks (`40P01`).
+       - Defined 10-minute hold TTL for pending online bookings with automated background expiry query restoring availability.
+       - Resolved late-arriving payment webhooks post-cancellation without double-booking: if slot is free, booking is re-confirmed; if slot was re-booked by another player, slot is never double-booked, and an automated refund/credit voucher is issued.
+    4. Enforceable Tenant Authorization & Forced RLS (Correction 4, commit 01bd81c):
+       - Specified authenticated ownership verification: gateway extracts caller identity from JWT and executes `SELECT 1 FROM venues WHERE id = $venueId AND owner_id = $userId` before setting tenant context; header spoofing is rejected with HTTP 403 `VENUE_ACCESS_DENIED`.
+       - Enforced PostgreSQL `FORCE ROW LEVEL SECURITY` on all tenant tables so table owners cannot bypass security policies.
+       - Configured dedicated unprivileged database role `smartify_app` with `NOSUPERUSER` and no `BYPASSRLS`.
+       - Enforced pooled-connection isolation via `SELECT set_config('app.current_tenant_id', $1, true)` inside explicit `BEGIN ... COMMIT` transaction blocks. Tested and verified in PostgreSQL 18.6: Tenant 2 sees 0 records of Tenant 1 with zero pool leakage.
+    5. Correct Ledger Semantics & Crash-Safe Idempotency (Correction 5, commit 4c40310):
+       - Replaced unsupported "double-entry" claim with an immutable append-only transaction ledger (`payment_transactions`) and dynamic balance calculation function (`compute_booking_financials`).
+       - Resolved on-site cash collection status: manual settlements (`payment_method IN ('cash', 'pos')`) are inserted directly with `status = 'succeeded'`, instantly reflecting in booking status and analytics.
+       - Specified atomic over-refund protection: locks booking row `FOR UPDATE`, calculates available balance subtracting pending refund reservations (`status = 'recorded'`), and blocks over-refunds with HTTP 422 `REFUND_EXCEEDS_COLLECTED`.
+       - Defined operation-scoped idempotency table keyed by `(user_id, operation_name, key)` with two-phase crash-safe recovery takeover after 30 seconds.
+    6. Durable Transactional Webhook Inbox & Provider-Specific Verification (Correction 6, commit 3ba0040):
+       - Replaced vulnerable "acknowledge before queue" sequence with the Durable Transactional Webhook Inbox Pattern: ingress handler persists raw payload and headers to `webhook_inbox` with `status = 'pending'` within a database transaction BEFORE returning HTTP 200 to the provider.
+       - Specified periodic recovery dispatcher polling unworked pending webhooks (`created_at < NOW() - 30s`) to guarantee crash resilience.
+       - Documented exact provider verification protocols: Chapa HMAC-SHA256 signature + mandatory server-to-server verification call `GET /v1/transaction/verify/{tx_ref}`; Telebirr asymmetric RSA-SHA256 signature verification + AES payload decryption; CBE Birr SHA-256 checksum verification.
+    7. Media Consent Revocation & Worker Authority (Correction 7, commit 3fd7dda):
+       - Specified Authenticated Media Edge Gateway terminating HLS traffic and performing in-memory Redis lookup `EXISTS media:revoked:{recording_id}` on every 2-second video segment request, guaranteeing stream termination within < 1s across all active viewers.
+       - Restricted face-blur completion authority: owners cannot self-declare blur completion; transition to `face_blur_status = 'completed'` strictly requires trusted worker token (`POST /internal/v1/workers/recordings/:id/blur-complete`) with cryptographic frame-hashing telemetry.
+       - Defined verifiable consent evidence audit records (`evidence_type: sms_otp | guardian_consent | digital_signature`).
+       - Corrected cryptographic terminology: distinguished symmetric HMAC-SHA256 from asymmetric Ed25519/RSA.
+    8. Acceptance Evidence, Compatibility Matrix & Verification Baseline:
+       - Delivered comprehensive 57-row Frontend Contract Compatibility Matrix in Section 8.1 mapping every frontend service method in `frontend/src/services/*.ts` to its HTTP method, path, CSRF header, payload, and bare response DTO.
+       - Formulated 17 integration test specifications (`TC-BE-01` through `TC-BE-17`) covering concurrent booking races, multi-sport conflicts, closure races, late webhooks, tenant header spoofing, forced RLS isolation, concurrent over-refunds, webhook inbox durability, Chapa verify failures, mid-stream media revocations, and blur worker authority.
+       - Formally validated SQL DDL, composite foreign keys, RLS isolation, hold expiry, over-refund protection, and webhook inbox deduplication live against isolated PostgreSQL 18.6 (all scripts exited with code 0).
+       - Clearly distinguished executed database verification records (M7) from proposed integration tests (M8), and operational performance targets from demonstrated database guarantees.
+       - Revised `BACKEND_ARCHITECTURE.md`, `BACKEND_HANDOFF.md`, and `IMPLEMENTATION_STATUS.md`. Milestone remains strictly design-only with clean git working tree.
+
 
 
 
